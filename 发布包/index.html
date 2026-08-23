@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>钢铁征途 坦克大战</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="game-shell">
+    <header class="topbar">
+      <div class="brand" aria-label="钢铁征途 坦克大战">
+        <span class="brand-mark">钢铁征途</span>
+        <span>坦克大战</span>
+      </div>
+      <div class="topbar-actions">
+        <span id="statusText" class="status-text">准备就绪</span>
+        <div class="music-volume-control">
+          <button id="musicButton" class="icon-button music-button" type="button" title="音乐音量 70%" aria-label="调节音乐音量，当前 70%" aria-expanded="false" aria-controls="musicVolumePanel">♫</button>
+          <div id="musicVolumePanel" class="music-volume-panel" hidden>
+            <label for="musicVolumeSlider"><span>音乐音量</span><output id="musicVolumeValue" for="musicVolumeSlider">70</output></label>
+            <input id="musicVolumeSlider" type="range" min="0" max="100" step="1" value="70" aria-label="背景音乐音量">
+          </div>
+        </div>
+        <button id="muteButton" class="icon-button" type="button" title="关闭音效" aria-label="关闭音效" aria-pressed="true">♪</button>
+        <button id="fullscreenButton" class="icon-button" type="button" title="全屏" aria-label="全屏">⛶</button>
+        <button id="pauseButton" class="icon-button" type="button" title="暂停" aria-label="暂停" disabled>Ⅱ</button>
+        <button id="resetButton" class="icon-button" type="button" title="返回主菜单" aria-label="返回主菜单">↻</button>
+        <button id="helpButton" class="icon-button help-button" type="button" title="帮助说明" aria-label="打开帮助说明" aria-expanded="false" aria-controls="helpPanel">?</button>
+      </div>
+    </header>
+
+    <section id="gameStage" class="game-stage" aria-label="游戏区域">
+      <canvas id="gameCanvas" width="1440" height="900" tabindex="0">你的浏览器不支持 Canvas，请使用新版 Chrome 或 Edge。</canvas>
+
+      <div class="hud" aria-hidden="true">
+        <div class="hud-item"><span>模式</span><strong id="modeValue">普通</strong></div>
+        <div id="levelHud" class="hud-item" hidden><span>关卡</span><strong id="levelValue">1 / 3</strong></div>
+        <div id="fieldSkillHud" class="hud-item field-skill-hud" hidden><span>场地技能</span><strong id="fieldSkillValue">--</strong></div>
+        <div id="crystalHud" class="hud-item crystal-hud" hidden><span>能源</span><strong id="crystalValue">0</strong></div>
+        <div class="hud-item"><span>命数</span><strong id="livesValue">2</strong></div>
+        <div class="hud-item"><span>生命</span><strong id="healthValue">100</strong></div>
+        <div class="hud-item"><span>敌军</span><strong id="enemyValue">--</strong></div>
+        <div class="hud-item"><span>得分</span><strong id="scoreValue">0000</strong></div>
+        <div class="hud-item"><span>连击</span><strong id="comboValue">--</strong></div>
+        <div class="hud-item"><span>装填</span><strong id="cooldownValue">READY</strong></div>
+        <div class="hud-item"><span>增益</span><strong id="powerValue">--</strong></div>
+      </div>
+
+      <section id="helpPanel" class="help-panel" hidden aria-labelledby="helpTitle">
+        <div class="help-dialog" role="dialog" aria-modal="false">
+          <header class="help-header">
+            <div>
+              <p class="eyebrow">战场手册 · XPZ</p>
+              <h2 id="helpTitle">帮助说明</h2>
+            </div>
+            <button id="helpCloseButton" class="help-close-button" type="button" title="关闭帮助" aria-label="关闭帮助">×</button>
+          </header>
+
+          <div class="help-content">
+            <section class="help-section help-page">
+              <h3>基础操作与战斗规则</h3>
+              <div class="help-grid">
+                <p><strong>移动</strong><span><kbd>W</kbd>/<kbd>S</kbd> 前进和后退，<kbd>A</kbd>/<kbd>D</kbd> 旋转车身。</span></p>
+                <p><strong>瞄准与开火</strong><span>鼠标控制炮塔方向；鼠标左键或 <kbd>Space</kbd> 发射。</span></p>
+                <p><strong>暂停</strong><span><kbd>P</kbd> 或 <kbd>Esc</kbd> 暂停/继续；切换到其他窗口时会自动暂停。</span></p>
+                <p><strong>地图与碰撞</strong><span>墙体会阻挡坦克和炮弹。砖墙可被炮弹击破，破坏后可能掉落场地能源。</span></p>
+              </div>
+            </section>
+
+            <section class="help-section help-page">
+              <h3>游戏模式</h3>
+              <div class="help-list">
+                <article><h4>普通模式</h4><p>4 辆普通敌军，玩家拥有 2 条命。第一次阵亡会在出生点重生并获得短暂无敌；击毁全部敌军即可胜利。</p></article>
+                <article><h4>挑战模式</h4><p>3 关连续战斗，每关 1 条命。敌军数量和强度逐关提升：4 / 6 / 8 辆，生命值为 75 / 100 / 125。任意一关失败后从第一关重新开始。</p></article>
+                <article><h4>无尽模式</h4><p>从第 1 关开始持续推进，敌军数量和属性逐渐成长。每关结束可选择强化；每 10 关重新抽取场地技能。第 10、20、30 关等会出现 BOSS。</p></article>
+                <article><h4>勇者行动</h4><p>每关只生成 1 名 BOSS。第 1、2、3 关分别对应无尽模式第 10、20、30 关的强度，连续击破 BOSS 才能推进。</p></article>
+              </div>
+            </section>
+
+            <section class="help-section help-page">
+              <h3>敌军单位</h3>
+              <div class="help-list">
+                <article><h4>普通坦克</h4><p>会巡逻、追踪、绕行和横向机动。进入攻击范围且炮塔完成瞄准后开火；墙体或其他敌军可能挡住射线。</p></article>
+                <article><h4>固定炮台</h4><p>不能移动，但火力覆盖更远：攻击范围为普通坦克的 2 倍，射击冷却基准为普通坦克的 85%。炮台即使在玩家当前屏幕之外，只要玩家进入其攻击范围，也可以瞄准和发射。炮台武器分为普通子弹、炸弹和迫击炮。</p></article>
+                <article><h4>精英坦克</h4><p>拥有更高生命和伤害，可能释放环形齐射，并会蓄力冲锋。无尽模式后期的精英还可能获得炸弹或迫击炮技能。</p></article>
+                <article><h4>BOSS 坦克</h4><p>拥有更高生命、伤害和正面护盾，并会使用多种技能：机枪齐射、炸弹、迫击炮、飞跃、激光和召唤虚影。技能会经历蓄力、效果和冷却阶段；迫击炮会沿玩家方向发射并在命中或触墙后爆炸。</p></article>
+              </div>
+            </section>
+
+            <section class="help-section help-page">
+              <h3>临时增益</h3>
+              <p class="help-note">无尽模式每关结束时从基础强化中三选一；临时效果只作用于下一关或当前关，具体以 HUD 状态为准。</p>
+              <div class="help-effect-grid">
+                <p><strong>钢铁意志</strong><span>提升生命上限，随选择关卡提高幅度。</span></p>
+                <p><strong>火力强化</strong><span>提升攻击力，随选择关卡提高幅度。</span></p>
+                <p><strong>快速装填</strong><span>射击速度提升 10%，可重复选择。</span></p>
+                <p><strong>战地维修</strong><span>本关首次受伤时，自动恢复生命上限的 40%。</span></p>
+                <p><strong>临时护盾</strong><span>本关获得 3 层护盾，每层可抵挡一次攻击。</span></p>
+                <p><strong>临时速射</strong><span>本关持续获得高速射击效果。</span></p>
+                <p><strong>透视</strong><span>本关用绿色箭头标记屏幕外敌军。</span></p>
+              </div>
+            </section>
+
+            <section class="help-section help-page">
+              <h3>永久效果</h3>
+              <p class="help-note">无尽模式每两关可从永久效果中选择一次，效果会保留到本次无尽挑战结束。</p>
+              <div class="help-effect-grid">
+                <p><strong>追踪弹</strong><span>子弹自动追踪标记目标，持续时间最高 5 秒。</span></p>
+                <p><strong>分裂弹</strong><span>发射扇形子弹，最多 5 颗，每颗造成当前攻击力的 70%。</span></p>
+                <p><strong>爆裂弹</strong><span>命中后产生碎片，碎片伤害最高为攻击力的 50%。</span></p>
+                <p><strong>信号干扰器</strong><span>周期性干扰敌军 0.95 秒，升级后冷却缩短。</span></p>
+                <p><strong>你跑不过我</strong><span>提升移动速度，最高提升 60%。</span></p>
+                <p><strong>勇者无畏</strong><span>每关开始提供一次性前方护盾，等级提升可抵挡次数。</span></p>
+                <p><strong>前车之鉴</strong><span>每次开火时向炮口方向安全冲刺一小段距离。</span></p>
+                <p><strong>后顾之忧</strong><span>每 2 秒向车尾发射消弹方块，方块在距车尾 100 像素处停止；等级越高可消除的敌方子弹越多。</span></p>
+                <p><strong>呼叫支援</strong><span>定期召唤支援飞机，初始冷却 24 秒，每级降低 3 秒，最低 9 秒。</span></p>
+                <p><strong>虚空行者</strong><span>允许短时间穿墙，单次在墙内停留时间有限。</span></p>
+              </div>
+            </section>
+
+            <section class="help-section help-page">
+              <h3>场地技能</h3>
+              <p class="help-note">仅无尽模式可用。每 10 关抽取一次，场地内的砖墙可能掉落能源。进入对应的 3×3 场地并收集足够能源后即可发动。</p>
+              <div class="help-list">
+                <article><h4>机械飞升</h4><p>消耗能源随机获得火力、穿透、治疗、装甲或贪婪效果；能源越多，可能获得的效果越强。</p></article>
+                <article><h4>不死图腾</h4><p>消耗能源获得复活机会。复活次数和效果随场地技能等级提升。</p></article>
+                <article><h4>密命王牌</h4><p>对敌军造成按其最大生命值计算的特殊伤害，等级越高消耗和效果越强。</p></article>
+                <article><h4>巫毒子弹</h4><p>开启毒痕效果，子弹命中敌军后施加持续伤害。</p></article>
+                <article><h4>天堂制造</h4><p>短时间提高移动能力并提供高速撞击效果，可用来突破障碍和冲击敌军。</p></article>
+                <article><h4>凛冽寒冬</h4><p>冻结并减缓全场敌军，短时间内压制敌军行动。</p></article>
+              </div>
+            </section>
+
+            <section class="help-section help-section-last help-page">
+              <h3>补给与 HUD</h3>
+              <p>维修包恢复生命；护盾补给提供 3 次伤害抵挡；快速装填提供短时速射；透视补给标记屏幕外敌军。顶部 HUD 会显示模式、关卡、能源、生命、敌军数量、装填状态和当前增益。</p>
+            </section>
+          </div>
+          <footer class="help-pagination" aria-label="帮助分页">
+            <button id="helpPreviousButton" class="help-page-button" type="button" title="上一页" aria-label="上一页">上一页</button>
+            <span id="helpPageIndicator" class="help-page-indicator" aria-live="polite">第 1 / 7 页</span>
+            <button id="helpNextButton" class="help-page-button" type="button" title="下一页" aria-label="下一页">下一页</button>
+          </footer>
+        </div>
+      </section>
+
+      <section id="menuPanel" class="overlay-panel menu-panel">
+        <p class="eyebrow">超级大运坦克</p>
+        <h1>钢铁征途 坦克大战</h1>
+        <p class="menu-copy">化身大运，向敌人发起冲锋！</p>
+        <div class="mode-selector" role="radiogroup" aria-label="游戏模式">
+          <button class="mode-option is-selected" type="button" data-mode="normal" role="radio" aria-checked="true">
+            <strong>普通模式</strong>
+            <span>2 条命 · 敌军反应较慢</span>
+          </button>
+          <button class="mode-option challenge-option" type="button" data-mode="challenge" role="radio" aria-checked="false">
+            <strong>挑战模式</strong>
+            <span>3 关连续作战 · 每关 1 条命</span>
+          </button>
+          <button class="mode-option endless-option" type="button" data-mode="endless" role="radio" aria-checked="false">
+            <strong>无尽模式</strong>
+            <span>5～8 辆敌军 · 逐关成长 · 随机构筑</span>
+          </button>
+          <button class="mode-option brave-option" type="button" data-mode="brave" role="radio" aria-checked="false">
+            <strong>勇者行动</strong>
+            <span>单挑 BOSS · 每关跨越 10 层强度</span>
+          </button>
+        </div>
+        <button id="startButton" class="primary-button" type="button">进入战场</button>
+        <div class="controls" aria-label="操作方式">
+          <span><kbd>WASD</kbd> 移动</span>
+          <span><kbd>鼠标</kbd> 瞄准</span>
+          <span><kbd>左键</kbd> 开火</span>
+          <span><kbd>Esc</kbd> 暂停</span>
+        </div>
+        <p id="recordSummary" class="record-summary">本机纪录：暂无</p>
+        <p class="identity">by 一杯静水 &amp; 徐同学infinity</p>
+      </section>
+
+      <section id="pausePanel" class="overlay-panel pause-panel" hidden>
+        <p class="eyebrow">战斗暂停</p>
+        <h2>已暂停</h2>
+        <div class="pause-actions">
+          <button id="resumeButton" class="primary-button" type="button">继续战斗</button>
+          <button id="pauseRestartButton" class="secondary-button" type="button">重新开始</button>
+          <button id="pauseMenuButton" class="secondary-button" type="button">返回主菜单</button>
+        </div>
+      </section>
+
+      <section id="countdownPanel" class="countdown-overlay" hidden aria-live="polite">
+        <span id="countdownValue">3</span>
+        <strong id="countdownLabel">准备战斗</strong>
+      </section>
+
+      <section id="fieldSkillRollPanel" class="overlay-panel field-skill-roll-panel" hidden>
+        <p class="eyebrow">无尽模式 · 场地技能</p>
+        <h2>抽取场地技能</h2>
+        <div id="fieldSkillWheel" class="field-skill-wheel" aria-label="场地技能轮盘">
+          <div id="fieldSkillWheelDisc" class="field-skill-wheel-disc">
+            <span class="wheel-icon wheel-icon-1" title="机械飞升" aria-label="机械飞升">
+              <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 8v10M32 46v10M8 32h10M46 32h10M15 15l7 7M42 42l7 7M49 15l-7 7M22 42l-7 7"/><path d="m32 18 5 5 7-1 3 7-5 5 1 7-7 3-5-5-7 1-3-7 5-5-1-7 7-3z"/><circle cx="32" cy="32" r="5"/></svg>
+            </span>
+            <span class="wheel-icon wheel-icon-2" title="不死图腾" aria-label="不死图腾">
+              <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 8 51 15v15c0 13-8 22-19 27C21 52 13 43 13 30V15L32 8Z"/><path d="M32 20v24M24 28l8-8 8 8M24 38h16"/></svg>
+            </span>
+            <span class="wheel-icon wheel-icon-3" title="密命王牌" aria-label="密命王牌">
+              <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 7 38 25l19 1-15 12 5 19-15-11-15 11 5-19L7 26l19-1 6-18Z"/><path d="M32 18v22M21 31h22"/></svg>
+            </span>
+            <span class="wheel-icon wheel-icon-4" title="巫毒子弹" aria-label="巫毒子弹">
+              <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 8c9 8 15 15 15 24a15 15 0 1 1-30 0c0-9 6-16 15-24Z"/><path d="M32 19v26M22 29l10 7 10-7M24 48h16"/></svg>
+            </span>
+            <span class="wheel-icon wheel-icon-5" title="天堂制造" aria-label="天堂制造">
+              <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M9 18h29v24H9zM38 27h10l7 8v7H38z"/><path d="M9 26h29M44 31h7M18 49h-4M50 49h-4"/><circle cx="18" cy="48" r="5"/><circle cx="50" cy="48" r="5"/></svg>
+            </span>
+            <span class="wheel-icon wheel-icon-6" title="凛冽寒冬" aria-label="凛冽寒冬">
+              <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 7v50M10 20l44 24M10 44l44-24M20 11l12 21-12 21M44 11 32 32l12 21"/><circle cx="32" cy="32" r="5"/></svg>
+            </span>
+          </div>
+          <button id="fieldSkillRollButton" class="field-skill-roll-button" type="button">开始</button>
+        </div>
+        <p id="fieldSkillRollStatus" class="field-skill-roll-status">每十关重新抽取一次</p>
+      </section>
+
+      <section id="rewardPanel" class="overlay-panel reward-panel" hidden>
+        <p class="eyebrow" id="rewardEyebrow">无尽模式 · 构筑奖励</p>
+        <h2 id="rewardTitle">选择一项强化</h2>
+        <p id="rewardSummary" class="level-clear-summary">第 1 关完成</p>
+        <div id="rewardOptions" class="reward-options"></div>
+      </section>
+
+      <section id="levelClearPanel" class="overlay-panel level-clear-panel" hidden>
+        <p class="eyebrow">挑战进度</p>
+        <h2>关卡完成</h2>
+        <p id="levelClearSummary" class="level-clear-summary">第 1 关已突破</p>
+        <div id="levelProgress" class="level-progress" aria-label="挑战关卡进度"></div>
+        <button id="nextLevelButton" class="primary-button" type="button">进入第 2 关</button>
+        <p class="level-warning">下一关重新补满生命，失败将从第一关重来</p>
+      </section>
+
+      <section id="victoryPanel" class="result-overlay victory-overlay" hidden>
+        <div class="result-burst" aria-hidden="true"></div>
+        <div class="trophy-scene" aria-hidden="true">
+          <span class="confetti confetti-a"></span>
+          <span class="confetti confetti-b"></span>
+          <span class="confetti confetti-c"></span>
+          <div class="trophy"><i></i></div>
+        </div>
+        <p class="result-kicker">校园防线守卫成功</p>
+        <h2>战斗胜利</h2>
+        <p class="result-score">最终得分 <strong id="victoryScore">0000</strong></p>
+        <p class="result-mode">完成模式：<strong id="victoryMode">普通模式</strong></p>
+        <div id="victoryStats" class="result-stats"></div>
+        <div class="result-actions">
+          <button class="primary-button retry-button" type="button">再次挑战</button>
+          <button class="secondary-button menu-button" type="button">返回主菜单</button>
+        </div>
+      </section>
+
+      <section id="defeatPanel" class="result-overlay defeat-overlay" hidden>
+        <div class="mist mist-a" aria-hidden="true"></div>
+        <div class="mist mist-b" aria-hidden="true"></div>
+        <div class="grave-scene" aria-hidden="true">
+          <div class="grave-moon"></div>
+          <div class="gravestone"><i>XPZ</i><b>任务失败</b></div>
+          <div class="grave-soil"></div>
+        </div>
+        <p class="result-kicker">防线失守</p>
+        <h2>战斗失败</h2>
+        <p class="result-score">本局得分 <strong id="defeatScore">0000</strong></p>
+        <p class="result-mode">本局模式：<strong id="defeatMode">普通模式</strong></p>
+        <div id="defeatStats" class="result-stats"></div>
+        <div class="result-actions">
+          <button class="primary-button retry-button" type="button">重新出击</button>
+          <button class="secondary-button menu-button" type="button">返回主菜单</button>
+        </div>
+      </section>
+    </section>
+
+    <footer class="footer-note">无需联网 · 双击即可运行 · 建议使用 Chrome 或 Edge</footer>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/collision.js"></script>
+  <script src="js/entities.js"></script>
+  <script src="js/cinematic.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/effects.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/field-skills.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
