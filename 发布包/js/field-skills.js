@@ -11,6 +11,27 @@
     return Config.fieldSkills.find(function (skill) { return skill.id === id; }) || null;
   }
 
+  var fieldSkillIconCache = {};
+
+  function getFieldSkillIcon(skill) {
+    if (!skill || !skill.icon || typeof Image === "undefined") { return null; }
+    if (!fieldSkillIconCache[skill.id]) {
+      fieldSkillIconCache[skill.id] = new Image();
+      fieldSkillIconCache[skill.id].src = skill.icon;
+    }
+    return fieldSkillIconCache[skill.id];
+  }
+
+  function getFieldSkillFrontIcon(skill) {
+    if (!skill || !skill.iconFront || typeof Image === "undefined") { return null; }
+    var cacheKey = skill.id + "Front";
+    if (!fieldSkillIconCache[cacheKey]) {
+      fieldSkillIconCache[cacheKey] = new Image();
+      fieldSkillIconCache[cacheKey].src = skill.iconFront;
+    }
+    return fieldSkillIconCache[cacheKey];
+  }
+
   function ensure(game) {
     if (game._fieldSkillStateReady) { return; }
     game._fieldSkillStateReady = true;
@@ -478,26 +499,66 @@
     var skill = this.getFieldSkill();
     if (!site || !skill) { return; }
     context.save();
-    context.fillStyle = "rgba(18, 25, 37, 0.72)";
-    context.fillRect(site.left - 6, site.top - 6, site.width + 12, site.height + 12);
+    context.fillStyle = "rgba(2, 7, 11, 0.58)";
+    context.shadowColor = "rgba(0, 0, 0, 0.72)";
+    context.shadowBlur = 20;
+    context.fillRect(site.left + 7, site.top + 11, site.width, site.height);
+    context.shadowBlur = 0;
+    context.fillStyle = "rgba(5, 11, 16, 0.88)";
+    context.fillRect(site.left - 6, site.top + site.height, site.width + 12, 10);
+    context.fillStyle = "rgba(255, 255, 255, 0.14)";
+    context.fillRect(site.left - 3, site.top - 3, site.width + 6, 5);
+    var icon = getFieldSkillIcon(skill);
+    if (icon && icon.complete && icon.naturalWidth > 0 && context.drawImage) {
+      context.globalAlpha = 0.94;
+      context.drawImage(icon, site.left, site.top, site.width, site.height);
+      context.globalAlpha = 1;
+    } else {
+      context.fillStyle = "rgba(18, 25, 37, 0.72)";
+      context.fillRect(site.left - 6, site.top - 6, site.width + 12, site.height + 12);
+    }
+    context.fillStyle = "rgba(6, 12, 18, 0.22)";
+    context.fillRect(site.left, site.top, site.width, site.height);
     context.strokeStyle = skill.color;
     context.lineWidth = 4;
     context.shadowColor = skill.color;
     context.shadowBlur = 18;
     context.strokeRect(site.left - 5, site.top - 5, site.width + 10, site.height + 10);
+    context.shadowBlur = 0;
+    context.strokeStyle = "rgba(255, 255, 255, 0.34)";
+    context.lineWidth = 2;
+    context.beginPath();
+    context.moveTo(site.left - 3, site.top - 3);
+    context.lineTo(site.left + site.width + 3, site.top - 3);
+    context.moveTo(site.left - 3, site.top - 3);
+    context.lineTo(site.left - 3, site.top + site.height + 3);
+    context.stroke();
     context.fillStyle = skill.color;
     context.font = "900 18px Microsoft YaHei, sans-serif";
     context.textAlign = "center";
     context.fillText(skill.label, site.centerX, site.top - 14);
-    var symbols = { mechanicalAscension: "⚙", undyingTotem: "†", trumpCard: "★", voodooBullet: "☣", bitterWinter: "❄" };
-    context.globalAlpha = 0.42;
+    context.globalAlpha = icon && icon.complete && icon.naturalWidth > 0 ? 0.9 : 0.42;
     context.font = "900 66px Segoe UI Symbol, sans-serif";
     context.textBaseline = "middle";
-    if (skill.id === "paradiseMade") {
-      drawParadiseTruckIcon(context, site.centerX, site.centerY + 2, skill.color);
-    } else {
-      context.fillText(symbols[skill.id] || "◆", site.centerX, site.centerY + 2);
+    if (!(icon && icon.complete && icon.naturalWidth > 0)) {
+      var symbols = { mechanicalAscension: "⚙", undyingTotem: "†", trumpCard: "★", voodooBullet: "☣", bitterWinter: "❄" };
+      if (skill.id === "paradiseMade") {
+        drawParadiseTruckIcon(context, site.centerX, site.centerY + 2, skill.color);
+      } else {
+        context.fillText(symbols[skill.id] || "◆", site.centerX, site.centerY + 2);
+      }
     }
+    context.restore();
+  };
+
+  Game.prototype.drawFieldSiteFront = function (context) {
+    var site = this.fieldSite;
+    var skill = this.getFieldSkill();
+    var icon = getFieldSkillFrontIcon(skill);
+    if (!site || !skill || !icon || !icon.complete || icon.naturalWidth <= 0 || !context.drawImage) { return; }
+    context.save();
+    context.globalAlpha = 0.98;
+    context.drawImage(icon, site.left, site.top, site.width, site.height);
     context.restore();
   };
 

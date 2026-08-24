@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 288">
+  <defs><linearGradient id="ice" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#29465a"/><stop offset=".5" stop-color="#183242"/><stop offset="1" stop-color="#0e1d2c"/></linearGradient><filter id="frost"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="drop" x="-25%" y="-25%" width="150%" height="170%"><feDropShadow dx="6" dy="9" stdDeviation="3" flood-color="#071521" flood-opacity=".84"/></filter></defs>
+  <!-- Layer 1: frozen yard -->
+  <rect width="288" height="288" fill="url(#ice)"/><path d="M0 206 49 171l51 21 48-30 63 29 77-42v139H0Z" fill="#31576a"/><path d="M0 65h288M0 133h288M0 229h288M48 0l34 288M231 0l-31 288" stroke="#72a9ba" stroke-width="7" opacity=".46"/><g fill="#bfeeff" opacity=".75"><path d="m35 192 14-24 14 24-14 25Z"/><path d="m227 167 18-31 18 31-18 30Z"/></g>
+  <ellipse cx="145" cy="238" rx="94" ry="18" fill="#071521" opacity=".62"/>
+  <!-- Layer 2: frozen artillery and immobilized enemy -->
+  <g stroke="#112332" stroke-width="8" stroke-linejoin="round" filter="url(#drop)">
+    <path d="M42 235h204l-16 26H58Z" fill="#172938"/><rect x="71" y="191" width="151" height="42" fill="#708d99"/><path d="M85 191v-45h104l27 45" fill="#4a6878"/><path d="M110 146 130 116h39l18 30" fill="#84a6ae"/><path d="M144 116V91"/><path d="M136 91h16V73h-16Z" fill="#caeff8"/><circle cx="144" cy="173" r="22" fill="#9edcff" filter="url(#frost)"/><path d="M144 154v38M125 173h38M131 160l26 26M157 160l-26 26" stroke="#ecfbff" stroke-width="5"/><path d="M101 211h33m20 0h34" stroke="#d2f5ff" stroke-width="5"/>
+  </g>
+  <path d="M71 191h151l-13 8H84Z" fill="#effcff" opacity=".3"/>
+  <path d="M71 233h151l-14 16H85Z" fill="#081824" opacity=".78"/>
+  <!-- Layer 3: snow curtains and frost crystal -->
+  <g fill="none" stroke="#9edcff" stroke-width="5" opacity=".8" filter="url(#frost)"><path d="M20 42c37 19 37 51 0 70m248-70c-37 19-37 51 0 70M18 130c47 20 47 60 0 80m252-80c-47 20-47 60 0 80"/><path d="m144 12 16 32-16 28-16-28Z"/><path d="M144 225v47M108 248l36 24 36-24"/></g>
+</svg>

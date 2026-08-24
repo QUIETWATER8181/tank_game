@@ -48,9 +48,10 @@
     reserveArea(reserved, to.column - half, Math.min(from.row, to.row), to.column + width - half - 1, Math.max(from.row, to.row));
   }
 
-  function isBlockedCell(cells, column, row) {
+  function isBlockedCell(cells, column, row, bossMap) {
     if (row < 0 || row >= cells.length || column < 0 || column >= cells[0].length) { return true; }
-    return ["#", "B", "I", "W"].indexOf(cells[row][column]) !== -1;
+    var blocked = ["#", "B", "I", "W"];
+    return blocked.indexOf(cells[row][column]) !== -1;
   }
 
   function cellKey(cell) {
@@ -76,17 +77,18 @@
       options = options || {};
       var baseSeed = Number.isFinite(Number(options.seed)) ? Number(options.seed) >>> 0 : 1;
       var level = Math.max(1, Math.floor(Number(options.level) || 1));
+      var bossMap = Boolean(options.bossMap || options.mode === "brave" || (options.mode === "endless" && level % 10 === 0));
       var result = null;
       for (var attempt = 0; attempt < 8; attempt += 1) {
-        result = this.generate(baseSeed, level, attempt, false);
+        result = this.generate(baseSeed, level, attempt, false, bossMap);
         if (this.validate(result).valid) { return result; }
       }
-      result = this.generate(baseSeed, level, 8, true);
+      result = this.generate(baseSeed, level, 8, true, bossMap);
       result.usedFallback = true;
       return result;
     },
 
-    generate: function (baseSeed, level, attempt, fallback) {
+    generate: function (baseSeed, level, attempt, fallback, bossMap) {
       var columns = this.columns;
       var rows = this.rows;
       var cells = makeGrid(rows, columns, ".");
@@ -213,16 +215,31 @@
       }
 
       var decorations = [];
-      for (var decorationIndex = 0; decorationIndex < Math.floor(columns * rows * 0.012); decorationIndex += 1) {
+      var decorationDensity = bossMap ? 0.029 : 0.012;
+      var decorationKinds = bossMap ? ["deadGrass", "deadGrass", "scorchedRoot", "rock", "crate", "sandbag"] : ["rock", "bush", "crate", "sandbag"];
+      for (var decorationIndex = 0; decorationIndex < Math.floor(columns * rows * decorationDensity); decorationIndex += 1) {
         var decorationColumn = 2 + Math.floor(random() * (columns - 4));
         var decorationRow = 3 + Math.floor(random() * (rows - 6));
         if (reserved[decorationRow][decorationColumn] || cells[decorationRow][decorationColumn] !== ".") { continue; }
         decorations.push({
           x: (decorationColumn + 0.5) * this.tileSize,
           y: (decorationRow + 0.5) * this.tileSize,
-          kind: ["rock", "bush", "crate", "sandbag"][Math.floor(random() * 4)],
+          kind: decorationKinds[Math.floor(random() * decorationKinds.length)],
           scale: 0.72 + random() * 0.42
         });
+      }
+
+      var firePatches = [];
+      if (bossMap && !fallback) {
+        for (var fireTry = 0; fireTry < 420 && firePatches.length < 22; fireTry += 1) {
+          var fireColumn = 2 + Math.floor(random() * (columns - 4));
+          var fireRow = 3 + Math.floor(random() * (rows - 6));
+          if (reserved[fireRow][fireColumn] || cells[fireRow][fireColumn] !== ".") { continue; }
+          var fireX = (fireColumn + 0.5) * this.tileSize;
+          var fireY = (fireRow + 0.5) * this.tileSize;
+          if (firePatches.some(function (patch) { return Math.hypot(patch.x - fireX, patch.y - fireY) < 82; })) { continue; }
+          firePatches.push({ x: fireX, y: fireY, radius: 26 + Math.floor(random() * 10), seed: Math.floor(random() * 100000) });
+        }
       }
 
       cells[2][12] = "B";
@@ -234,6 +251,7 @@
         cells: cells,
         decorations: decorations,
         obstacles: [],
+        driedGround: [],
         obstacleGrid: makeGrid(rows, columns, null),
         navigationRevision: 0,
         seed: seed,
@@ -241,7 +259,9 @@
         generationAttempt: attempt,
         usedFallback: Boolean(fallback),
         isLargeWorld: true,
-        terrainStyle: "pixel-campus",
+        isBossMap: Boolean(bossMap),
+        terrainStyle: bossMap ? "battlefield-wasteland" : "pixel-campus",
+        firePatches: firePatches,
         bossArena: {
           x: arenaCells.left * this.tileSize,
           y: arenaCells.top * this.tileSize,
@@ -378,7 +398,9 @@
       if (index !== -1) {
         worldMap.obstacles.splice(index, 1);
         worldMap.cells[obstacle.row][obstacle.column] = ".";
-        worldMap.obstacleGrid[obstacle.row][obstacle.column] = null;
+        if (worldMap.obstacleGrid && worldMap.obstacleGrid[obstacle.row]) {
+          worldMap.obstacleGrid[obstacle.row][obstacle.column] = null;
+        }
         worldMap.navigationRevision += 1;
         worldMap._obstacleGridCount = worldMap.obstacles.length;
       }
@@ -387,13 +409,90 @@
     draw: function (context, worldMap, bounds) {
       var self = this;
       this.drawWater(context, worldMap, bounds);
+      this.drawDriedGround(context, worldMap, bounds);
       this.drawDecorations(context, worldMap, bounds);
       this.drawStonePlatform(context, worldMap);
       var obstacles = bounds ? this.queryObstacles(worldMap, bounds.left, bounds.top, bounds.right, bounds.bottom) : worldMap.obstacles;
       obstacles.forEach(function (obstacle) {
         if (obstacle.kind !== "W") { self.drawObstacle(context, obstacle, worldMap); }
       });
+      this.drawFirePatches(context, worldMap, bounds);
       this.drawSpawnMarkers(context, worldMap);
+    },
+
+    drawOverview: function (context, worldMap, bounds) {
+      var self = this;
+      var obstacles = this.queryObstacles(worldMap, bounds.left, bounds.top, bounds.right, bounds.bottom);
+      context.save();
+      context.globalAlpha = 0.88;
+      context.fillStyle = worldMap.isBossMap ? "#514b44" : "#717970";
+      if (worldMap.bossArena) {
+        context.fillRect(worldMap.bossArena.x, worldMap.bossArena.y, worldMap.bossArena.width, worldMap.bossArena.height);
+      }
+      obstacles.forEach(function (obstacle) {
+        if (obstacle.kind === "W") {
+          context.fillStyle = worldMap.isBossMap ? "#554238" : "#3d7180";
+        } else if (obstacle.kind === "B") {
+          context.fillStyle = worldMap.isBossMap ? "#6b4432" : "#8a493d";
+        } else if (obstacle.kind === "#" || obstacle.kind === "I") {
+          context.fillStyle = worldMap.isBossMap ? "#3d3d3a" : "#6a7778";
+        } else {
+          context.fillStyle = "#56615e";
+        }
+        context.fillRect(obstacle.x + 2, obstacle.y + 2, obstacle.width - 4, obstacle.height - 4);
+      });
+      if (worldMap.bossArena) {
+        context.strokeStyle = worldMap.isBossMap ? "#c29a6f" : "#d9e2d4";
+        context.lineWidth = 12;
+        context.strokeRect(worldMap.bossArena.x, worldMap.bossArena.y, worldMap.bossArena.width, worldMap.bossArena.height);
+      }
+      context.restore();
+    },
+
+    drawFirePatches: function (context, worldMap, bounds) {
+      if (!worldMap.isBossMap) { return; }
+      (worldMap.firePatches || []).forEach(function (patch) {
+        if (bounds && (patch.x + patch.radius < bounds.left || patch.x - patch.radius > bounds.right || patch.y + patch.radius < bounds.top || patch.y - patch.radius > bounds.bottom)) { return; }
+        var now = performance.now();
+        context.save();
+        context.globalAlpha = 0.42; context.fillStyle = "#7a2419"; context.shadowColor = "#ff4d1f"; context.shadowBlur = 18;
+        context.beginPath(); context.arc(patch.x, patch.y, patch.radius * (0.9 + Math.sin(now / 150 + patch.seed) * 0.08), 0, Math.PI * 2); context.fill();
+        for (var flameIndex = 0; flameIndex < 9; flameIndex += 1) {
+          var angle = flameIndex * 0.73 + patch.seed; var distance = patch.radius * (0.22 + (flameIndex % 4) * 0.15);
+          var flameX = patch.x + Math.cos(angle) * distance; var flameY = patch.y + Math.sin(angle) * distance;
+          var flameHeight = 10 + (flameIndex % 3) * 5 + Math.sin(now / 110 + flameIndex) * 3;
+          context.globalAlpha = 0.72; context.fillStyle = flameIndex % 2 ? "#ff9a32" : "#ffd166"; context.beginPath();
+          context.moveTo(flameX, flameY + 9); context.quadraticCurveTo(flameX - 8, flameY - flameHeight * 0.1, flameX - 1, flameY - flameHeight); context.quadraticCurveTo(flameX + 8, flameY - flameHeight * 0.35, flameX, flameY + 9); context.fill();
+        }
+        context.restore();
+      });
+    },
+
+    drawDriedGround: function (context, worldMap, bounds) {
+      var size = this.tileSize;
+      (worldMap.driedGround || []).forEach(function (cell) {
+        if (bounds && (cell.x + size < bounds.left || cell.x > bounds.right ||
+            cell.y + size < bounds.top || cell.y > bounds.bottom)) { return; }
+        context.save();
+        context.fillStyle = "#a88a4f";
+        context.fillRect(cell.x, cell.y, size, size);
+        context.fillStyle = "rgba(221, 190, 103, 0.5)";
+        context.fillRect(cell.x + 5, cell.y + 7, size - 10, 4);
+        context.strokeStyle = "rgba(86, 65, 38, 0.7)";
+        context.lineWidth = 2;
+        context.beginPath();
+        context.moveTo(cell.x + 10, cell.y + 18);
+        context.lineTo(cell.x + 24, cell.y + 26);
+        context.lineTo(cell.x + 17, cell.y + 39);
+        context.moveTo(cell.x + 39, cell.y + 22);
+        context.lineTo(cell.x + 31, cell.y + 34);
+        context.lineTo(cell.x + 46, cell.y + 48);
+        context.stroke();
+        context.fillStyle = "rgba(231, 207, 126, 0.55)";
+        context.fillRect(cell.x + 8, cell.y + 47, 4, 3);
+        context.fillRect(cell.x + 42, cell.y + 11, 3, 3);
+        context.restore();
+      });
     },
 
     drawWater: function (context, worldMap, bounds) {
@@ -403,6 +502,7 @@
         return obstacle.kind === "W";
       });
       if (!waterCells.length) { return; }
+      if (worldMap.isBossMap) { this.drawDriedRiverbed(context, worldMap, waterCells, bounds); return; }
 
       var waterAt = function (column, row) {
         return cells[row] && cells[row][column] === "W";
@@ -538,15 +638,128 @@
       context.restore();
     },
 
+    drawDriedRiverbed: function (context, worldMap, waterCells, bounds) {
+      var size = this.tileSize;
+      var cells = worldMap.cells;
+      var isRiver = function (column, row) { return cells[row] && cells[row][column] === "W"; };
+      var hash = function (column, row, salt) { return hash2(column, row, worldMap.seed + salt); };
+      var minX = waterCells[0].x;
+      var minY = waterCells[0].y;
+      var maxX = waterCells[0].x + size;
+      var maxY = waterCells[0].y + size;
+      waterCells.forEach(function (cell) {
+        minX = Math.min(minX, cell.x); minY = Math.min(minY, cell.y);
+        maxX = Math.max(maxX, cell.x + size); maxY = Math.max(maxY, cell.y + size);
+      });
+
+      // Fill the connected riverbed as one clipped surface. Internal cell edges
+      // never receive a border, so neighboring cells remain visually seamless.
+      context.save();
+      context.beginPath();
+      waterCells.forEach(function (cell) { context.rect(cell.x, cell.y, size, size); });
+      context.clip();
+      context.fillStyle = "#28221f";
+      context.fillRect(minX - 2, minY - 2, maxX - minX + 4, maxY - minY + 4);
+      context.fillStyle = "#896b4f";
+      context.fillRect(minX, minY, maxX - minX, maxY - minY);
+      waterCells.forEach(function (cell) {
+        context.fillStyle = hash(cell.column, cell.row, 817) > 0.5 ? "#a88763" : "#795b45";
+        context.fillRect(cell.x + 1, cell.y + 1, size - 2, size - 2);
+        context.strokeStyle = "rgba(67, 45, 34, 0.78)";
+        context.lineWidth = 2;
+        context.beginPath();
+        context.moveTo(cell.x + 7, cell.y + 25);
+        context.lineTo(cell.x + 18, cell.y + 19);
+        context.lineTo(cell.x + 28, cell.y + 31);
+        context.lineTo(cell.x + 39, cell.y + 21);
+        context.lineTo(cell.x + 52, cell.y + 29);
+        context.moveTo(cell.x + 18, cell.y + 52);
+        context.lineTo(cell.x + 25, cell.y + 40);
+        context.lineTo(cell.x + 37, cell.y + 43);
+        context.stroke();
+        if (hash(cell.column, cell.row, 881) > 0.42) {
+          context.fillStyle = "#4b382d";
+          context.beginPath();
+          context.moveTo(cell.x + 8, cell.y + 48);
+          context.lineTo(cell.x + 19, cell.y + 38);
+          context.lineTo(cell.x + 27, cell.y + 49);
+          context.lineTo(cell.x + 42, cell.y + 39);
+          context.lineTo(cell.x + 52, cell.y + 51);
+          context.closePath();
+          context.fill();
+        }
+      });
+      context.restore();
+
+      // Only the outside perimeter gets the recessed vertical bank.
+      context.save();
+      context.lineJoin = "round";
+      waterCells.forEach(function (cell) {
+        var north = !isRiver(cell.column, cell.row - 1);
+        var east = !isRiver(cell.column + 1, cell.row);
+        var south = !isRiver(cell.column, cell.row + 1);
+        var west = !isRiver(cell.column - 1, cell.row);
+        var drawHorizontalBank = function (top) {
+          var edgeY = cell.y + (top ? 0 : size);
+          var direction = top ? -1 : 1;
+          var depth = 12 + Math.round(hash(cell.column * 7 + 1, cell.row * 5 + 2, top ? 991 : 997) * 7);
+          context.fillStyle = "#2b211c";
+          context.beginPath();
+          context.moveTo(cell.x, edgeY);
+          context.lineTo(cell.x + size, edgeY);
+          context.lineTo(cell.x + size, edgeY + direction * depth);
+          context.lineTo(cell.x, edgeY + direction * (depth - 3));
+          context.closePath();
+          context.fill();
+          context.strokeStyle = "#9b7653";
+          context.lineWidth = 3;
+          context.beginPath();
+          context.moveTo(cell.x, edgeY + direction * 2);
+          context.lineTo(cell.x + 14, edgeY + direction * 5);
+          context.lineTo(cell.x + 28, edgeY + direction * 3);
+          context.lineTo(cell.x + 44, edgeY + direction * 7);
+          context.lineTo(cell.x + size, edgeY + direction * 4);
+          context.stroke();
+        };
+        var drawVerticalBank = function (left) {
+          var edgeX = cell.x + (left ? 0 : size);
+          var direction = left ? -1 : 1;
+          var depth = 12 + Math.round(hash(cell.column * 3 + 4, cell.row * 9 + 3, left ? 1001 : 1007) * 7);
+          context.fillStyle = "#2b211c";
+          context.beginPath();
+          context.moveTo(edgeX, cell.y);
+          context.lineTo(edgeX, cell.y + size);
+          context.lineTo(edgeX + direction * depth, cell.y + size);
+          context.lineTo(edgeX + direction * (depth - 3), cell.y);
+          context.closePath();
+          context.fill();
+          context.strokeStyle = "#9b7653";
+          context.lineWidth = 3;
+          context.beginPath();
+          context.moveTo(edgeX + direction * 3, cell.y);
+          context.lineTo(edgeX + direction * 6, cell.y + 14);
+          context.lineTo(edgeX + direction * 3, cell.y + 30);
+          context.lineTo(edgeX + direction * 7, cell.y + 46);
+          context.lineTo(edgeX + direction * 4, cell.y + size);
+          context.stroke();
+        };
+        if (north) { drawHorizontalBank(true); }
+        if (east) { drawVerticalBank(false); }
+        if (south) { drawHorizontalBank(false); }
+        if (west) { drawVerticalBank(true); }
+      });
+      context.restore();
+    },
+
     drawStonePlatform: function (context, worldMap) {
       var arena = worldMap.bossArena;
       var size = this.tileSize;
       context.save();
       context.fillStyle = "#26312f";
       context.fillRect(arena.x - 3, arena.y + 6, arena.width + 6, arena.height + 5);
-      context.fillStyle = "#717970";
+      context.fillStyle = worldMap.isBossMap ? "#514b44" : "#717970";
       context.fillRect(arena.x, arena.y, arena.width, arena.height);
-      context.fillStyle = "#9da095";
+      context.fillStyle = worldMap.isBossMap ? "#84786a" : "#9da095";
       context.fillRect(arena.x + 5, arena.y + 5, arena.width - 10, arena.height - 10);
       for (var row = 0; row < arena.height / size; row += 1) {
         for (var column = 0; column < arena.width / size; column += 1) {
@@ -570,8 +783,8 @@
           context.moveTo(tileX + 3, tileY + 4);
           context.lineTo(tileX + 3, tileY + size - 5);
           context.stroke();
-          if (tone < 0.32) {
-            context.strokeStyle = "rgba(54, 61, 57, 0.42)";
+          if (tone < (worldMap.isBossMap ? 0.64 : 0.32)) {
+            context.strokeStyle = worldMap.isBossMap ? "rgba(42, 29, 24, 0.8)" : "rgba(54, 61, 57, 0.42)";
             context.lineWidth = 2;
             context.beginPath();
             context.moveTo(tileX + 14, tileY + 19);
@@ -582,10 +795,10 @@
           }
         }
       }
-      context.strokeStyle = "rgba(231, 237, 224, 0.75)";
+      context.strokeStyle = worldMap.isBossMap ? "rgba(211, 165, 108, 0.42)" : "rgba(231, 237, 224, 0.75)";
       context.lineWidth = 3;
       context.strokeRect(arena.x + 4.5, arena.y + 4.5, arena.width - 9, arena.height - 9);
-      context.strokeStyle = "rgba(29, 37, 35, 0.6)";
+      context.strokeStyle = worldMap.isBossMap ? "rgba(31, 23, 20, 0.86)" : "rgba(29, 37, 35, 0.6)";
       context.lineWidth = 5;
       context.strokeRect(arena.x + 1.5, arena.y + 1.5, arena.width - 3, arena.height - 3);
       context.restore();
@@ -624,6 +837,24 @@
           context.fillRect(-9, -8, 5, 3); context.fillRect(1, -14, 5, 3); context.fillRect(7, -1, 5, 3);
           context.fillStyle = "rgba(9, 34, 21, 0.8)";
           context.fillRect(-14, 8, 25, 5);
+        } else if (decoration.kind === "deadGrass") {
+          context.shadowBlur = 5;
+          context.strokeStyle = "#9e845e";
+          context.lineWidth = 3;
+          context.beginPath();
+          context.moveTo(-14, 15); context.lineTo(-7, -14);
+          context.moveTo(-4, 16); context.lineTo(1, -19);
+          context.moveTo(5, 15); context.lineTo(13, -13);
+          context.moveTo(12, 15); context.lineTo(19, -7);
+          context.stroke();
+        } else if (decoration.kind === "scorchedRoot") {
+          context.strokeStyle = "#3a2922";
+          context.lineWidth = 5;
+          context.beginPath();
+          context.moveTo(-3, 18); context.lineTo(-5, -4); context.lineTo(-19, -19);
+          context.moveTo(-5, 0); context.lineTo(10, -17);
+          context.moveTo(-4, 8); context.lineTo(15, 1);
+          context.stroke();
         } else if (decoration.kind === "crate") {
           context.fillStyle = "#573b2c"; context.fillRect(-16, -16, 32, 32);
           context.fillStyle = "#8f5f3d"; context.fillRect(-13, -13, 26, 26);
@@ -643,11 +874,70 @@
       });
     },
 
+    drawBossFence: function (context, obstacle, breakable) {
+      var x = obstacle.x;
+      var y = obstacle.y;
+      var size = this.tileSize;
+      context.save();
+      context.shadowColor = "rgba(0, 0, 0, 0.7)";
+      context.shadowBlur = 0;
+      context.shadowOffsetX = 5;
+      context.shadowOffsetY = 7;
+      context.fillStyle = "#241c19";
+      context.fillRect(x + 3, y + 7, size - 4, size - 5);
+      context.shadowColor = "transparent";
+      if (breakable) {
+        context.fillStyle = "#6d4930";
+        context.fillRect(x + 5, y + 5, size - 10, size - 11);
+        context.strokeStyle = "#c18a52";
+        context.lineWidth = 4;
+        context.beginPath();
+        context.moveTo(x + 9, y + 52); context.lineTo(x + 20, y + 8);
+        context.moveTo(x + 30, y + 54); context.lineTo(x + 35, y + 6);
+        context.moveTo(x + 50, y + 52); context.lineTo(x + 46, y + 8);
+        context.stroke();
+        context.strokeStyle = "rgba(39, 26, 20, 0.8)";
+        context.lineWidth = 3;
+        context.beginPath();
+        context.moveTo(x + 4, y + 22); context.lineTo(x + 56, y + 29);
+        context.moveTo(x + 4, y + 40); context.lineTo(x + 56, y + 34);
+        context.stroke();
+        context.strokeStyle = "rgba(236, 179, 105, 0.5)";
+        context.lineWidth = 1.5;
+        context.strokeRect(x + 7, y + 7, size - 14, size - 14);
+      } else {
+        context.fillStyle = "#3d4545";
+        context.fillRect(x + 6, y + 6, size - 12, size - 12);
+        context.strokeStyle = "#9da6a2";
+        context.lineWidth = 4;
+        context.beginPath();
+        context.moveTo(x + 10, y + 54); context.lineTo(x + 10, y + 6);
+        context.moveTo(x + 30, y + 54); context.lineTo(x + 30, y + 6);
+        context.moveTo(x + 50, y + 54); context.lineTo(x + 50, y + 6);
+        context.stroke();
+        context.strokeStyle = "#202827";
+        context.lineWidth = 4;
+        context.beginPath();
+        context.moveTo(x + 5, y + 18); context.lineTo(x + 55, y + 18);
+        context.moveTo(x + 5, y + 39); context.lineTo(x + 55, y + 39);
+        context.stroke();
+        context.strokeStyle = "rgba(223, 233, 222, 0.42)";
+        context.lineWidth = 1.5;
+        context.strokeRect(x + 7, y + 7, size - 14, size - 14);
+      }
+      context.restore();
+    },
+
     drawObstacle: function (context, obstacle, worldMap) {
       var x = obstacle.x;
       var y = obstacle.y;
       var size = this.tileSize;
       context.save();
+      if (worldMap && worldMap.isBossMap && ["#", "B", "I"].indexOf(obstacle.kind) !== -1) {
+        context.restore();
+        this.drawBossFence(context, obstacle, obstacle.kind === "B");
+        return;
+      }
       if (obstacle.kind === "#") {
         context.shadowColor = "rgba(0, 0, 0, 0.6)"; context.shadowBlur = 0; context.shadowOffsetX = 5; context.shadowOffsetY = 6;
         context.fillStyle = "#253137"; context.fillRect(x + 2, y + 4, size - 4, size - 4);

@@ -14,6 +14,15 @@
     identity: "钢铁征途",
     backgroundMusic: "music/MEGALOVANIA-Toby Fox.mp3",
     bossBackgroundMusic: "music/boss-legacy-theme.mp3",
+    bossMeteor: Object.freeze({
+      damage: 100,
+      radius: 100,
+      minimumInterval: 2,
+      maximumInterval: 30,
+      minimumCount: 1,
+      maximumCount: 3,
+      duration: 2
+    }),
     cinematicSoundEffects: Object.freeze({
       rotor: "assets/audio/cinematic/helicopter-rotor.mp3",
       pilot: "assets/audio/cinematic/helicopter-pilot.mp3"
@@ -42,14 +51,17 @@
     playerFireCooldown: 0.38,
     enemyFireCooldown: 1.45,
     fixedTurret: Object.freeze({
-      spawnChance: 0.1,
+      spawnChance: 0.15,
       healthMultiplier: 1.3,
       attackRangeMultiplier: 2,
       fireCooldownMultiplier: 0.85,
-      bombRadius: 80,
-      mortarRadius: 80,
+      bombRadius: 120,
+      mortarRadius: 120,
       projectileSpeedMultiplier: 0.58,
-      weaponBreakpoints: Object.freeze({ bullet: 0.5, bomb: 0.8 })
+      mortarWarningDuration: 0.7,
+      mortarFlightDuration: 0.7,
+      mortarWarningRadius: 50,
+      weaponBreakpoints: Object.freeze({ bullet: 0.1, bomb: 0.6 })
     }),
     eliteTank: Object.freeze({
       scale: 1.1,
@@ -126,6 +138,43 @@
         strafeChance: 0.62, preferredRange: 350
       })
     }),
+    partsSettlement: Object.freeze({
+      normal: Object.freeze({ scorePerParts: 500, partsPerStep: 10, victoryBonus: 30 }),
+      challenge: Object.freeze({ scorePerParts: 300, partsPerStep: 10, victoryMultiplier: 2 }),
+      endless: Object.freeze({ scorePerParts: 1000, partsPerStep: 10, scoreMultiplierInterval: 5, scoreMultiplier: 1.2 }),
+      brave: Object.freeze({ scorePerParts: 150, partsPerStep: 10, scoreMultiplier: 2 })
+    }),
+    shop: Object.freeze({
+      categories: Object.freeze([
+        Object.freeze({ id: "upgrades", label: "强化" }),
+        Object.freeze({ id: "boosts", label: "增益" }),
+        Object.freeze({ id: "items", label: "道具" }),
+        Object.freeze({ id: "skins", label: "皮肤" })
+      ]),
+      upgrades: Object.freeze([
+        Object.freeze({ id: "health", label: "基础血量", description: "无尽模式和勇者行动中，基础血量 +25。", baseCost: 100, costStep: 25, maxLevel: 9999, allowedModes: ["endless", "brave"], effect: "+25 生命" }),
+        Object.freeze({ id: "attack", label: "基础攻击力", description: "无尽模式和勇者行动中，基础攻击力 +1。", baseCost: 300, costStep: 10, maxLevel: 9999, allowedModes: ["endless", "brave"], effect: "+1 攻击" }),
+        Object.freeze({ id: "speed", label: "基础移速", description: "无尽模式和勇者行动中，基础移速 +1%，最高 20%。", baseCost: 1000, costStep: 1000, maxLevel: 20, allowedModes: ["endless", "brave"], effect: "+1% 移速" })
+      ]),
+      boosts: Object.freeze([
+        Object.freeze({ id: "healing", label: "治疗", description: "单次无尽模式或勇者行动中，每 10 秒回复 100 生命。", price: 500, maxLevel: 1, allowedModes: ["endless", "brave"], effect: "每 10 秒 +100 生命" }),
+        Object.freeze({ id: "frenzy", label: "狂暴", description: "单次无尽模式或勇者行动中，攻击力 +15%，移速 +5%。", price: 5000, maxLevel: 1, allowedModes: ["endless", "brave"], effect: "攻击 +15% · 移速 +5%" }),
+        Object.freeze({ id: "instantKill", label: "瞬杀", description: "击中普通坦克或炮台时，有 0.1% 概率直接爆炸。", price: 10086, maxLevel: 1000, allowedModes: ["endless", "brave"], effect: "普通坦克与炮台 · 0.1%" })
+      ]),
+      items: Object.freeze([
+        Object.freeze({ id: "mudTruck", label: "泥头车", description: "无尽模式开局获得前车之鉴，发射时沿瞬移路径造成当前攻击力 100% 的伤害。", price: 5000, maxLevel: 1, allowedModes: ["endless"], effect: "无尽模式 · 前车之鉴" }),
+        Object.freeze({ id: "bomb", label: "炸弹", description: "无尽模式和勇者行动中，子弹有 10% 概率突变为炸弹。", price: 2608, maxLevel: 10, allowedModes: ["endless", "brave"], effect: "10% 概率 · 范围爆炸" }),
+        Object.freeze({ id: "mortar", label: "迫击炮", description: "无尽模式和勇者行动中，子弹有 1% 概率突变为迫击炮弹，落向鼠标位置。", price: 2604, maxLevel: 100, allowedModes: ["endless", "brave"], effect: "1% 概率 · 鼠标落点" }),
+        Object.freeze({ id: "redBullet", label: "红色子弹", description: "无尽模式和勇者行动中，发射的子弹全部变为红色子弹，攻击力翻倍。", price: 9999, maxLevel: 1, allowedModes: ["endless", "brave"], effect: "全部子弹 · 攻击翻倍" })
+      ]),
+      skins: Object.freeze([
+        Object.freeze({ id: "default", label: "原皮", description: "出厂涂装，已解锁。", price: 0, image: "assets/images/tanks/player-hull.png" }),
+        Object.freeze({ id: "red", label: "红皮", description: "参考红色涂装。", price: 5000, image: "assets/images/tanks/red.jpg" }),
+        Object.freeze({ id: "yellow", label: "黄皮", description: "参考黄色涂装。", price: 5000, image: "assets/images/tanks/yellow.jpg" }),
+        Object.freeze({ id: "blue", label: "蓝皮", description: "参考蓝色涂装。", price: 5000, image: "assets/images/tanks/blue.jpg" }),
+        Object.freeze({ id: "green", label: "绿皮", description: "参考绿色涂装。", price: 5000, image: "assets/images/tanks/green.jpg" })
+      ])
+    }),
     endlessRewards: Object.freeze({
       base: Object.freeze([
         Object.freeze({ id: "maxHealth", label: "钢铁意志", description: "生命上限提升，当前层数越高，提升越多。" }),
@@ -150,12 +199,12 @@
       ])
     }),
     fieldSkills: Object.freeze([
-      Object.freeze({ id: "mechanicalAscension", label: "机械飞升", color: "#8cf6c3" }),
-      Object.freeze({ id: "undyingTotem", label: "不死图腾", color: "#72cfff" }),
-      Object.freeze({ id: "trumpCard", label: "密命王牌", color: "#ffd166" }),
-      Object.freeze({ id: "voodooBullet", label: "巫毒子弹", color: "#d88cff" }),
-      Object.freeze({ id: "paradiseMade", label: "天堂制造", color: "#fff0a8" }),
-      Object.freeze({ id: "bitterWinter", label: "凛冽寒冬", color: "#9edcff" })
+      Object.freeze({ id: "mechanicalAscension", label: "机械飞升", color: "#8cf6c3", icon: "field-skill-icons/mechanical-ascension.svg", iconFront: "field-skill-icons/mechanical-ascension-front.svg" }),
+      Object.freeze({ id: "undyingTotem", label: "不死图腾", color: "#72cfff", icon: "field-skill-icons/undying-totem.svg", iconFront: "field-skill-icons/undying-totem-front.svg" }),
+      Object.freeze({ id: "trumpCard", label: "密命王牌", color: "#ffd166", icon: "field-skill-icons/trump-card.svg", iconFront: "field-skill-icons/trump-card-front.svg" }),
+      Object.freeze({ id: "voodooBullet", label: "巫毒子弹", color: "#d88cff", icon: "field-skill-icons/voodoo-bullet.svg", iconFront: "field-skill-icons/voodoo-bullet-front.svg" }),
+      Object.freeze({ id: "paradiseMade", label: "天堂制造", color: "#fff0a8", icon: "field-skill-icons/paradise-made.svg", iconFront: "field-skill-icons/paradise-made-front.svg" }),
+      Object.freeze({ id: "bitterWinter", label: "凛冽寒冬", color: "#9edcff", icon: "field-skill-icons/bitter-winter.svg", iconFront: "field-skill-icons/bitter-winter-front.svg" })
     ]),
     states: Object.freeze({
       MENU: "MENU",
@@ -164,6 +213,7 @@
       COUNTDOWN: "COUNTDOWN",
       CINEMATIC: "CINEMATIC",
       PAUSED: "PAUSED",
+      SHOP: "SHOP",
       LEVEL_CLEAR: "LEVEL_CLEAR",
       REWARD: "REWARD",
       VICTORY: "VICTORY",

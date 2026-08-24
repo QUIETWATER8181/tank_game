@@ -35,6 +35,8 @@
   var victoryPanel = document.getElementById("victoryPanel");
   var defeatPanel = document.getElementById("defeatPanel");
   var startButton = document.getElementById("startButton");
+  var partsValue = document.getElementById("partsValue");
+  var shopButton = document.getElementById("shopButton");
   var musicButton = document.getElementById("musicButton");
   var musicVolumePanel = document.getElementById("musicVolumePanel");
   var musicVolumeSlider = document.getElementById("musicVolumeSlider");
@@ -43,6 +45,7 @@
   var fullscreenButton = document.getElementById("fullscreenButton");
   var modeOptions = document.querySelectorAll(".mode-option");
   var pauseButton = document.getElementById("pauseButton");
+  var pauseGiftButton = document.getElementById("pauseGiftButton");
   var resetButton = document.getElementById("resetButton");
   var helpButton = document.getElementById("helpButton");
   var helpPanel = document.getElementById("helpPanel");
@@ -53,10 +56,22 @@
   var helpPages = document.querySelectorAll(".help-page");
   var helpPageIndex = 0;
   var helpPointerHandled = false;
-  var helpPointerHandled = false;
+  var shopPanel = document.getElementById("shopPanel");
+  var shopCloseButton = document.getElementById("shopCloseButton");
+  var shopTabs = document.getElementById("shopTabs");
+  var shopItems = document.getElementById("shopItems");
+  var shopStatus = document.getElementById("shopStatus");
+  var shopPartsValue = document.getElementById("shopPartsValue");
+  var shopCategory = "upgrades";
   var resumeButton = document.getElementById("resumeButton");
   var pauseRestartButton = document.getElementById("pauseRestartButton");
   var pauseMenuButton = document.getElementById("pauseMenuButton");
+  var giftPanel = document.getElementById("giftPanel");
+  var giftForm = document.getElementById("giftForm");
+  var giftCodeInput = document.getElementById("giftCodeInput");
+  var giftCloseButton = document.getElementById("giftCloseButton");
+  var giftStatus = document.getElementById("giftStatus");
+  var giftPanelOpen = false;
   var statusText = document.getElementById("statusText");
   var healthValue = document.getElementById("healthValue");
   var healthHud = healthValue.parentElement;
@@ -79,13 +94,16 @@
   var menuButtons = document.querySelectorAll(".menu-button");
   var accumulator = 0;
   var previousTime = performance.now();
+  var lastCountdownDisplay = null;
   updateMusicVolumeInterface(TankGame.Audio.getMusicVolume());
 
   function syncInterface() {
     var state = game.state;
     document.getElementById("gameStage").classList.toggle("is-cinematic", state === Config.states.CINEMATIC);
     menuPanel.hidden = state !== Config.states.MENU;
+    shopPanel.hidden = state !== Config.states.SHOP;
     pausePanel.hidden = state !== Config.states.PAUSED;
+    giftPanel.hidden = !giftPanelOpen || state !== Config.states.PAUSED;
     countdownPanel.hidden = state !== Config.states.COUNTDOWN;
     levelClearPanel.hidden = state !== Config.states.LEVEL_CLEAR;
     rewardPanel.hidden = state !== Config.states.REWARD;
@@ -128,6 +146,8 @@
     } else {
       statusText.textContent = "战场运行中";
     }
+    partsValue.textContent = String(game.parts);
+    shopPartsValue.textContent = String(game.parts);
     victoryScore.textContent = String(game.score).padStart(4, "0");
     defeatScore.textContent = String(game.score).padStart(4, "0");
     victoryMode.textContent = game.selectedMode === "challenge" ? "挑战模式 · 三关通关" : game.mode.label;
@@ -136,11 +156,12 @@
         (game.selectedMode === "brave" ? "勇者行动 · 第 " + game.resultLevel + " 关" : game.mode.label));
     renderStats(victoryStats);
     renderStats(defeatStats);
+    renderShop();
     updateRecordSummary();
     if (state === Config.states.REWARD) {
       rewardEyebrow.textContent = game.rewardStage === "permanent" ? "每两关一次 · 永久效果" : "每关一次 · 基础数值或临时增益";
       rewardTitle.textContent = game.rewardStage === "permanent" ? "选择一项永久效果" : "选择一项强化";
-      rewardSummary.textContent = "第 " + game.rewardLevel + " 关完成 · 随机三选一";
+        rewardSummary.textContent = "第 " + game.rewardLevel + " 关完成 · 获得零件 +" + (game.partsReward || 0) + " · 随机三选一";
       rewardOptions.innerHTML = game.rewardOptions.map(function (reward, index) {
         var level = game.endlessPermanent[reward.id] || 0;
         var detail = reward.id === "maxHealth" ? "+" + game.getEndlessRewardAmount(reward.id, game.rewardLevel) + " 生命上限" : reward.id === "attack" ? "+" + game.getEndlessRewardAmount(reward.id, game.rewardLevel) + " 攻击力" : reward.id === "splitBullet" ? "选择后发射 " + (level + 2) + " 颗子弹，每颗 70% 伤害" : reward.id === "explosive" ? "碎片伤害 " + Math.round((0.25 + level * 0.05) * 100) + "%" : reward.id === "speed" ? "移速提升 " + (40 + level * 5) + "%" : reward.id === "supportCall" ? "支援冷却 " + Math.max(9, 24 - level * 3).toFixed(1) + " 秒" : reward.description;
@@ -150,14 +171,14 @@
     if (state === Config.states.LEVEL_CLEAR) {
       if (game.selectedMode === "brave") {
         levelClearEyebrow.textContent = "勇者行动 · BOSS 已击破";
-        levelClearSummary.textContent = "第 " + game.resultLevel + " 关已突破 · 下一关对应无尽第 " + ((game.braveLevel + 1) * 10) + " 关";
+        levelClearSummary.textContent = "第 " + game.resultLevel + " 关已突破 · 获得零件 +" + (game.partsReward || 0) + " · 下一关对应无尽第 " + ((game.braveLevel + 1) * 10) + " 关";
         nextLevelButton.textContent = "挑战第 " + (game.braveLevel + 1) + " 关";
         levelClearWarning.textContent = "下一关重新补满生命，失败后从第一关重新开始";
         levelProgress.innerHTML = "<span class=\"level-step is-complete\">" + game.braveLevel + "</span><i></i><span class=\"level-step is-next\">" + (game.braveLevel + 1) + "</span>";
       } else {
         levelClearEyebrow.textContent = "挑战进度";
         levelClearWarning.textContent = "下一关重新补满生命，失败将从第一关重来";
-        levelClearSummary.textContent = "第 " + game.resultLevel + " 关已突破，下一关敌军将更强";
+        levelClearSummary.textContent = "第 " + game.resultLevel + " 关已突破 · 获得零件 +" + (game.partsReward || 0) + " · 下一关敌军将更强";
         nextLevelButton.textContent = "进入第 " + (game.challengeLevel + 1) + " 关";
         levelProgress.innerHTML = game.mode.levels.map(function (level) {
           var className = level.level <= game.lastCompletedLevel ? "is-complete" : (level.level === game.challengeLevel + 1 ? "is-next" : "");
@@ -177,6 +198,7 @@
   function renderStats(container) {
     var accuracy = game.stats.shots > 0 ? Math.round(game.stats.hits / game.stats.shots * 100) : 0;
     var record = game.records[game.selectedMode] || {};
+    var displayedPartsReward = container === defeatStats ? (game.partsTotalReward || game.partsReward || 0) : (game.partsReward || 0);
     var values = [
       ["战斗用时", formatTime(game.elapsed)],
       ["命中率", accuracy + "%"],
@@ -184,7 +206,8 @@
       game.selectedMode === "challenge" ? ["到达关卡", game.resultLevel + " / " + game.maxChallengeLevel] :
         (["endless", "brave"].indexOf(game.selectedMode) !== -1 ? ["到达关卡", "第 " + game.resultLevel + " 关"] : ["剩余命数", String(game.lives)]),
       ["最高得分", String(record.highScore || game.score).padStart(4, "0")],
-      ["最佳时间", formatTime(record.bestTime)]
+      ["最佳时间", formatTime(record.bestTime)],
+      [container === defeatStats ? "本局累计零件" : "本次零件", "+" + String(displayedPartsReward)]
     ];
     container.innerHTML = values.map(function (value) {
       return '<div class="result-stat"><span>' + value[0] + '</span><strong>' + value[1] + '</strong></div>';
@@ -194,6 +217,26 @@
   function updateRecordSummary() {
     var record = game.records[game.selectedMode] || {};
     recordSummary.textContent = "本机纪录：最高 " + String(record.highScore || 0).padStart(4, "0") + " · 最快 " + formatTime(record.bestTime);
+  }
+
+  function renderShop() {
+    var categories = Config.shop.categories;
+    var items = Config.shop[shopCategory] || [];
+    shopTabs.innerHTML = categories.map(function (category) {
+      return '<button class="shop-tab ' + (category.id === shopCategory ? "is-active" : "") + '" type="button" data-shop-category="' + category.id + '">' + category.label + '</button>';
+    }).join("");
+    shopItems.innerHTML = items.map(function (item) {
+      var level = game.getShopLevel(shopCategory, item.id);
+      var owned = shopCategory === "skins" ? Boolean(game.shopData.skins[item.id]) : level > 0;
+      var equipped = shopCategory === "skins" && game.shopData.equippedSkin === item.id;
+      var capped = shopCategory === "skins" ? owned : level >= item.maxLevel;
+      var available = true;
+      var action = shopCategory === "skins" ? (equipped ? "已装备" : (owned ? "装备" : (item.price + " 零件"))) : (capped ? "已满级" : (game.getShopCost(shopCategory, item.id) + " 零件"));
+      var image = item.image ? '<img src="' + item.image + '" alt="" aria-hidden="true">' : '<span class="shop-item-glyph">◆</span>';
+      var modeText = item.allowedModes ? "适用：" + item.allowedModes.map(function (modeId) { return Config.modes[modeId].label.replace("模式", ""); }).join(" / ") : "适用：所有模式";
+      var disabled = (shopCategory !== "skins" && capped) || (shopCategory === "skins" && equipped);
+      return '<article class="shop-item ' + (equipped ? "is-equipped" : "") + '">' + image + '<div class="shop-item-copy"><h3>' + item.label + '</h3><p>' + item.description + '</p><span>' + (shopCategory === "skins" ? (owned ? "已解锁" : "未解锁") : (level ? "持有 " + level + " / " + item.maxLevel : "未购买")) + '</span><small>' + modeText + '</small></div><button class="shop-buy-button" type="button" data-shop-id="' + item.id + '" ' + (disabled ? "disabled" : "") + '>' + action + '</button></article>';
+    }).join("");
   }
 
   function getVolumeColor(volume) {
@@ -266,6 +309,38 @@
     }
     syncInterface();
   }
+
+  shopButton.addEventListener("click", function () {
+    game.openShop();
+    shopStatus.textContent = "选择一项商品";
+    syncInterface();
+    shopCloseButton.focus();
+  });
+
+  shopCloseButton.addEventListener("click", function () { game.closeShop(); syncInterface(); shopButton.focus(); });
+  shopTabs.addEventListener("click", function (event) {
+    var tab = event.target.closest("[data-shop-category]");
+    if (!tab) { return; }
+    shopCategory = tab.dataset.shopCategory;
+    shopStatus.textContent = "选择一项商品";
+    renderShop();
+  });
+  shopItems.addEventListener("click", function (event) {
+    var button = event.target.closest("[data-shop-id]");
+    var item;
+    var result;
+    if (!button) { return; }
+    item = game.getShopItem(shopCategory, button.dataset.shopId);
+    if (shopCategory === "skins" && game.shopData.skins[button.dataset.shopId]) {
+      game.equipSkin(button.dataset.shopId);
+      shopStatus.textContent = "已装备 " + item.label;
+    } else {
+      result = game.purchaseShopItem(shopCategory, button.dataset.shopId);
+      shopStatus.textContent = result.ok ? "已获得 " + item.label : (result.reason === "parts" ? "零件不足，还需要 " + (result.cost - game.parts) + " 零件" : (result.reason === "mode" ? "当前模式不可使用该商品" : "该商品已达到上限"));
+    }
+    renderShop();
+    syncInterface();
+  });
 
   startButton.addEventListener("click", function () {
     TankGame.Audio.initialize();
@@ -384,6 +459,39 @@
 
   pauseButton.addEventListener("click", togglePause);
 
+  pauseGiftButton.addEventListener("click", function () {
+    giftPanelOpen = true;
+    giftStatus.textContent = "输入兑换码后兑换礼包";
+    syncInterface();
+    giftCodeInput.focus();
+  });
+
+  function closeGiftPanel() {
+    giftPanelOpen = false;
+    syncInterface();
+    pauseGiftButton.focus();
+  }
+
+  giftCloseButton.addEventListener("click", closeGiftPanel);
+  giftPanel.addEventListener("click", function (event) {
+    if (event.target === giftPanel) { closeGiftPanel(); }
+  });
+  giftForm.addEventListener("submit", function (event) {
+    var result;
+    event.preventDefault();
+    if (game.state !== Config.states.PAUSED) { return; }
+    result = game.redeemGiftCode(giftCodeInput.value);
+    if (result.ok) {
+      giftStatus.textContent = "兑换成功，获得 " + result.amount + " 零件";
+      giftCodeInput.value = "";
+    } else {
+      giftStatus.textContent = "兑换码无效";
+      giftCodeInput.select();
+    }
+    syncInterface();
+    giftCodeInput.focus();
+  });
+
   resumeButton.addEventListener("click", function () {
     game.resume();
     syncInterface();
@@ -489,6 +597,18 @@
       event.preventDefault();
       return;
     }
+    if (event.code === "Escape" && game.state === Config.states.SHOP) {
+      game.closeShop();
+      syncInterface();
+      shopButton.focus();
+      event.preventDefault();
+      return;
+    }
+    if (event.code === "Escape" && giftPanelOpen) {
+      closeGiftPanel();
+      event.preventDefault();
+      return;
+    }
     if ((event.code === "Escape" || event.code === "KeyP") && game.state !== Config.states.MENU) {
       event.preventDefault();
       togglePause();
@@ -520,7 +640,15 @@
     }
 
     game.render(accumulator / Config.fixedStep);
-    countdownValue.textContent = game.countdown > 0.3 ? String(Math.ceil(game.countdown)) : "GO";
+    var countdownDisplay = game.getCountdownDisplay ? game.getCountdownDisplay() :
+      (game.countdown > 0.3 ? String(Math.ceil(Math.max(0, game.countdown))) : "GO");
+    if (countdownDisplay !== lastCountdownDisplay) {
+      countdownValue.textContent = countdownDisplay;
+      countdownValue.classList.remove("is-changing");
+      void countdownValue.offsetWidth;
+      countdownValue.classList.add("is-changing");
+      lastCountdownDisplay = countdownDisplay;
+    }
     countdownLabel.textContent = game.selectedMode === "challenge" ? "第 " + game.challengeLevel + " 关 · 准备战斗" :
       (game.selectedMode === "endless" ? "无尽模式 · 第 " + game.endlessLevel + " 关" :
         (game.selectedMode === "brave" ? "勇者行动 · 第 " + game.braveLevel + " 关" : "准备战斗"));

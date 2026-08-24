@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 288">
+  <defs><linearGradient id="swamp" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#27353a"/><stop offset=".55" stop-color="#18212d"/><stop offset="1" stop-color="#3b2340"/></linearGradient><filter id="violet"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="drop" x="-25%" y="-25%" width="150%" height="170%"><feDropShadow dx="6" dy="9" stdDeviation="3" flood-color="#0d0b16" flood-opacity=".82"/></filter></defs>
+  <!-- Layer 1: contaminated floor -->
+  <rect width="288" height="288" fill="url(#swamp)"/><path d="M0 210c40-38 66 24 111-8 42-30 75 14 116-15 25-17 42-2 61 5v96H0Z" fill="#32283a"/>
+  <path d="M0 95h288M0 150h288M40 0l25 288M181 0l-25 288" stroke="#6a4770" stroke-width="7" opacity=".4"/><g fill="#7d5190" opacity=".6"><circle cx="42" cy="206" r="15"/><circle cx="240" cy="106" r="19"/><circle cx="90" cy="79" r="10"/></g>
+  <ellipse cx="145" cy="238" rx="94" ry="18" fill="#0d0b16" opacity=".6"/>
+  <!-- Layer 2: ballistic lab and voodoo projectile -->
+  <g stroke="#151b25" stroke-width="8" stroke-linejoin="round" filter="url(#drop)">
+    <path d="M46 239h195l-20 22H66Z" fill="#171b24"/><rect x="64" y="203" width="160" height="36" fill="#61706e"/><path d="M81 203v-51h111v51" fill="#46565a"/>
+    <path d="M105 152 124 120h40l19 32" fill="#6f7f7f"/><path d="M144 120V91"/><path d="M136 91h16v-19h-16Z" fill="#9b6bb4"/><circle cx="144" cy="179" r="20" fill="#d88cff" filter="url(#violet)"/><circle cx="144" cy="179" r="8" fill="#f4d7ff"/>
+    <path d="M96 218h37m25 0h35M86 165h18m80 0h18" stroke="#d6a7df" stroke-width="5"/>
+  </g>
+  <path d="M64 203h160l-12 8H77Z" fill="#e4d9eb" opacity=".22"/>
+  <path d="M64 239h160l-17 15H80Z" fill="#0b0a12" opacity=".76"/>
+  <!-- Layer 3: toxic trail and ritual markings -->
+  <path d="M163 181c35-8 44-23 66-43 16-14 27-26 39-48" fill="none" stroke="#d88cff" stroke-width="8" stroke-dasharray="4 13" filter="url(#violet)"/><g fill="none" stroke="#d88cff" stroke-width="4" opacity=".8"><circle cx="144" cy="179" r="59"/><path d="m144 108 10 31 32 4-25 20 8 31-25-18-25 18 8-31-25-20 32-4Z"/></g>
+</svg>

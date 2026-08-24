@@ -147,6 +147,10 @@
       </section>
 
       <section id="menuPanel" class="overlay-panel menu-panel">
+        <div class="menu-economy" aria-label="零件与商店">
+          <div class="parts-balance"><span class="parts-icon" aria-hidden="true">◆</span><span>零件</span><strong id="partsValue">0</strong></div>
+          <button id="shopButton" class="shop-button" type="button" title="打开商店" aria-label="打开商店">商店</button>
+        </div>
         <p class="eyebrow">超级大运坦克</p>
         <h1>钢铁征途 坦克大战</h1>
         <p class="menu-copy">化身大运，向敌人发起冲锋！</p>
@@ -179,13 +183,50 @@
         <p class="identity">by 一杯静水 &amp; 徐同学infinity</p>
       </section>
 
+      <section id="shopPanel" class="shop-panel" hidden aria-labelledby="shopTitle">
+        <div class="shop-dialog" role="dialog" aria-modal="true">
+          <header class="shop-header">
+            <div>
+              <p class="eyebrow">零件整备中心</p>
+              <h2 id="shopTitle">商店</h2>
+            </div>
+            <div class="shop-header-actions">
+              <div class="shop-balance"><span class="parts-icon" aria-hidden="true">◆</span><strong id="shopPartsValue">0</strong></div>
+              <button id="shopCloseButton" class="help-close-button" type="button" title="返回主菜单" aria-label="返回主菜单">×</button>
+            </div>
+          </header>
+          <nav id="shopTabs" class="shop-tabs" aria-label="商店栏目"></nav>
+          <p id="shopStatus" class="shop-status" aria-live="polite">选择一项商品</p>
+          <div id="shopItems" class="shop-items"></div>
+        </div>
+      </section>
+
       <section id="pausePanel" class="overlay-panel pause-panel" hidden>
         <p class="eyebrow">战斗暂停</p>
         <h2>已暂停</h2>
         <div class="pause-actions">
           <button id="resumeButton" class="primary-button" type="button">继续战斗</button>
+          <button id="pauseGiftButton" class="secondary-button" type="button">兑换礼包</button>
           <button id="pauseRestartButton" class="secondary-button" type="button">重新开始</button>
           <button id="pauseMenuButton" class="secondary-button" type="button">返回主菜单</button>
+        </div>
+      </section>
+
+      <section id="giftPanel" class="gift-panel" hidden aria-labelledby="giftTitle">
+        <div class="gift-dialog" role="dialog" aria-modal="true">
+          <header class="gift-header">
+            <div>
+              <p class="eyebrow">暂停菜单 · 礼包兑换</p>
+              <h2 id="giftTitle">兑换礼包</h2>
+            </div>
+            <button id="giftCloseButton" class="help-close-button" type="button" title="关闭礼包兑换" aria-label="关闭礼包兑换">×</button>
+          </header>
+          <form id="giftForm" class="gift-form">
+            <label for="giftCodeInput">兑换码</label>
+            <input id="giftCodeInput" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="输入兑换码" aria-describedby="giftStatus">
+            <button class="primary-button" type="submit">兑换</button>
+            <p id="giftStatus" class="gift-status" aria-live="polite">输入兑换码后兑换礼包</p>
+          </form>
         </div>
       </section>
 
@@ -200,22 +241,22 @@
         <div id="fieldSkillWheel" class="field-skill-wheel" aria-label="场地技能轮盘">
           <div id="fieldSkillWheelDisc" class="field-skill-wheel-disc">
             <span class="wheel-icon wheel-icon-1" title="机械飞升" aria-label="机械飞升">
-              <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 8v10M32 46v10M8 32h10M46 32h10M15 15l7 7M42 42l7 7M49 15l-7 7M22 42l-7 7"/><path d="m32 18 5 5 7-1 3 7-5 5 1 7-7 3-5-5-7 1-3-7 5-5-1-7 7-3z"/><circle cx="32" cy="32" r="5"/></svg>
+              <img src="field-skill-icons/mechanical-ascension.svg" alt="" aria-hidden="true">
             </span>
             <span class="wheel-icon wheel-icon-2" title="不死图腾" aria-label="不死图腾">
-              <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 8 51 15v15c0 13-8 22-19 27C21 52 13 43 13 30V15L32 8Z"/><path d="M32 20v24M24 28l8-8 8 8M24 38h16"/></svg>
+              <img src="field-skill-icons/undying-totem.svg" alt="" aria-hidden="true">
             </span>
             <span class="wheel-icon wheel-icon-3" title="密命王牌" aria-label="密命王牌">
-              <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 7 38 25l19 1-15 12 5 19-15-11-15 11 5-19L7 26l19-1 6-18Z"/><path d="M32 18v22M21 31h22"/></svg>
+              <img src="field-skill-icons/trump-card.svg" alt="" aria-hidden="true">
             </span>
             <span class="wheel-icon wheel-icon-4" title="巫毒子弹" aria-label="巫毒子弹">
-              <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 8c9 8 15 15 15 24a15 15 0 1 1-30 0c0-9 6-16 15-24Z"/><path d="M32 19v26M22 29l10 7 10-7M24 48h16"/></svg>
+              <img src="field-skill-icons/voodoo-bullet.svg" alt="" aria-hidden="true">
             </span>
             <span class="wheel-icon wheel-icon-5" title="天堂制造" aria-label="天堂制造">
-              <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M9 18h29v24H9zM38 27h10l7 8v7H38z"/><path d="M9 26h29M44 31h7M18 49h-4M50 49h-4"/><circle cx="18" cy="48" r="5"/><circle cx="50" cy="48" r="5"/></svg>
+              <img src="field-skill-icons/paradise-made.svg" alt="" aria-hidden="true">
             </span>
             <span class="wheel-icon wheel-icon-6" title="凛冽寒冬" aria-label="凛冽寒冬">
-              <svg viewBox="0 0 64 64" aria-hidden="true"><path d="M32 7v50M10 20l44 24M10 44l44-24M20 11l12 21-12 21M44 11 32 32l12 21"/><circle cx="32" cy="32" r="5"/></svg>
+              <img src="field-skill-icons/bitter-winter.svg" alt="" aria-hidden="true">
             </span>
           </div>
           <button id="fieldSkillRollButton" class="field-skill-roll-button" type="button">开始</button>
@@ -251,6 +292,7 @@
         <h2>战斗胜利</h2>
         <p class="result-score">最终得分 <strong id="victoryScore">0000</strong></p>
         <p class="result-mode">完成模式：<strong id="victoryMode">普通模式</strong></p>
+
         <div id="victoryStats" class="result-stats"></div>
         <div class="result-actions">
           <button class="primary-button retry-button" type="button">再次挑战</button>

@@ -17,6 +17,14 @@
     this.player = null;
     this.enemies = [];
     this.bullets = [];
+    this.mortarWarnings = [];
+    this.bossMeteors = [];
+    this.bossMeteorTimer = 0;
+    this.bossEmbers = [];
+    this.bossWarParticles = [];
+    this.bossWarParticleDelay = 0;
+    this.bossWarParticleFade = 0;
+    this.bossFirePits = [];
     this.muzzleFlashes = [];
     this.frontStepTrails = [];
     this.bossCloneTrails = [];
@@ -29,10 +37,22 @@
     this.bossLasers = [];
     this.markedTarget = null;
     this.score = 0;
+    this.parts = this.loadParts();
+    this.partsReward = 0;
+    this.partsTotalReward = 0;
+    this.partsGrantedTotal = 0;
+    this.shopData = this.loadShopData();
+    this.runShop = { healing: false, frenzy: false, instantKill: false, mudTruck: false, bomb: false, mortar: false, redBullet: false };
+    this.shopHealingTimer = 10;
     this.comboCount = 0;
     this.comboTimer = 0;
     this.maxCombo = 0;
     this.completionHandled = false;
+    this.bossMeteors = [];
+    this.bossMeteorTimer = 0;
+    this.bossEmbers = [];
+    this.bossWarParticles = [];
+    this.bossFirePits = [];
     this.selectedMode = "normal";
     this.mode = Config.modes.normal;
     this.challengeLevel = 1;
@@ -96,6 +116,86 @@
       this.lastCompletedLevel = 0;
       this.markedTarget = null;
     }
+  };
+
+  Game.prototype.loadShopData = function () {
+    var parsed;
+    var data = { upgrades: { health: 0, attack: 0, speed: 0 }, boosts: { healing: 0, frenzy: 0, instantKill: 0 }, items: { mudTruck: 0, bomb: 0, mortar: 0, redBullet: 0 }, skins: { default: true }, equippedSkin: "default" };
+    try {
+      parsed = JSON.parse(window.localStorage.getItem("xpz-tank-shop")) || {};
+      ["upgrades", "boosts", "items"].forEach(function (category) {
+        Object.keys(data[category]).forEach(function (id) {
+          var value = Number(parsed[category] && parsed[category][id]);
+          if (Number.isFinite(value) && value >= 0) { data[category][id] = Math.floor(value); }
+        });
+      });
+      if (parsed.skins) { Object.keys(parsed.skins).forEach(function (id) { if (parsed.skins[id] === true) { data.skins[id] = true; } }); }
+      if (parsed.equippedSkin && data.skins[parsed.equippedSkin]) { data.equippedSkin = parsed.equippedSkin; }
+    } catch (error) { }
+    data.upgrades.speed = Math.min(20, data.upgrades.speed);
+    return data;
+  };
+
+  Game.prototype.saveShopData = function () {
+    try { window.localStorage.setItem("xpz-tank-shop", JSON.stringify(this.shopData)); } catch (error) { }
+  };
+
+  Game.prototype.getShopItem = function (category, id) {
+    var list = Config.shop[category] || [];
+    return list.find(function (item) { return item.id === id; }) || null;
+  };
+
+  Game.prototype.getShopLevel = function (category, id) {
+    if (category === "skins") { return this.shopData.skins[id] ? 1 : 0; }
+    return this.shopData[category] && this.shopData[category][id] || 0;
+  };
+
+  Game.prototype.getShopCost = function (category, id) {
+    var item = this.getShopItem(category, id);
+    var level = this.getShopLevel(category, id);
+    return item && item.baseCost !== undefined ? item.baseCost + level * item.costStep : (item ? item.price : 0);
+  };
+
+  Game.prototype.isShopItemAvailable = function (category, id, modeId) {
+    var item = this.getShopItem(category, id);
+    return Boolean(item && (!item.allowedModes || item.allowedModes.indexOf(modeId || this.selectedMode) !== -1));
+  };
+
+  Game.prototype.purchaseShopItem = function (category, id) {
+    var item = this.getShopItem(category, id);
+    var level = this.getShopLevel(category, id);
+    var cost;
+    if (!item || level >= item.maxLevel || (category === "skins" && this.shopData.skins[id])) { return { ok: false, reason: "max" }; }
+    cost = this.getShopCost(category, id);
+    if (this.parts < cost) { return { ok: false, reason: "parts", cost: cost }; }
+    this.parts -= cost;
+    if (category === "skins") { this.shopData.skins[id] = true; this.shopData.equippedSkin = id; }
+    else { this.shopData[category][id] = level + 1; }
+    this.saveParts();
+    this.saveShopData();
+    return { ok: true, cost: cost };
+  };
+
+  Game.prototype.equipSkin = function (id) {
+    if (this.shopData.skins[id]) { this.shopData.equippedSkin = id; this.saveShopData(); return true; }
+    return false;
+  };
+
+  Game.prototype.openShop = function () { if (this.state === Config.states.MENU) { this.setState(Config.states.SHOP); } };
+  Game.prototype.closeShop = function () { if (this.state === Config.states.SHOP) { this.setState(Config.states.MENU); } };
+
+  Game.prototype.activateRunShop = function () {
+    var allowed = ["endless", "brave"].indexOf(this.selectedMode) !== -1;
+    this.runShop = { healing: false, frenzy: false, instantKill: false, mudTruck: false, bomb: false, mortar: false, redBullet: false };
+    if (!allowed) { return; }
+    ["healing", "frenzy", "instantKill"].forEach(function (id) {
+      if (this.shopData.boosts[id] > 0) { this.shopData.boosts[id] -= 1; this.runShop[id] = true; }
+    }, this);
+    ["mudTruck", "bomb", "mortar", "redBullet"].forEach(function (id) {
+      if (this.shopData.items[id] > 0 && (id !== "mudTruck" || this.selectedMode === "endless")) { this.shopData.items[id] -= 1; this.runShop[id] = true; }
+    }, this);
+    this.shopHealingTimer = 10;
+    this.saveShopData();
   };
 
   Game.prototype.getChallengeLevelConfig = function () {
@@ -353,6 +453,56 @@
     }
   };
 
+  Game.prototype.loadParts = function () {
+    var stored;
+    try {
+      stored = Number(window.localStorage.getItem("xpz-tank-parts"));
+      return Number.isFinite(stored) && stored >= 0 ? Math.floor(stored) : 0;
+    } catch (error) {
+      return 0;
+    }
+  };
+
+  Game.prototype.saveParts = function () {
+    try { window.localStorage.setItem("xpz-tank-parts", String(this.parts)); } catch (error) { }
+  };
+
+  Game.prototype.redeemGiftCode = function (code) {
+    var normalized = String(code || "").trim().toUpperCase();
+    if (normalized !== "QUIETWATER") { return { ok: false, reason: "invalid" }; }
+    this.parts += 10000;
+    this.saveParts();
+    return { ok: true, amount: 10000 };
+  };
+
+  Game.prototype.getPartsReward = function (modeId, score, isVictory) {
+    var settlement = Config.partsSettlement[modeId];
+    var adjustedScore = Math.max(0, Math.floor(Number(score) || 0));
+    var reward;
+    if (!settlement) { return 0; }
+    reward = Math.floor(adjustedScore / settlement.scorePerParts) * settlement.partsPerStep;
+    if (modeId === "normal" && isVictory) { reward += settlement.victoryBonus; }
+    if (modeId === "challenge" && isVictory) { reward *= settlement.victoryMultiplier; }
+    return reward;
+  };
+
+  Game.prototype.settleParts = function (isVictory) {
+    var totalReward = this.getPartsReward(this.selectedMode, this.score, isVictory);
+    this.partsTotalReward = totalReward;
+    this.partsReward = Math.max(0, totalReward - this.partsGrantedTotal);
+    this.partsGrantedTotal = Math.max(this.partsGrantedTotal, totalReward);
+    if (this.partsReward > 0) {
+      this.parts += this.partsReward;
+      this.saveParts();
+    }
+    return this.partsReward;
+  };
+
+  Game.prototype.settleFinalParts = function () {
+    // Final defeat still settles the accumulated score; only the ungranted
+    // difference is added because earlier level clears may have paid already.
+    return this.settleParts(false);
+  };
   Game.prototype.sanitizeRecords = function (records) {
     var clean = {};
     ["normal", "challenge", "endless", "brave"].forEach(function (modeId) {
@@ -391,12 +541,15 @@
     this.player.bodyAngle = -Math.PI / 2;
     this.player.turretAngle = -Math.PI / 2;
     this.player.invulnerable = 0;
-    this.player.maxHealth = ["endless", "brave"].indexOf(this.selectedMode) !== -1 ? this.endlessBaseStats.maxHealth : 100;
+    this.player.maxHealth = ["endless", "brave"].indexOf(this.selectedMode) !== -1 ? this.endlessBaseStats.maxHealth + this.shopData.upgrades.health * 25 : 100;
     this.player.health = this.player.maxHealth;
-    this.player.bulletDamage = ["endless", "brave"].indexOf(this.selectedMode) !== -1 ? this.endlessBaseStats.attack : Config.bulletDamage;
+    this.player.bulletDamage = ["endless", "brave"].indexOf(this.selectedMode) !== -1 ? this.endlessBaseStats.attack + this.shopData.upgrades.attack : Config.bulletDamage;
     this.player.fireRateMultiplier = this.selectedMode === "endless" ? this.endlessBaseStats.fireRate : 1;
     var speedLevel = this.selectedMode === "endless" ? Math.min(5, this.endlessPermanent.speed || 0) : 0;
     this.player.moveSpeedMultiplier = speedLevel ? Math.round((1.4 + (speedLevel - 1) * 0.05) * 100) / 100 : 1;
+    if (["endless", "brave"].indexOf(this.selectedMode) !== -1) { this.player.moveSpeedMultiplier += this.shopData.upgrades.speed / 100 + (this.runShop.frenzy ? 0.05 : 0); }
+    if (this.runShop.frenzy) { this.player.bulletDamage = Math.round(this.player.bulletDamage * 1.15); }
+    this.player.skin = this.shopData.equippedSkin;
     this.player.trackingTime = this.selectedMode === "endless" ? Math.min(5, this.endlessPermanent.tracking ? 2 + (this.endlessPermanent.tracking - 1) * 0.5 : 0) : 0;
     this.player.levelRepair = this.selectedMode === "endless" && this.endlessTemp.repair;
     this.player.levelShield = this.selectedMode === "endless" && this.endlessTemp.shield;
@@ -468,7 +621,27 @@
     this.enemies.forEach(function (enemy) {
       enemy.turretAngle = Math.atan2(self.player.y - enemy.y, self.player.x - enemy.x);
     });
+    var hasBoss = this.enemies.some(function (enemy) { return enemy.isBoss; });
+    if (hasBoss) {
+      this.bossMeteorTimer = Config.bossMeteor.minimumInterval +
+        Math.random() * (Config.bossMeteor.maximumInterval - Config.bossMeteor.minimumInterval);
+      this.bossEmbers = this.createBossEmbers();
+      this.bossWarParticles = this.createBossWarParticles();
+      this.bossWarParticleDelay = 1.25;
+      this.bossWarParticleFade = 0;
+      this.bossFirePits = [];
+    }
     this.bullets = [];
+    this.mortarWarnings = [];
+    this.bossMeteors = [];
+    if (!hasBoss) {
+      this.bossMeteorTimer = 0;
+      this.bossEmbers = [];
+      this.bossWarParticles = [];
+      this.bossWarParticleDelay = 0;
+      this.bossWarParticleFade = 0;
+      this.bossFirePits = [];
+    }
     this.muzzleFlashes = [];
     this.frontStepTrails = [];
     this.bossCloneTrails = [];
@@ -506,7 +679,7 @@
       if (TankGame.Audio.startCinematicAudio) { TankGame.Audio.startCinematicAudio(); }
       return;
     }
-    this.countdown = 3.25;
+    this.countdown = 3;
     this.countdownTick = 4;
     this.setState(Config.states.COUNTDOWN);
     TankGame.Audio.play("begin");
@@ -540,6 +713,10 @@
     if (this.selectedMode === "endless") { this.resetEndlessRun(); }
     this.lastCompletedLevel = 0;
     this.resultLevel = 1;
+    this.partsReward = 0;
+    this.partsTotalReward = 0;
+    this.partsGrantedTotal = 0;
+    this.activateRunShop();
     this.input.reset();
     this.resetWorld(false);
     this.updateLevelMusic();
@@ -630,6 +807,10 @@
       if (this.comboTimer === 0) { this.comboCount = 0; }
     }
     this.updateWrecks(deltaTime);
+    if (this.runShop.healing && this.player.alive) {
+      this.shopHealingTimer -= deltaTime;
+      if (this.shopHealingTimer <= 0) { this.shopHealingTimer += 10; this.player.health = Math.min(this.player.maxHealth, this.player.health + 100); }
+    }
     this.updateFrontStepTrails(deltaTime);
     this.updateBossCloneTrails(deltaTime);
     this.updateRearGuards(deltaTime);
@@ -657,7 +838,10 @@
     this.jammerFlash = Math.max(0, (this.jammerFlash || 0) - deltaTime);
     this.updateBossEnemies(deltaTime);
     this.updateEliteEnemies(deltaTime);
+    this.updateBossBattleEffects(deltaTime);
+    this.updateFireHazards(deltaTime);
     this.updateCombat(deltaTime);
+    this.updateMortarWarnings(deltaTime);
     TankGame.AI.update(this, deltaTime);
     TankGame.Effects.update(deltaTime);
     this.updatePlayerLifeCycle(deltaTime);
@@ -674,6 +858,10 @@
     this.resultLevel = this.selectedMode === "endless" ? this.endlessLevel :
       (this.selectedMode === "brave" ? this.braveLevel : this.challengeLevel);
     if (this.selectedMode === "endless") {
+      if (this.endlessLevel % Config.partsSettlement.endless.scoreMultiplierInterval === 0) {
+        this.score = Math.floor(this.score * Config.partsSettlement.endless.scoreMultiplier);
+      }
+      this.settleParts(true);
       this.rewardLevel = this.endlessLevel;
       this.rewardStage = "primary";
       this.rewardOptions = this.ensureEarlySurvivalReward(this.createRewardOptions(Config.endlessRewards.base, 3));
@@ -688,6 +876,8 @@
     }
     if (this.selectedMode === "brave") {
       if (!this.braveLevelDamaged) { this.braveRevives += 1; }
+      this.score = Math.floor(this.score * Config.partsSettlement.brave.scoreMultiplier);
+      this.settleParts(true);
       this.lastCompletedLevel = this.braveLevel;
       this.setState(Config.states.LEVEL_CLEAR);
       TankGame.Audio.play("levelClear");
@@ -695,8 +885,8 @@
     }
     if (this.selectedMode === "challenge") {
       this.lastCompletedLevel = this.maxChallengeLevel;
-      this.score = Math.floor(this.score * 1.5);
     }
+    this.settleParts(true);
     this.setState(Config.states.VICTORY);
     this.saveRecord();
     TankGame.Audio.play("victory");
@@ -716,6 +906,10 @@
     }
   };
 
+  Game.prototype.getCountdownDisplay = function () {
+    return this.countdown > 0.3 ? String(Math.ceil(Math.max(0, this.countdown))) : "GO";
+  };
+
   Game.prototype.updatePlayerLifeCycle = function (deltaTime) {
     if (this.player.alive) { return; }
     if (this.selectedMode === "brave" && this.braveRevives > 0) {
@@ -731,6 +925,7 @@
         this.comboTimer = 0;
         this.resultLevel = this.selectedMode === "endless" ? this.endlessLevel :
       (this.selectedMode === "brave" ? this.braveLevel : this.challengeLevel);
+        this.settleFinalParts();
         this.setState(Config.states.DEFEAT);
         this.saveRecord();
         TankGame.Audio.play("defeat");
@@ -747,6 +942,24 @@
 
   Game.prototype.registerPlayerDamage = function () {
     if (this.selectedMode === "brave") { this.braveLevelDamaged = true; }
+  };
+
+  Game.prototype.damageEnemy = function (enemy, damage, effectX, effectY) {
+    if (!enemy || !enemy.alive) { return false; }
+    enemy.health = Math.max(0, enemy.health - damage);
+    enemy.hitFlash = 0.12;
+    TankGame.Effects.burst(effectX || enemy.x, effectY || enemy.y, "#ff8e71", 10, 130);
+    if (enemy.health > 0) { return true; }
+    enemy.alive = false;
+    enemy.wreck = true;
+    enemy.wreckLife = 3;
+    enemy.wreckParticles = enemy.wreckParticles || [];
+    if (enemy.isBoss || enemy.isBossClone || enemy.isElite) { this.deactivateBossThreats(enemy); }
+    TankGame.Effects.burst(enemy.x, enemy.y, "#ffb15c", 30, 230);
+    TankGame.Audio.play("explode");
+    enemy.burnSound = TankGame.Audio.playBurning();
+    this.registerEnemyKill();
+    return true;
   };
 
   Game.prototype.createBraveReviveParticles = function () {
@@ -860,6 +1073,10 @@
   };
 
   Game.prototype.fire = function (tank) {
+    if (tank.team === "enemy" && tank.isTurret && tank.turretWeapon === "mortar") {
+      this.queueTurretMortar(tank);
+      return;
+    }
     var muzzleDistance = TankGame.Entities.getMuzzleDistance(tank);
     var x = tank.x + Math.cos(tank.turretAngle) * muzzleDistance;
     var y = tank.y + Math.sin(tank.turretAngle) * muzzleDistance;
@@ -873,6 +1090,28 @@
       var offset = bulletCount === 1 ? 0 : -spread + (spread * 2 * bulletIndex / (bulletCount - 1));
       var bullet = TankGame.Entities.createBullet(x, y, tank.turretAngle + offset, tank.team);
       bullet.damage = (tank.bulletDamage || Config.bulletDamage) * (splitLevel ? 0.7 : 1);
+      if (tank.team === "player" && this.runShop.redBullet) { bullet.redBullet = true; bullet.damage *= 2; }
+      if (tank.team === "player" && ["endless", "brave"].indexOf(this.selectedMode) !== -1 && this.runShop.bomb && Math.random() < 0.1) {
+        bullet.bossBomb = true;
+        bullet.playerBomb = true;
+        bullet.radius = 9;
+        bullet.speed = Config.bulletSpeed * 0.68;
+        bullet.explosionRadius = 80;
+      } else if (tank.team === "player" && ["endless", "brave"].indexOf(this.selectedMode) !== -1 && this.runShop.mortar && Math.random() < 0.01) {
+        bullet.playerMortar = true;
+        bullet.fixedTurretMortar = true;
+        bullet.mortar = true;
+        bullet.bossBomb = true;
+        bullet.radius = 9;
+        bullet.startX = x;
+        bullet.startY = y;
+        bullet.targetX = this.input.pointer.x;
+        bullet.targetY = this.input.pointer.y;
+        bullet.flightDuration = 0.72;
+        bullet.flightTimer = bullet.flightDuration;
+        bullet.explosionRadius = 92;
+        bullet.lifetime = bullet.flightDuration;
+      }
       bullet.trackingRemaining = trackingActive ? (tank.trackingTime || 0) : 0;
       if (tank.isBoss || tank.isBossClone || tank.isElite) { bullet.sourceEnemy = tank; }
       if ((tank.isBoss || tank.isBossClone || tank.isElite) && (tank.active_skill === "bomb" || tank.active_skill === "mortar") && tank.skill_states[tank.active_skill].phase === "effect") {
@@ -902,7 +1141,7 @@
       this.spawnRearGuard(tank, muzzleDistance);
       this.rearGuardCooldown = 2;
     }
-    if (tank.team === "player" && this.selectedMode === "endless" && this.endlessPermanent.frontStep) {
+    if (tank.team === "player" && this.selectedMode === "endless" && (this.endlessPermanent.frontStep || this.runShop.mudTruck)) {
       var startX = tank.x;
       var startY = tank.y;
       var teleportPath = this.movePlayerSafely(tank, tank.turretAngle, 48, startX, startY);
@@ -915,6 +1154,66 @@
     } else {
       TankGame.Audio.play("enemyShoot");
     }
+  };
+
+  Game.prototype.queueTurretMortar = function (tank) {
+    var config = Config.fixedTurret;
+    if (!this.player.alive) { return; }
+    this.mortarWarnings.push({
+      x: this.player.x,
+      y: this.player.y,
+      radius: config.mortarWarningRadius,
+      timer: config.mortarWarningDuration,
+      maxTimer: config.mortarWarningDuration,
+      sourceEnemy: tank,
+      damage: Math.max(1, Math.round((tank.bulletDamage || Config.bulletDamage) * 1.25)),
+      explosionRadius: config.mortarRadius,
+      alive: true
+    });
+    TankGame.Audio.play("enemyShoot");
+  };
+
+  Game.prototype.updateMortarWarnings = function (deltaTime) {
+    var self = this;
+    this.mortarWarnings.forEach(function (warning) {
+      if (!warning.sourceEnemy || !warning.sourceEnemy.alive) {
+        warning.alive = false;
+        return;
+      }
+      warning.timer -= deltaTime;
+      if (warning.timer > 0) { return; }
+      warning.alive = false;
+      if (!warning.sourceEnemy || !warning.sourceEnemy.alive) { return; }
+      self.launchTurretMortar(warning);
+    });
+    this.mortarWarnings = this.mortarWarnings.filter(function (warning) { return warning.alive; });
+  };
+
+  Game.prototype.launchTurretMortar = function (warning) {
+    var source = warning.sourceEnemy;
+    var muzzleDistance = TankGame.Entities.getMuzzleDistance(source);
+    var bullet = TankGame.Entities.createBullet(
+      source.x + Math.cos(source.turretAngle) * muzzleDistance,
+      source.y + Math.sin(source.turretAngle) * muzzleDistance,
+      source.turretAngle,
+      "enemy"
+    );
+    bullet.fixedTurretMortar = true;
+    bullet.mortar = true;
+    bullet.bossBomb = true;
+    bullet.sourceEnemy = source;
+    bullet.startX = bullet.x;
+    bullet.startY = bullet.y;
+    bullet.targetX = warning.x;
+    bullet.targetY = warning.y;
+    bullet.flightDuration = Config.fixedTurret.mortarFlightDuration;
+    bullet.flightTimer = bullet.flightDuration;
+    bullet.damage = warning.damage;
+    bullet.explosionRadius = warning.explosionRadius;
+    bullet.radius = 9;
+    bullet.lifetime = bullet.flightDuration;
+    this.bullets.push(bullet);
+    this.muzzleFlashes.push({ x: bullet.x, y: bullet.y, life: 0.12, color: "#ff765e" });
   };
 
   Game.prototype.getEnemyAttackRange = function (enemy, mode) {
@@ -1593,7 +1892,19 @@
         !TankGame.Collision.tankCollidesWithWreck({ x: tank.x, y: nextY, radius: tank.radius }, this.enemies)) {
       tank.y = nextY;
     }
-    return [pathStart, { x: tank.x, y: tank.y }];
+    var pathEnd = { x: tank.x, y: tank.y };
+    if (tank.team === "player" && this.runShop.mudTruck && Math.hypot(pathEnd.x - pathStart.x, pathEnd.y - pathStart.y) > 1) {
+      this.damageEnemiesAlongPath(pathStart, pathEnd, tank.bulletDamage || Config.bulletDamage);
+    }
+    return [pathStart, pathEnd];
+  };
+
+  Game.prototype.damageEnemiesAlongPath = function (start, end, damage) {
+    var self = this;
+    this.enemies.forEach(function (enemy) {
+      if (!enemy.alive || !TankGame.Collision.segmentIntersectsCircle(start.x, start.y, end.x, end.y, enemy, enemy.radius)) { return; }
+      self.damageEnemy(enemy, damage, end.x, end.y);
+    });
   };
 
   Game.prototype.spawnFrontStepTrails = function (path, bodyAngle, turretAngle) {
@@ -1684,6 +1995,19 @@
   Game.prototype.updateBullet = function (bullet, deltaTime) {
     var self = this;
     if (!bullet.alive) { return; }
+    if (bullet.fixedTurretMortar) {
+      bullet.previousX = bullet.x;
+      bullet.previousY = bullet.y;
+      bullet.flightTimer = Math.max(0, bullet.flightTimer - deltaTime);
+      var flightProgress = 1 - bullet.flightTimer / bullet.flightDuration;
+      bullet.x = bullet.startX + (bullet.targetX - bullet.startX) * flightProgress;
+      bullet.y = bullet.startY + (bullet.targetY - bullet.startY) * flightProgress;
+      if (bullet.flightTimer === 0) {
+        bullet.alive = false;
+        if (bullet.playerMortar) { this.detonatePlayerBomb(bullet); } else { this.detonateBossBomb(bullet); }
+      }
+      return;
+    }
     if (bullet.trackingRemaining > 0 && bullet.team === "player") {
       var target = this.selectedMode === "endless" && this.markedTarget && this.markedTarget.alive ? this.markedTarget : null;
       if (target) {
@@ -1705,7 +2029,7 @@
 
     if (bullet.lifetime <= 0 || bullet.x < 0 || bullet.y < 0 || bullet.x > Config.worldWidth || bullet.y > Config.worldHeight) {
       bullet.alive = false;
-      if (bullet.bossBomb) { this.detonateBossBomb(bullet); }
+      if (bullet.bossBomb) { if (bullet.playerBomb || bullet.playerMortar) { this.detonatePlayerBomb(bullet); } else { this.detonateBossBomb(bullet); } }
       return;
     }
 
@@ -1715,7 +2039,7 @@
     if (wall) {
       var canPierceWall = this.canFieldPierceBullet(bullet);
       if (!canPierceWall) { bullet.alive = false; }
-      if (bullet.bossBomb) { this.detonateBossBomb(bullet); }
+      if (bullet.bossBomb) { if (bullet.playerBomb || bullet.playerMortar) { this.detonatePlayerBomb(bullet); } else { this.detonateBossBomb(bullet); } }
       TankGame.Effects.burst(bullet.x, bullet.y, wall.kind === "B" ? "#ffad72" : "#d9eee4", 8, 120);
       if (!canPierceWall && bullet.team === "player" && this.endlessPermanent.explosive && !bullet.fragment) { this.spawnFragments(bullet.x, bullet.y, this.player.bulletDamage); }
       if (wall.kind === "B") {
@@ -1785,7 +2109,7 @@
     var canPierceTarget = bullet.team === "player" && bullet.fieldPierceRemaining > 0;
     if (!canPierceTarget) { bullet.alive = false; }
     if (bullet.bossBomb) {
-      this.detonateBossBomb(bullet);
+      if (bullet.playerBomb || bullet.playerMortar) { this.detonatePlayerBomb(bullet); } else { this.detonateBossBomb(bullet); }
       return;
     }
     if (target.isBoss && target.bossShieldCharges > 0 && this.isFrontShieldHit(target, bullet)) {
@@ -1805,7 +2129,11 @@
       return;
     }
     if (target.team === "player" && this.consumeTemporaryShield(target, bullet.x, bullet.y)) { return; }
-    target.health -= bullet.damage;
+    if (bullet.team === "player" && this.runShop.instantKill && !target.isBoss && !target.isElite && !target.isBossClone && Math.random() < 0.001) {
+      target.health = 0;
+    } else {
+      target.health -= bullet.damage;
+    }
     if (target.team === "player") { this.registerPlayerDamage(); }
     target.hitFlash = 0.12;
     if (target.team === "player" && target.levelRepair) {
@@ -1904,9 +2232,25 @@
     if (this.player.alive && dx * dx + dy * dy <= Math.pow(radius + this.player.radius, 2)) {
       this.damagePlayerFromSpecial(bullet.damage, bullet.x, bullet.y);
     }
-    TankGame.Effects.burst(bullet.x, bullet.y, "#ffb000", 72, 300);
+    var particleScale = (bullet.fixedTurretMortar || bullet.turretWeapon === "bomb" || (bullet.bossBomb && !bullet.mortar)) ? 1.75 : 1;
+    TankGame.Effects.burst(bullet.x, bullet.y, "#ffb000", Math.round(72 * particleScale), 300);
+    TankGame.Effects.burst(bullet.x, bullet.y, "#ff5b24", Math.round(36 * particleScale), 220);
+    TankGame.Effects.burst(bullet.x, bullet.y, "#ffe66d", Math.round(24 * particleScale), 370);
+    this.shake = Math.max(this.shake, 9);
+    return true;
+  };
+
+  Game.prototype.detonatePlayerBomb = function (bullet) {
+    var self = this;
+    var radius = bullet.explosionRadius || 80;
+    if (bullet.bossBombDetonated) { return false; }
+    bullet.bossBombDetonated = true;
+    this.enemies.forEach(function (enemy) {
+      if (!enemy.alive || Math.hypot(enemy.x - bullet.x, enemy.y - bullet.y) > radius + enemy.radius) { return; }
+      self.damageEnemy(enemy, bullet.damage, bullet.x, bullet.y);
+    });
+    TankGame.Effects.burst(bullet.x, bullet.y, bullet.playerMortar ? "#d56bff" : "#ffb000", 72, 300);
     TankGame.Effects.burst(bullet.x, bullet.y, "#ff5b24", 36, 220);
-    TankGame.Effects.burst(bullet.x, bullet.y, "#ffe66d", 24, 370);
     this.shake = Math.max(this.shake, 9);
     return true;
   };
@@ -2132,6 +2476,240 @@
     this.supportAircraft = this.supportAircraft.filter(function (aircraft) { return aircraft.alive; });
   };
 
+  Game.prototype.isBossBattleActive = function () {
+    return Boolean(this.worldMap && this.worldMap.bossArena && this.findLevelBoss());
+  };
+
+  Game.prototype.createBossEmbers = function () {
+    var arena = this.worldMap.bossArena;
+    return Array.from({ length: 44 }, function () {
+      return {
+        x: arena.centerX + (Math.random() - 0.5) * 980,
+        y: arena.centerY + (Math.random() - 0.5) * 720,
+        life: 0.8 + Math.random() * 2.6,
+        maxLife: 3.4,
+        speed: 8 + Math.random() * 24,
+        size: 1.5 + Math.random() * 2.8,
+        phase: Math.random() * Math.PI * 2
+      };
+    });
+  };
+
+  Game.prototype.createBossWarParticles = function () {
+    var width = Config.viewportWidth || this.canvas.width;
+    var height = Config.viewportHeight || this.canvas.height;
+    var columns = 8;
+    var rows = 7;
+    var shades = ["#696969", "#808080", "#989898", "#b0b0b0", "#5b5b5b", "#c4c4c4"];
+    return Array.from({ length: columns * rows }, function (_, index) {
+      var column = index % columns;
+      var row = Math.floor(index / columns);
+      var edgeX = column === 0 ? 0 : (column === columns - 1 ? width : column * width / (columns - 1));
+      var edgeY = row === 0 ? 0 : (row === rows - 1 ? height : row * height / (rows - 1));
+      var jitterX = column === 0 || column === columns - 1 ? 0 : (Math.random() - 0.5) * 90;
+      var jitterY = row === 0 || row === rows - 1 ? 0 : (Math.random() - 0.5) * 70;
+      var angle = Math.PI / 4 + (Math.random() - 0.5) * 0.32;
+      var speed = 72 + Math.random() * 142;
+      return {
+        x: edgeX + jitterX,
+        y: edgeY + jitterY,
+        vx: -Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        angle: angle,
+        size: 1.4 + Math.random() * 3.8,
+        length: 12 + Math.random() * 30,
+        alpha: 0.18 + Math.random() * 0.4,
+        shade: shades[Math.floor(Math.random() * shades.length)],
+        wobble: Math.random() * Math.PI * 2,
+        phase: Math.random() * Math.PI * 2
+      };
+    });
+  };
+
+  Game.prototype.updateBossWarParticles = function (deltaTime) {
+    var width = Config.viewportWidth || this.canvas.width;
+    var height = Config.viewportHeight || this.canvas.height;
+    if (this.state === Config.states.CINEMATIC || this.state === Config.states.COUNTDOWN) { return; }
+    if (this.bossWarParticleDelay > 0) {
+      this.bossWarParticleDelay = Math.max(0, this.bossWarParticleDelay - deltaTime);
+      return;
+    }
+    this.bossWarParticleFade = Math.min(1, this.bossWarParticleFade + deltaTime / 1.2);
+    this.bossWarParticles.forEach(function (particle) {
+      particle.x += particle.vx * deltaTime;
+      particle.y += particle.vy * deltaTime;
+      particle.x += Math.sin(this.elapsed * 2.4 + particle.phase) * 3 * deltaTime;
+      particle.y += Math.cos(this.elapsed * 1.8 + particle.wobble) * 2 * deltaTime;
+      // Wrap each axis independently. Keeping the other coordinate prevents
+      // the diagonal stream from collapsing toward a shared reset corner.
+      if (particle.x < -particle.length - 12) { particle.x = width + particle.length; }
+      if (particle.x > width + particle.length + 12) { particle.x = -particle.length; }
+      if (particle.y < -particle.length - 12) { particle.y = height + particle.length; }
+      if (particle.y > height + particle.length + 12) { particle.y = -particle.length; }
+    }, this);
+  };
+
+  Game.prototype.updateFireHazards = function (deltaTime) {
+    var self = this;
+    var tanks = [this.player].concat(this.enemies || []);
+    if (!this.worldMap || !this.worldMap.isBossMap) { return; }
+    tanks.forEach(function (tank) {
+      if (!tank || !tank.alive) { return; }
+      var fireZones = (self.worldMap.firePatches || []).concat(self.bossFirePits || []);
+      var inFire = fireZones.some(function (patch) {
+        var radius = patch.radius + (tank.radius || 23) * 0.72;
+        return Math.hypot(tank.x - patch.x, tank.y - patch.y) <= radius;
+      });
+      if (inFire && !tank.burning) {
+        tank.burning = true;
+        tank.burnTickTimer = 0.5;
+        tank.burnSound = TankGame.Audio.playBurning ? TankGame.Audio.playBurning() : null;
+      }
+      if (!tank.burning) { return; }
+      tank.burningTimer = inFire ? 3 : Math.max(0, (tank.burningTimer || 0) - deltaTime);
+      tank.burnTickTimer -= deltaTime;
+      while (tank.burnTickTimer <= 0 && tank.alive) {
+        tank.burnTickTimer += 0.5;
+        self.applyFireDamage(tank);
+      }
+      if (tank.burningTimer <= 0.000001 || !tank.alive) {
+        tank.burning = false;
+        if (TankGame.Audio.stopBurningSound && tank.burnSound) { TankGame.Audio.stopBurningSound(tank.burnSound); }
+        tank.burnSound = null;
+      }
+    });
+  };
+
+  Game.prototype.applyFireDamage = function (tank) {
+    if (!tank || !tank.alive) { return; }
+    tank.health = Math.max(0, (tank.health || 0) - 2);
+    tank.hitFlash = 0.08;
+    TankGame.Effects.burst(tank.x, tank.y - 14, "#ff8a24", 5, 55);
+    if (tank.team === "player") { this.registerPlayerDamage(); }
+    if (tank.health > 0) { return; }
+    tank.alive = false;
+    if (TankGame.Audio.stopBurningSound && tank.burnSound) { TankGame.Audio.stopBurningSound(tank.burnSound); }
+    tank.burnSound = null;
+    tank.burning = false;
+    if (tank.team === "enemy") {
+      tank.wreck = true;
+      tank.wreckLife = 3;
+      tank.wreckParticles = tank.wreckParticles || [];
+      this.registerEnemyKill();
+    }
+  };
+
+  Game.prototype.updateBossBattleEffects = function (deltaTime) {
+    var self = this;
+    if (!this.isBossBattleActive()) {
+      this.bossMeteors = [];
+      this.bossFirePits = [];
+      return;
+    }
+    var boss = this.findLevelBoss();
+    this.updateBossWarParticles(deltaTime);
+    this.bossFirePits.forEach(function (pit) { pit.life -= deltaTime; });
+    this.bossFirePits = this.bossFirePits.filter(function (pit) { return pit.life > 0; });
+    this.bossEmbers.forEach(function (ember) {
+      ember.life -= deltaTime;
+      ember.y -= ember.speed * deltaTime;
+      ember.x += Math.sin(self.elapsed * 3 + ember.phase) * 5 * deltaTime;
+      if (ember.life <= 0) {
+        ember.x = self.player.x + (Math.random() - 0.5) * 980;
+        ember.y = self.player.y + 360 + Math.random() * 360;
+        ember.life = 0.8 + Math.random() * 2.6;
+      }
+    });
+    this.bossMeteors.forEach(function (meteor) {
+      meteor.timer -= deltaTime;
+      meteor.progress = Math.min(1, 1 - meteor.timer / meteor.duration);
+      meteor.x = meteor.startX + (meteor.targetX - meteor.startX) * meteor.progress;
+      meteor.y = meteor.startY + (meteor.targetY - meteor.startY) * meteor.progress;
+      meteor.rotation += meteor.spin * deltaTime;
+      if (meteor.timer <= 0) {
+        self.impactBossMeteor(meteor);
+        meteor.alive = false;
+      }
+    });
+    this.bossMeteors = this.bossMeteors.filter(function (meteor) { return meteor.alive; });
+    this.bossMeteorTimer -= deltaTime;
+    if (this.bossMeteorTimer <= 0) {
+      var meteorConfig = Config.bossMeteor;
+      this.spawnBossMeteors(meteorConfig.minimumCount + Math.floor(Math.random() *
+        (meteorConfig.maximumCount - meteorConfig.minimumCount + 1)));
+      this.bossMeteorTimer = meteorConfig.minimumInterval +
+        Math.random() * (meteorConfig.maximumInterval - meteorConfig.minimumInterval);
+    }
+    if (boss && !boss.alive) { this.bossMeteors = []; }
+  };
+
+  Game.prototype.spawnBossMeteors = function (count, targets) {
+    if (!this.isBossBattleActive()) { return []; }
+    var created = [];
+    var targetList = targets || [];
+    var meteorConfig = Config.bossMeteor;
+    for (var index = 0; index < count; index += 1) {
+      var target = targetList[index] || {
+        x: meteorConfig.radius + Math.random() * (Config.worldWidth - meteorConfig.radius * 2),
+        y: meteorConfig.radius + Math.random() * (Config.worldHeight - meteorConfig.radius * 2)
+      };
+      var flightAngle = Math.random() < 0.5 ? Math.PI / 4 : Math.PI * 3 / 4;
+      var entryDistance = 900 + Math.random() * 280;
+      var startX = target.x - Math.cos(flightAngle) * entryDistance;
+      var startY = target.y - Math.sin(flightAngle) * entryDistance;
+      var meteor = {
+        x: startX,
+        y: startY,
+        startX: startX,
+        startY: startY,
+        targetX: target.x,
+        targetY: target.y,
+        timer: meteorConfig.duration,
+        duration: meteorConfig.duration,
+        progress: 0,
+        radius: meteorConfig.radius,
+        damage: meteorConfig.damage,
+        flightAngle: flightAngle,
+        rotation: Math.random() * Math.PI * 2,
+        spin: (Math.random() - 0.5) * 8,
+        alive: true
+      };
+      this.bossMeteors.push(meteor);
+      created.push(meteor);
+    }
+    return created;
+  };
+
+  Game.prototype.impactBossMeteor = function (meteor) {
+    var self = this;
+    var impact = { x: meteor.targetX, y: meteor.targetY, radius: meteor.radius };
+    var obstacles = TankGame.Map.queryObstacles(this.worldMap,
+      impact.x - impact.radius, impact.y - impact.radius,
+      impact.x + impact.radius, impact.y + impact.radius).slice();
+    obstacles.forEach(function (obstacle) {
+      if (obstacle.row === 0 || obstacle.row === TankGame.Map.rows - 1 ||
+          obstacle.column === 0 || obstacle.column === TankGame.Map.columns - 1) { return; }
+      if (!TankGame.Collision.circleIntersectsRectangle(impact, obstacle)) { return; }
+      if (["#", "B", "I"].indexOf(obstacle.kind) !== -1) {
+        TankGame.Map.removeObstacle(self.worldMap, obstacle);
+      }
+    });
+    if (this.fieldCrystals) {
+      this.fieldCrystals = this.fieldCrystals.filter(function (crystal) {
+        return Math.hypot(crystal.x - impact.x, crystal.y - impact.y) > impact.radius;
+      });
+    }
+    if (this.player.alive && Math.hypot(this.player.x - impact.x, this.player.y - impact.y) <= impact.radius + this.player.radius) {
+      this.damagePlayerFromSpecial(meteor.damage, impact.x, impact.y);
+    }
+    TankGame.Effects.burst(impact.x, impact.y, "#ffb000", 100, 340);
+    TankGame.Effects.burst(impact.x, impact.y, "#ff5b24", 70, 250);
+    TankGame.Effects.burst(impact.x, impact.y, "#ffe66d", 44, 420);
+    this.bossFirePits.push({ x: impact.x, y: impact.y, radius: impact.radius, life: 12, maxLife: 12, seed: Math.random() * 100000 });
+    TankGame.Effects.burst(impact.x, impact.y - 10, "#655344", 34, 110);
+    this.shake = Math.max(this.shake, 14);
+  };
+
   Game.prototype.collectSupply = function (supply) {
     if (supply.type === "repair") { this.applyRepair(this.player); }
     if (supply.type === "shield") {
@@ -2173,6 +2751,8 @@
     this.drawTracks(context);
     this.drawWrecks(context);
     TankGame.Map.draw(context, this.worldMap, bounds);
+    this.drawBossBattleEffects(context);
+    this.drawBossFirePits(context);
     if (cinematicActive) { this.cinematic.drawRotorWash(context); }
     this.drawFrontStepTrails(context);
     this.drawBossCloneTrails(context);
@@ -2186,6 +2766,7 @@
       if (!cinematicActive || enemy !== this.cinematic.boss) { TankGame.Entities.drawTank(context, enemy); }
     }, this);
     this.drawMarkedTarget(context);
+    this.drawMortarWarnings(context);
     this.drawRearGuards(context);
     this.drawBraveReviveShield(context);
     if (this.player.alive && (this.player.paradiseMade || this.player.invulnerable <= 0 || Math.floor(this.elapsed * 10) % 2 === 0)) {
@@ -2195,6 +2776,7 @@
       this.cinematic.drawBoss(context);
       this.cinematic.drawAircraft(context);
     }
+    if (this.drawFieldSiteFront) { this.drawFieldSiteFront(context); }
     this.bullets.forEach(function (bullet) { TankGame.Entities.drawBullet(context, bullet); });
     this.drawBossLasers(context);
     this.drawMuzzleFlashes(context);
@@ -2213,12 +2795,185 @@
       this.drawRespawnMessage(context);
     }
     context.restore();
+    if (this.isBossBattleActive() && [Config.states.CINEMATIC, Config.states.COUNTDOWN].indexOf(this.state) === -1) { this.drawBossWarParticles(context); }
     if (cinematicActive) { this.cinematic.drawScreenOverlay(context); }
     if ([Config.states.COUNTDOWN, Config.states.PLAYING, Config.states.PAUSED].indexOf(this.state) !== -1) {
       this.drawTacticalRadar(context);
       this.drawPerspectiveIndicators(context);
       this.drawLowHealthWarning(context);
     }
+  };
+
+  Game.prototype.drawBossBattleEffects = function (context) {
+    if (!this.isBossBattleActive()) { return; }
+    this.bossEmbers.forEach(function (ember) {
+      context.save();
+      context.globalAlpha = Math.max(0, Math.min(1, ember.life / ember.maxLife));
+      context.fillStyle = ember.size > 3 ? "#ff7a45" : "#ffd166";
+      context.shadowColor = "#ff4d24";
+      context.shadowBlur = 10;
+      context.beginPath();
+      context.arc(ember.x, ember.y, ember.size, 0, Math.PI * 2);
+      context.fill();
+      context.restore();
+    });
+    this.bossMeteors.forEach(function (meteor) {
+      var scale = 0.75 + meteor.progress * 0.55;
+      var trailLength = 70 + meteor.progress * 70;
+      context.save();
+      context.translate(meteor.x, meteor.y);
+      context.rotate(meteor.flightAngle);
+      context.globalAlpha = 0.6;
+      context.strokeStyle = "#ff5b24";
+      context.lineWidth = 13 * scale;
+      context.shadowColor = "#ff3b16";
+      context.shadowBlur = 24;
+      context.beginPath();
+      context.moveTo(-trailLength, 12);
+      context.lineTo(-18, 4);
+      context.stroke();
+      context.strokeStyle = "#ffd166";
+      context.lineWidth = 6 * scale;
+      context.beginPath();
+      context.moveTo(-trailLength + 8, 12);
+      context.lineTo(-15, 3);
+      context.stroke();
+      context.globalAlpha = 1;
+      context.rotate(meteor.rotation);
+      context.shadowColor = "#ff6b2c";
+      context.shadowBlur = 18;
+      context.fillStyle = "#403b39";
+      context.beginPath();
+      context.moveTo(-19 * scale, -10 * scale);
+      context.lineTo(-7 * scale, -20 * scale);
+      context.lineTo(10 * scale, -15 * scale);
+      context.lineTo(19 * scale, -2 * scale);
+      context.lineTo(12 * scale, 15 * scale);
+      context.lineTo(-5 * scale, 20 * scale);
+      context.lineTo(-19 * scale, 10 * scale);
+      context.closePath();
+      context.fill();
+      context.fillStyle = "#7d6b5b";
+      context.beginPath();
+      context.moveTo(-11 * scale, -8 * scale);
+      context.lineTo(-3 * scale, -14 * scale);
+      context.lineTo(6 * scale, -10 * scale);
+      context.lineTo(10 * scale, -2 * scale);
+      context.lineTo(1 * scale, 3 * scale);
+      context.lineTo(-9 * scale, 1 * scale);
+      context.closePath();
+      context.fill();
+      context.fillStyle = "#241f1e";
+      context.beginPath();
+      context.arc(8 * scale, 7 * scale, 4 * scale, 0, Math.PI * 2);
+      context.arc(-8 * scale, -4 * scale, 3 * scale, 0, Math.PI * 2);
+      context.fill();
+      context.restore();
+    });
+  };
+
+  Game.prototype.drawBossFirePits = function (context) {
+    if (!this.isBossBattleActive()) { return; }
+    this.bossFirePits.forEach(function (pit) {
+      var pulse = 0.94 + Math.sin(this.elapsed * 7 + pit.seed) * 0.06;
+      context.save();
+      context.globalAlpha = 0.48;
+      context.fillStyle = "#4a211b";
+      context.shadowColor = "#ff4d24";
+      context.shadowBlur = 25;
+      context.beginPath();
+      context.arc(pit.x, pit.y, pit.radius * pulse, 0, Math.PI * 2);
+      context.fill();
+      for (var index = 0; index < 20; index += 1) {
+        var angle = index * 0.57 + pit.seed;
+        var distance = pit.radius * (0.18 + (index % 5) * 0.14);
+        var x = pit.x + Math.cos(angle) * distance;
+        var y = pit.y + Math.sin(angle) * distance;
+        var height = 12 + (index % 4) * 5 + Math.sin(this.elapsed * 10 + index) * 3;
+        context.globalAlpha = 0.5 + (index % 3) * 0.1;
+        context.fillStyle = index % 2 ? "#ff8c24" : "#ffd166";
+        context.beginPath();
+        context.moveTo(x, y + 8);
+        context.quadraticCurveTo(x - 7, y - height * 0.12, x - 1, y - height);
+        context.quadraticCurveTo(x + 7, y - height * 0.35, x, y + 8);
+        context.fill();
+      }
+      context.restore();
+    }, this);
+  };
+
+  Game.prototype.drawBossWarParticles = function (context) {
+    if (!this.isBossBattleActive() || this.bossWarParticleDelay > 0 || this.state === Config.states.CINEMATIC || this.state === Config.states.COUNTDOWN) { return; }
+    var fade = this.bossWarParticleFade * this.bossWarParticleFade * (3 - 2 * this.bossWarParticleFade);
+    this.bossWarParticles.forEach(function (particle) {
+      context.save();
+      context.globalAlpha = particle.alpha * fade;
+      context.translate(particle.x, particle.y);
+      context.rotate(particle.angle);
+      context.strokeStyle = particle.shade;
+      context.lineWidth = particle.size;
+      context.lineCap = "round";
+      context.shadowColor = particle.shade;
+      context.shadowBlur = particle.size * 2.5;
+      context.beginPath();
+      context.moveTo(-particle.length * 0.5, 0);
+      context.lineTo(particle.length * 0.5, 0);
+      context.stroke();
+      context.restore();
+    });
+  };
+
+  Game.prototype.drawMortarWarnings = function (context) {
+    this.mortarWarnings.forEach(function (warning) {
+      if (!warning.alive) { return; }
+      context.save();
+      context.globalAlpha = 0.34;
+      context.fillStyle = "#e34336";
+      context.shadowColor = "rgba(227, 67, 54, 0.65)";
+      context.shadowBlur = 10;
+      context.beginPath();
+      context.arc(warning.x, warning.y, warning.radius, 0, Math.PI * 2);
+      context.fill();
+      context.globalAlpha = 0.86;
+      context.strokeStyle = "#ff5b4f";
+      context.lineWidth = 3;
+      context.beginPath();
+      context.arc(warning.x, warning.y, warning.radius, 0, Math.PI * 2);
+      context.stroke();
+      context.strokeStyle = "rgba(255, 226, 194, 0.92)";
+      context.lineWidth = 2;
+      context.beginPath();
+      context.moveTo(warning.x - warning.radius - 9, warning.y);
+      context.lineTo(warning.x - warning.radius + 12, warning.y);
+      context.moveTo(warning.x + warning.radius - 12, warning.y);
+      context.lineTo(warning.x + warning.radius + 9, warning.y);
+      context.moveTo(warning.x, warning.y - warning.radius - 9);
+      context.lineTo(warning.x, warning.y - warning.radius + 12);
+      context.moveTo(warning.x, warning.y + warning.radius - 12);
+      context.lineTo(warning.x, warning.y + warning.radius + 9);
+      context.stroke();
+      context.strokeStyle = "rgba(255, 240, 210, 0.74)";
+      context.lineWidth = 1.5;
+      context.beginPath();
+      context.moveTo(warning.x - warning.radius * 0.7, warning.y - warning.radius * 0.7);
+      context.lineTo(warning.x - warning.radius * 0.42, warning.y - warning.radius * 0.7);
+      context.lineTo(warning.x - warning.radius * 0.7, warning.y - warning.radius * 0.42);
+      context.moveTo(warning.x + warning.radius * 0.7, warning.y - warning.radius * 0.7);
+      context.lineTo(warning.x + warning.radius * 0.42, warning.y - warning.radius * 0.7);
+      context.lineTo(warning.x + warning.radius * 0.7, warning.y - warning.radius * 0.42);
+      context.moveTo(warning.x - warning.radius * 0.7, warning.y + warning.radius * 0.7);
+      context.lineTo(warning.x - warning.radius * 0.42, warning.y + warning.radius * 0.7);
+      context.lineTo(warning.x - warning.radius * 0.7, warning.y + warning.radius * 0.42);
+      context.moveTo(warning.x + warning.radius * 0.7, warning.y + warning.radius * 0.7);
+      context.lineTo(warning.x + warning.radius * 0.42, warning.y + warning.radius * 0.7);
+      context.lineTo(warning.x + warning.radius * 0.7, warning.y + warning.radius * 0.42);
+      context.stroke();
+      context.fillStyle = "rgba(255, 242, 218, 0.95)";
+      context.beginPath();
+      context.arc(warning.x, warning.y, 3, 0, Math.PI * 2);
+      context.fill();
+      context.restore();
+    });
   };
 
   Game.prototype.drawMarkedTarget = function (context) {
@@ -2726,6 +3481,10 @@
   };
 
   Game.prototype.drawGround = function (context, bounds) {
+    if (this.worldMap && this.worldMap.isBossMap) {
+      this.drawWastelandGround(context, bounds);
+      return;
+    }
     var left = bounds ? bounds.left : 0;
     var top = bounds ? bounds.top : 0;
     var right = bounds ? bounds.right : Config.worldWidth;
@@ -2790,7 +3549,28 @@
     }
     context.restore();
   };
+  Game.prototype.drawWastelandGround = function (context, bounds) {
+    var left = bounds ? bounds.left : 0;
+    var top = bounds ? bounds.top : 0;
+    var right = bounds ? bounds.right : Config.worldWidth;
+    var bottom = bounds ? bounds.bottom : Config.worldHeight;
+    var hash = function (x, y, salt) { var v = Math.imul((x | 0) ^ 0x45D9F3B, 0x27D4EB2D); v = Math.imul(v ^ (y | 0), 0x165667B1); v = Math.imul(v ^ (salt | 0), 0x9E3779B1); v ^= v >>> 15; return (v >>> 0) / 4294967296; };
+    context.fillStyle = "#2d2926"; context.fillRect(left, top, right - left, bottom - top);
+    context.save();
+    for (var y = Math.floor(top / 42) * 42; y < bottom + 42; y += 42) {
+      for (var x = Math.floor(left / 42) * 42; x < right + 42; x += 42) {
+        var tone = hash(Math.floor(x / 42), Math.floor(y / 42), 31);
+        context.fillStyle = tone > 0.55 ? "rgba(119, 94, 69, 0.19)" : "rgba(12, 12, 12, 0.2)";
+        context.fillRect(x + 3, y + 4, 32 + Math.floor(tone * 8), 25);
+        if (tone < 0.42) { context.strokeStyle = "rgba(9, 8, 8, 0.46)"; context.lineWidth = 2; context.beginPath(); context.moveTo(x + 8, y + 13); context.lineTo(x + 19, y + 22); context.lineTo(x + 14, y + 32); context.stroke(); }
+        if (tone > 0.72) { context.fillStyle = "rgba(204, 157, 96, 0.38)"; context.fillRect(x + 22, y + 9, 3, 3); context.fillRect(x + 28, y + 15, 2, 2); }
+      }
+    }
+    context.restore();
+  };
+
   Game.prototype.drawCampusGrid = function (context, bounds) {
+    if (this.worldMap && this.worldMap.isBossMap) { return; }
     var spacing = Config.tileSize;
     var left = bounds ? Math.floor(bounds.left / spacing) * spacing : 0;
     var right = bounds ? Math.ceil(bounds.right / spacing) * spacing : Config.worldWidth;

@@ -47,8 +47,15 @@
     context.shadowColor = "rgba(0, 0, 0, 0.6)";
     context.shadowBlur = 8 / definition.scale;
     context.shadowOffsetY = 5 / definition.scale;
+    if (tank.team === "player" && tank.skin && tank.skin !== "default") {
+      context.filter = tank.skin === "red" ? "hue-rotate(320deg) saturate(1.8)" :
+        (tank.skin === "yellow" ? "hue-rotate(28deg) saturate(1.9) brightness(1.12)" :
+          (tank.skin === "blue" ? "hue-rotate(175deg) saturate(1.7) brightness(0.96)" : "hue-rotate(72deg) saturate(1.35) brightness(0.9)"));
+    }
     if (tank.hitFlash > 0) {
       context.filter = "brightness(1.75) saturate(0.45)";
+    } else if (tank.burning) {
+      context.filter = "brightness(1.2) saturate(3.4) hue-rotate(-18deg)";
     } else if (shadow) {
       context.filter = "sepia(0.9) saturate(2.2) hue-rotate(225deg) brightness(0.72)";
     }
@@ -69,53 +76,41 @@
   function drawFixedTurret(context, tank, drawY) {
     var scale = (tank.visualScale || 1) * 1.12;
     var flash = tank.hitFlash > 0;
-
-    // The base stays aligned to the battlefield while the armored head tracks its target.
+    var burning = tank.burning;
+    var hull = burning ? "#8e3229" : (flash ? "#e4d8c1" : "#8d8573");
+    var lightHull = burning ? "#c24c35" : (flash ? "#efe5d0" : "#b6a78d");
     context.save();
     context.translate(tank.x, drawY);
     context.scale(scale, scale);
-    context.shadowColor = "rgba(0, 0, 0, 0.72)";
-    context.shadowBlur = 13;
-    context.shadowOffsetY = 8;
-
-    context.fillStyle = "#242722";
-    context.fillRect(-38, -38, 76, 76);
-    context.shadowColor = "transparent";
-    context.fillStyle = flash ? "#ebe6cf" : "#67665e";
-    context.fillRect(-35, -35, 70, 70);
-
-    context.fillStyle = flash ? "#f4eed8" : "#9a927f";
+    context.shadowColor = "rgba(0, 0, 0, 0.78)";
+    context.shadowBlur = 15;
+    context.shadowOffsetY = 9;
+    context.fillStyle = "#1f1c1a";
     context.beginPath();
-    context.moveTo(-27, -32);
-    context.lineTo(27, -32);
-    context.lineTo(32, -27);
-    context.lineTo(32, 27);
-    context.lineTo(27, 32);
-    context.lineTo(-27, 32);
-    context.lineTo(-32, 27);
-    context.lineTo(-32, -27);
-    context.closePath();
+    context.moveTo(-43, -31); context.lineTo(-31, -43); context.lineTo(31, -43); context.lineTo(43, -31);
+    context.lineTo(43, 31); context.lineTo(31, 43); context.lineTo(-31, 43); context.lineTo(-43, 31); context.closePath();
     context.fill();
-    context.strokeStyle = "#3a3b36";
-    context.lineWidth = 3;
-    context.stroke();
-
-    context.fillStyle = flash ? "#d9d4c2" : "#67675f";
-    context.fillRect(-29, -29, 8, 58);
-    context.fillRect(21, -29, 8, 58);
-    context.fillRect(-17, -30, 34, 5);
-    context.fillRect(-17, 25, 34, 5);
-    context.fillStyle = "#343630";
-    context.fillRect(-27, -20, 7, 14);
-    context.fillRect(-27, 6, 7, 14);
-    context.fillRect(20, -20, 7, 14);
-    context.fillRect(20, 6, 7, 14);
-
-    context.fillStyle = "#252823";
-    [[-27, -27], [27, -27], [27, 27], [-27, 27]].forEach(function (bolt) {
-      context.beginPath();
-      context.arc(bolt[0], bolt[1], 2.2, 0, Math.PI * 2);
-      context.fill();
+    context.shadowColor = "transparent";
+    context.fillStyle = "#4a4740";
+    context.fillRect(-38, -36, 76, 72);
+    context.fillStyle = hull;
+    context.beginPath();
+    context.moveTo(-30, -34); context.lineTo(30, -34); context.lineTo(36, -27); context.lineTo(36, 27);
+    context.lineTo(28, 34); context.lineTo(-28, 34); context.lineTo(-36, 27); context.lineTo(-36, -27); context.closePath();
+    context.fill();
+    context.strokeStyle = "#252523"; context.lineWidth = 3; context.stroke();
+    context.fillStyle = lightHull;
+    context.fillRect(-27, -28, 54, 8);
+    context.fillRect(-27, 20, 54, 7);
+    context.fillStyle = "#383733";
+    context.fillRect(-33, -19, 7, 14); context.fillRect(-33, 6, 7, 14);
+    context.fillRect(26, -19, 7, 14); context.fillRect(26, 6, 7, 14);
+    context.fillStyle = "#1e201e";
+    context.fillRect(-25, -30, 8, 60); context.fillRect(17, -30, 8, 60);
+    context.strokeStyle = "rgba(229, 207, 166, 0.45)"; context.lineWidth = 2;
+    context.strokeRect(-31, -28, 62, 56);
+    [[-30, -28], [30, -28], [30, 28], [-30, 28]].forEach(function (bolt) {
+      context.fillStyle = "#171817"; context.beginPath(); context.arc(bolt[0], bolt[1], 3, 0, Math.PI * 2); context.fill();
     });
     context.restore();
 
@@ -123,54 +118,67 @@
     context.translate(tank.x, drawY);
     context.rotate(tank.turretAngle);
     context.scale(scale, scale);
-    context.shadowColor = "rgba(0, 0, 0, 0.58)";
-    context.shadowBlur = 8;
-    context.shadowOffsetY = 4;
-
-    context.fillStyle = "#20231f";
-    context.fillRect(8, -7, 52, 14);
-    context.fillStyle = flash ? "#eee9d3" : "#8e8877";
-    context.fillRect(9, -5, 47, 10);
-    context.fillStyle = "#403f39";
-    context.fillRect(27, -6, 5, 12);
-    context.fillRect(47, -6, 5, 12);
-    context.fillStyle = "#171a17";
-    context.fillRect(55, -8, 9, 16);
-    context.fillStyle = "#b4aa91";
-    context.fillRect(55, -4, 7, 8);
-
-    context.fillStyle = flash ? "#f4eed8" : "#b2a98f";
+    context.shadowColor = "rgba(0, 0, 0, 0.7)";
+    context.shadowBlur = 11;
+    context.shadowOffsetY = 5;
+    context.fillStyle = "#1e1c1a";
     context.beginPath();
-    context.moveTo(-19, -16);
-    context.lineTo(-8, -23);
-    context.lineTo(13, -20);
-    context.lineTo(23, -10);
-    context.lineTo(23, 10);
-    context.lineTo(13, 20);
-    context.lineTo(-8, 23);
-    context.lineTo(-19, 16);
-    context.closePath();
-    context.fill();
-    context.strokeStyle = "#393a34";
-    context.lineWidth = 3;
-    context.stroke();
-
-    context.fillStyle = flash ? "#ded8c4" : "#817b6b";
+    context.moveTo(-25, -22); context.lineTo(10, -25); context.lineTo(28, -14); context.lineTo(31, 14);
+    context.lineTo(13, 25); context.lineTo(-25, 21); context.closePath(); context.fill();
+    context.shadowColor = "transparent";
+    context.fillStyle = hull;
     context.beginPath();
-    context.arc(-4, 0, 11, 0, Math.PI * 2);
-    context.fill();
-    context.strokeStyle = "#4a4941";
-    context.lineWidth = 2;
-    context.stroke();
-    context.fillStyle = "#393b35";
-    context.fillRect(-11, -2, 14, 4);
-
-    context.fillStyle = tank.turretWeapon === "mortar" ? "#c24d3d" : (tank.turretWeapon === "bomb" ? "#d89a35" : "#8eaa4a");
-    context.beginPath();
-    context.arc(-14, 13, 2.8, 0, Math.PI * 2);
-    context.fill();
+    context.moveTo(-21, -18); context.lineTo(9, -21); context.lineTo(23, -11); context.lineTo(25, 11);
+    context.lineTo(11, 20); context.lineTo(-21, 16); context.closePath(); context.fill();
+    context.strokeStyle = "#2d2c28"; context.lineWidth = 3; context.stroke();
+    context.fillStyle = lightHull;
+    context.fillRect(-12, -14, 23, 5);
+    context.fillStyle = "#34332e";
+    context.fillRect(-13, -7, 23, 14);
+    context.strokeStyle = "rgba(230, 211, 174, 0.44)"; context.lineWidth = 2;
+    context.strokeRect(-18, -16, 35, 30);
+    context.fillStyle = "#171817";
+    context.fillRect(6, -9, 31, 18);
+    context.fillStyle = "#403f38";
+    context.fillRect(10, -6, 26, 12);
+    context.fillStyle = "#181918";
+    context.fillRect(34, -11, 8, 22);
+    context.fillStyle = "#7c7360";
+    context.fillRect(35, -7, 5, 14);
+    context.fillStyle = "#cb503b";
+    context.beginPath(); context.arc(-14, 12, 3.4, 0, Math.PI * 2); context.fill();
     context.restore();
   }
+  function drawBurningEffect(context, tank, drawY) {
+    if (!tank.burning || !tank.alive) { return; }
+    var now = performance.now();
+    context.save();
+    context.translate(tank.x, drawY);
+    context.globalAlpha = 0.72;
+    context.strokeStyle = "#ff453a";
+    context.lineWidth = 4;
+    context.shadowColor = "#ff3b18";
+    context.shadowBlur = 16;
+    context.beginPath();
+    context.arc(0, 0, (tank.radius || 23) + 5 + Math.sin(now / 90) * 2, 0, Math.PI * 2);
+    context.stroke();
+    for (var index = 0; index < 7; index += 1) {
+      var angle = index * 0.92 + now / 700;
+      var distance = (tank.radius || 23) * (0.35 + (index % 3) * 0.18);
+      var x = Math.cos(angle) * distance;
+      var y = Math.sin(angle) * distance - 4;
+      var height = 9 + (index % 3) * 4 + Math.sin(now / 105 + index) * 2;
+      context.globalAlpha = 0.5 + (index % 2) * 0.15;
+      context.fillStyle = index % 2 ? "#ff8a24" : "#ffd166";
+      context.beginPath();
+      context.moveTo(x, y + 7);
+      context.quadraticCurveTo(x - 5, y - height * 0.1, x - 1, y - height);
+      context.quadraticCurveTo(x + 6, y - height * 0.32, x, y + 7);
+      context.fill();
+    }
+    context.restore();
+  }
+
   function isBoundaryObstacle(obstacle) {
     return obstacle.row === 0 || obstacle.row === TankGame.Map.rows - 1 ||
       obstacle.column === 0 || obstacle.column === TankGame.Map.columns - 1;
@@ -295,6 +303,7 @@
         context.fillStyle = "#d3a448";
         context.fillRect(tank.x - 32 * scale, drawY - 50 * scale, 64 * scale * Math.max(0, tank.health / (tank.maxHealth || 50)), 4);
         context.restore();
+        drawBurningEffect(context, tank, drawY);
         return;
       }
       if (!drawTankSprites(context, tank, drawY, shadow)) {
@@ -308,9 +317,9 @@
         context.shadowOffsetY = 6;
         context.fillStyle = "#101815";
         context.fillRect(-27, -25, 54, 50);
-        context.fillStyle = tank.hitFlash > 0 ? "#f1f4d6" : (tank.team === "player" ? "#2f463c" : (boss ? "#8b0000" : (elite ? "#72191d" : (shadow ? "#392a55" : "#5c332f"))));
+        context.fillStyle = tank.burning ? "#b72d28" : (tank.hitFlash > 0 ? "#f1f4d6" : (tank.team === "player" ? "#2f463c" : (boss ? "#8b0000" : (elite ? "#72191d" : (shadow ? "#392a55" : "#5c332f")))));
         context.fillRect(-21, -22, 42, 44);
-        context.fillStyle = tank.team === "player" ? "#8cf6c3" : (boss ? "#ffd700" : (elite ? "#c89b3c" : (shadow ? "#c77dff" : "#ff8e71")));
+        context.fillStyle = tank.burning ? "#ff453a" : (tank.team === "player" ? "#8cf6c3" : (boss ? "#ffd700" : (elite ? "#c89b3c" : (shadow ? "#c77dff" : "#ff8e71"))));
         context.fillRect(-28, -25, 9, 50);
         context.fillRect(19, -25, 9, 50);
         if (elite || boss) {
@@ -409,6 +418,8 @@
         context.restore();
       }
 
+      drawBurningEffect(context, tank, drawY);
+
       if (tank.team === "player" && tank.shieldCharges > 0 && (tank.levelShield || tank.shieldTimer > 0)) {
         context.save();
         context.strokeStyle = "rgba(114, 207, 255, 0.85)";
@@ -488,17 +499,37 @@
     },
 
     drawBullet: function (context, bullet) {
+      if (bullet.fixedTurretMortar) {
+        var progress = 1 - Math.max(0, bullet.flightTimer) / bullet.flightDuration;
+        var height = Math.sin(progress * Math.PI) * 56;
+        context.save();
+        context.shadowColor = "#ff6b51";
+        context.shadowBlur = 15;
+        context.fillStyle = "#d24f3b";
+        context.beginPath();
+        context.arc(bullet.x, bullet.y - height, bullet.radius * 4, 0, Math.PI * 2);
+        context.fill();
+        context.fillStyle = "#ffd18a";
+        context.beginPath();
+        context.arc(bullet.x - 4, bullet.y - height - 4, Math.max(4, bullet.radius * 0.35), 0, Math.PI * 2);
+        context.fill();
+        context.restore();
+        return;
+      }
       context.save();
-      context.strokeStyle = bullet.fieldArmor ? "rgba(255, 68, 54, 0.88)" : (bullet.team === "player" ? "rgba(183, 255, 220, 0.7)" :
-        (bullet.bossBomb ? "rgba(255, 176, 0, 0.82)" : (bullet.bossBurst ? "rgba(255, 215, 0, 0.78)" : "rgba(255, 143, 113, 0.72)")));
+      context.strokeStyle = bullet.fieldArmor ? "rgba(255, 68, 54, 0.88)" :
+        (bullet.redBullet ? "rgba(255, 68, 54, 0.92)" :
+          (bullet.team === "player" ? "rgba(183, 255, 220, 0.7)" :
+            (bullet.bossBomb ? "rgba(255, 176, 0, 0.82)" :
+              (bullet.bossBurst ? "rgba(255, 215, 0, 0.78)" : "rgba(255, 143, 113, 0.72)"))));
       context.lineWidth = 3;
       context.beginPath();
       context.moveTo(bullet.previousX, bullet.previousY);
       context.lineTo(bullet.x, bullet.y);
       context.stroke();
-      context.shadowColor = bullet.fieldArmor ? "#ff3b30" : (bullet.team === "player" ? "#8cf6c3" : (bullet.bossBomb || bullet.bossBurst ? "#ffd700" : "#ff715c"));
+      context.shadowColor = bullet.fieldArmor ? "#ff3b30" : (bullet.redBullet ? "#ff3028" : (bullet.team === "player" ? "#8cf6c3" : (bullet.bossBomb || bullet.bossBurst ? "#ffd700" : "#ff715c")));
       context.shadowBlur = bullet.bossBomb ? 20 : 12;
-      context.fillStyle = bullet.fieldArmor ? "#ff453a" : (bullet.bossBomb ? "#ff8c00" : (bullet.bossBurst ? "#fff2a8" : "#fff7cf"));
+      context.fillStyle = bullet.fieldArmor ? "#ff453a" : (bullet.redBullet ? "#ff3028" : (bullet.bossBomb ? "#ff8c00" : (bullet.bossBurst ? "#fff2a8" : "#fff7cf")));
       context.beginPath();
       context.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
       context.fill();
