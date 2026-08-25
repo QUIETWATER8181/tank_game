@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 288">
+  <defs>
+    <linearGradient id="front" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#8faeb5"/><stop offset=".25" stop-color="#4a6875"/><stop offset="1" stop-color="#142532"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="7" stdDeviation="4" flood-color="#030b12" flood-opacity=".85"/></filter>
+  </defs>
+  <!-- Broken shrine arch leaves a clear opening for the tank body. -->
+  <g fill="none" stroke="#101a26" stroke-width="11" stroke-linejoin="round" filter="url(#shadow)">
+    <path d="M24 288V225c0-43 31-70 62-70h116c31 0 62 27 62 70v63" fill="#2b4653"/>
+    <path d="M24 225h42v63H24m198-63h42v63h-42" fill="url(#front)"/>
+    <path d="M67 218c4-31 25-48 47-48h60c22 0 43 17 47 48" stroke="#77959f" stroke-width="15"/>
+    <path d="M67 218c4-31 25-48 47-48h60c22 0 43 17 47 48" stroke="#d6f4fa" stroke-width="4" opacity=".55"/>
+  </g>
+  <path d="M0 254h73v34H0Zm215 0h73v34h-73Z" fill="#162a36" stroke="#0b151e" stroke-width="7"/>
+  <path d="M8 259h57m168 0h48" stroke="#72cfff" stroke-width="4" opacity=".7"/>
+</svg>

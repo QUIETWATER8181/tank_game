@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <base href="../">
+  <title>Boss cinematic visual check</title>
+  <style>
+    html, body { margin: 0; overflow: hidden; background: #030705; }
+    canvas { display: block; width: 1440px; height: 900px; }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" width="1440" height="900"></canvas>
+  <script src="js/config.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/input.js"></script>
+  <script src="js/collision.js"></script>
+  <script src="js/entities.js"></script>
+  <script src="js/cinematic.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/effects.js"></script>
+  <script src="js/game.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      var canvas = document.getElementById("gameCanvas");
+      var input = new TankGame.InputManager(canvas);
+      var game = new TankGame.Game(canvas, input);
+      var requestedTime = Number(new URLSearchParams(location.search).get("time"));
+      game.setMode("endless");
+      game.endlessLevel = 10;
+      game.resetWorld(true);
+      game.beginLevel();
+      if (game.cinematic && Number.isFinite(requestedTime)) {
+        game.cinematic.time = Math.max(0, Math.min(game.cinematic.duration - 0.01, requestedTime));
+      }
+      function frame() {
+        game.render();
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }());
+  </script>
+</body>
+</html>

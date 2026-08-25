@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 288">
+  <defs>
+    <linearGradient id="front" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#789995"/><stop offset=".22" stop-color="#405b5c"/><stop offset="1" stop-color="#101c23"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="6" stdDeviation="4" flood-color="#03080c" flood-opacity=".8"/></filter>
+  </defs>
+  <!-- Transparent center is the passage; the near-side forge rail occludes the tank. -->
+  <path d="M0 222h72v-16h144v16h72v66H0Z" fill="#071117" opacity=".35"/>
+  <g filter="url(#shadow)" stroke="#101820" stroke-width="7" stroke-linejoin="round">
+    <path d="M0 222h72v-16h144v16h72v23H0Z" fill="url(#front)"/>
+    <path d="M0 245h288v43H0Z" fill="#17272d"/>
+    <path d="M0 245h288" stroke="#c7e4dc" stroke-width="4" opacity=".58"/>
+    <path d="M72 206h144v39H72Z" fill="#263b3e"/>
+    <path d="M72 206h144l-11 9H83Z" fill="#c2ddd4" opacity=".45"/>
+    <path d="M62 208v-24h12v24m140 0v-24h12v24" fill="#506c6b"/>
+    <circle cx="78" cy="224" r="7" fill="#8cf6c3"/><circle cx="210" cy="224" r="7" fill="#8cf6c3"/>
+    <path d="M16 260h46m164 0h46" stroke="#8ca6a1" stroke-width="5" opacity=".65"/>
+  </g>
+</svg>

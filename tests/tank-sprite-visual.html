@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <base href="../">
+  <title>Tank sprite visual check</title>
+  <style>
+    html, body { margin: 0; background: #0d1210; color: #eef4ed; font: 16px Consolas, monospace; }
+    canvas { display: block; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <canvas id="check" width="1200" height="720"></canvas>
+  <script src="js/config.js"></script>
+  <script src="js/entities.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      var canvas = document.getElementById("check");
+      var context = canvas.getContext("2d");
+      var entries = [
+        { label: "PLAYER / ABRAMS", x: 300, y: 220, team: "player", body: -0.15, turret: 0.5 },
+        { label: "NORMAL ENEMY", x: 900, y: 220, team: "enemy", body: 0.25, turret: -0.55 },
+        { label: "ELITE / TWIN CANNON", x: 300, y: 520, team: "enemy", body: -0.4, turret: 0.35, elite: true, scale: 1.1 },
+        { label: "BOSS", x: 900, y: 520, team: "enemy", body: 0.5, turret: -0.3, boss: true, scale: 1.1 }
+      ];
+
+      function draw() {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = "#101714";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.strokeStyle = "rgba(140, 246, 195, 0.12)";
+        for (var x = 0; x <= canvas.width; x += 60) { context.beginPath(); context.moveTo(x, 0); context.lineTo(x, canvas.height); context.stroke(); }
+        for (var y = 0; y <= canvas.height; y += 60) { context.beginPath(); context.moveTo(0, y); context.lineTo(canvas.width, y); context.stroke(); }
+        entries.forEach(function (entry) {
+          var tank = TankGame.Entities.createTank(entry.x, entry.y, entry.team);
+          tank.bodyAngle = entry.body;
+          tank.turretAngle = entry.turret;
+          tank.visualScale = entry.scale || 1;
+          tank.health = 100;
+          tank.maxHealth = 100;
+          tank.isElite = Boolean(entry.elite);
+          tank.isBoss = Boolean(entry.boss);
+          TankGame.Entities.drawTank(context, tank);
+          context.fillStyle = "#eef4ed";
+          context.textAlign = "center";
+          context.font = "700 18px Consolas, monospace";
+          context.fillText(entry.label, entry.x, entry.y - 105);
+        });
+      }
+
+      window.setTimeout(draw, 800);
+    }());
+  </script>
+</body>
+</html>

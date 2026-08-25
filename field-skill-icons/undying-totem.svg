@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 288">
+  <defs><linearGradient id="soil" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#20394a"/><stop offset="1" stop-color="#0e1929"/></linearGradient><filter id="blue"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="drop" x="-25%" y="-25%" width="150%" height="170%"><feDropShadow dx="6" dy="9" stdDeviation="3" flood-color="#050b12" flood-opacity=".82"/></filter></defs>
+  <!-- Layer 1: night soil and memorial stones -->
+  <rect width="288" height="288" fill="url(#soil)"/><path d="M0 205 52 184l45 15 54-26 49 23 88-32v124H0Z" fill="#263b4c"/>
+  <path d="M0 232h288M23 70l43 13m-24 33 45 11m169-67-38 20m45 26-55 18" stroke="#49657a" stroke-width="8" opacity=".6"/>
+  <g fill="#778b95" stroke="#111d29" stroke-width="6"><path d="m32 190 30-28 29 28v24H32Z"/><path d="m206 192 27-35 30 35v24h-57Z"/></g>
+  <ellipse cx="145" cy="239" rx="79" ry="18" fill="#050b12" opacity=".58"/>
+  <!-- Layer 2: totem, roots, armored resurrection core -->
+  <g stroke="#101a26" stroke-width="8" stroke-linejoin="round" filter="url(#drop)">
+    <path d="M75 255h138l-16-27H91Z" fill="#162633"/><path d="M103 229h83V82h-83Z" fill="#526c78"/>
+    <path d="m144 34 35 19-11 35h-48l-11-35Z" fill="#314955"/><path d="M144 36v193M112 119h64M112 181h72" stroke="#9bb7bf" stroke-width="5"/>
+    <path d="M116 82 88 64 76 88l28 19M172 82l28-18 12 24-28 19" fill="none"/>
+    <circle cx="144" cy="143" r="26" fill="#72cfff" filter="url(#blue)"/><path d="M144 124v38M125 143h38" stroke="#e5fbff" stroke-width="7"/>
+    <path d="M104 230 80 253m104-23 24 23" stroke="#72cfff" stroke-width="7"/>
+  </g>
+  <path d="M105 83h78l-8 8h-62Z" fill="#d9f5ff" opacity=".28"/>
+  <path d="M103 229h83l-10 16h-63Z" fill="#07121d" opacity=".75"/>
+  <!-- Layer 3: revival beam -->
+  <path d="M128 0h32l-8 110h-16Z" fill="#a9ecff" opacity=".28" filter="url(#blue)"/><path d="M56 144h176M75 99l138 90M213 99 75 189" fill="none" stroke="#72cfff" stroke-width="4" opacity=".7"/>
+</svg>
