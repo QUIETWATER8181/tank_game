@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 288">
+  <defs>
+    <linearGradient id="front" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c49a55"/><stop offset=".25" stop-color="#674a2e"/><stop offset="1" stop-color="#171c20"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="6" stdDeviation="4" flood-color="#080a0c" flood-opacity=".82"/></filter>
+  </defs>
+  <!-- Command-table edge: the opening above it is transparent. -->
+  <g filter="url(#shadow)" stroke="#171b20" stroke-width="8" stroke-linejoin="round">
+    <path d="M0 220h288v68H0Z" fill="url(#front)"/>
+    <path d="M0 220h288v19H0Z" fill="#e2bd69" opacity=".68"/>
+    <path d="M0 239h288v49H0Z" fill="#272b2b"/>
+    <path d="M0 239h288" stroke="#fff0a1" stroke-width="4" opacity=".5"/>
+    <path d="M18 252h70v19H18Zm182 0h70v19h-70Z" fill="#4a3b2a"/>
+    <path d="M104 239h80v49h-80Z" fill="#1e2728"/>
+    <path d="M111 247h66v8h-66Z" fill="#8a7047"/>
+    <circle cx="114" cy="270" r="5" fill="#ffd166"/><circle cx="174" cy="270" r="5" fill="#ffd166"/>
+  </g>
+  <path d="m23 224 17-6 17 6-17 6Zm208 0 17-6 17 6-17 6Z" fill="#fff0a1" opacity=".7"/>
+</svg>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 288">
+  <defs><linearGradient id="road" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6e5d3f"/><stop offset="1" stop-color="#293d3d"/></linearGradient><filter id="sun"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="drop" x="-25%" y="-25%" width="150%" height="170%"><feDropShadow dx="7" dy="10" stdDeviation="3" flood-color="#18231c" flood-opacity=".72"/></filter></defs>
+  <!-- Layer 1: sunlit road and industrial verge -->
+  <rect width="288" height="288" fill="#506b5a"/><path d="M0 0h288v288H0Z" fill="#83966c" opacity=".35"/><path d="M-25 258 104-10h81l128 268v30H-25Z" fill="url(#road)" stroke="#9b895d" stroke-width="8"/><path d="M89 288 143 0h13l50 288" stroke="#e6d18b" stroke-width="7" stroke-dasharray="26 18" opacity=".8"/><path d="M0 63h72M214 70h74M0 156h50M232 165h56" stroke="#b7c17f" stroke-width="10" opacity=".7"/>
+  <ellipse cx="149" cy="240" rx="104" ry="17" fill="#18231c" opacity=".46"/>
+  <!-- Layer 2: impossible-speed tank truck -->
+  <g stroke="#182025" stroke-width="8" stroke-linejoin="round" filter="url(#drop)">
+    <path d="M41 235h211l-13 27H54Z" fill="#243035"/><path d="M70 185h115v48H70Z" fill="#9a9581"/><path d="M185 198h42l26 25v10h-68Z" fill="#c0b794"/><path d="M79 185 96 155h70l19 30" fill="#b3ad91"/><path d="M117 155v-31h28v31" fill="#d9cf9e"/><path d="M101 200h83v17h-83Z" fill="#f7e39a"/><path d="M204 205h28v16h-28Z" fill="#253844"/><circle cx="95" cy="239" r="17" fill="#1b242a"/><circle cx="216" cy="239" r="17" fill="#1b242a"/><circle cx="95" cy="239" r="7" fill="#fff0a8"/><circle cx="216" cy="239" r="7" fill="#fff0a8"/>
+  </g>
+  <path d="M70 185h115l-11 8H82Z" fill="#fff7c8" opacity=".3"/>
+  <path d="M70 233h157l-12 16H83Z" fill="#15221f" opacity=".7"/>
+  <!-- Layer 3: radiance and motion -->
+  <g fill="none" stroke="#fff0a8" stroke-width="6" opacity=".8" filter="url(#sun)"><circle cx="144" cy="145" r="91" stroke-dasharray="16 12"/><path d="M38 48 82 82M250 48 206 82M39 214l50-29M249 214l-50-29"/></g>
+</svg>

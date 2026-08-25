@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 288">
+  <defs><linearGradient id="table" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#403725"/><stop offset="1" stop-color="#181b20"/></linearGradient><linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff1a1"/><stop offset=".45" stop-color="#d99a3e"/><stop offset="1" stop-color="#7b4523"/></linearGradient><filter id="drop" x="-25%" y="-25%" width="150%" height="170%"><feDropShadow dx="6" dy="9" stdDeviation="3" flood-color="#0b0d11" flood-opacity=".8"/></filter></defs>
+  <!-- Layer 1: tactical table -->
+  <rect width="288" height="288" fill="url(#table)"/><path d="M0 195 288 58v230H0Z" fill="#252a29"/><path d="m0 226 288-137M0 269 288 131M28 32l232 234" stroke="#6c5935" stroke-width="7" opacity=".55"/>
+  <g fill="#68746f" opacity=".7"><rect x="23" y="61" width="58" height="15"/><rect x="211" y="214" width="53" height="14"/><rect x="23" y="242" width="30" height="11"/></g>
+  <ellipse cx="145" cy="235" rx="92" ry="16" fill="#0b0d11" opacity=".58"/>
+  <!-- Layer 2: command bunker and targeting tank -->
+  <g stroke="#171b20" stroke-width="8" stroke-linejoin="round" filter="url(#drop)">
+    <path d="M53 231h182l-18 27H71Z" fill="#1a2025"/><rect x="74" y="198" width="141" height="35" fill="#79827c"/>
+    <path d="M95 198v-43h99v43M108 155l10-29h53l12 29Z" fill="#586663"/><path d="M144 126v-25"/><rect x="135" y="91" width="19" height="14" fill="#be9161"/>
+    <path d="M110 172h67v15h-67Z" fill="#1c2c31"/><circle cx="126" cy="179" r="4" fill="#ffd166"/><circle cx="161" cy="179" r="4" fill="#ff715c"/>
+    <path d="m108 205-28-24m99 24 28-24" fill="none"/><circle cx="144" cy="151" r="10" fill="#ffd166"/>
+  </g>
+  <path d="M75 198h140l-12 7H87Z" fill="#f4f0c7" opacity=".25"/>
+  <path d="M74 233h141l-13 15H87Z" fill="#0c1116" opacity=".72"/>
+  <!-- Layer 3: decisive card and sightline -->
+  <g stroke="#ffd166" stroke-width="6" fill="none"><path d="m205 34 35 13-12 43-36-13Z" fill="#402d24"/><path d="m208 48 8 12 13-2-10 10 4 13-12-8-12 6 5-13-8-10 14 2Z"/><path d="M43 49 246 151" stroke-dasharray="7 8" opacity=".72"/></g>
+</svg>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 288">
+  <defs>
+    <linearGradient id="front" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#e1d39e"/><stop offset=".3" stop-color="#8f815e"/><stop offset="1" stop-color="#263333"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="7" stdDeviation="4" flood-color="#18231c" flood-opacity=".72"/></filter>
+  </defs>
+  <!-- Near-side highway barrier hides the lower wheels while leaving the road opening. -->
+  <g filter="url(#shadow)" stroke="#182025" stroke-width="8" stroke-linejoin="round">
+    <path d="M0 224h288v64H0Z" fill="url(#front)"/>
+    <path d="M0 224h288v17H0Z" fill="#fff0a8" opacity=".74"/>
+    <path d="M0 241h288v47H0Z" fill="#344847"/>
+    <path d="M0 241h288" stroke="#fff6c3" stroke-width="4" opacity=".6"/>
+    <path d="M14 253h75v16H14Zm185 0h75v16h-75Z" fill="#8b7c59"/>
+    <path d="M100 242h88v46h-88Z" fill="#50655c"/>
+    <path d="M107 249h74" stroke="#eadb9b" stroke-width="5" stroke-dasharray="18 12"/>
+    <circle cx="96" cy="232" r="8" fill="#fff0a8"/><circle cx="192" cy="232" r="8" fill="#fff0a8"/>
+  </g>
+  <path d="M0 275h288" stroke="#fff6c3" stroke-width="4" opacity=".45"/>
+</svg>

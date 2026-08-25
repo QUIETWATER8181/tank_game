@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 288">
+  <defs>
+    <linearGradient id="front" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c2e9f2"/><stop offset=".24" stop-color="#608c9d"/><stop offset="1" stop-color="#1a3545"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="7" stdDeviation="4" flood-color="#071521" flood-opacity=".88"/></filter>
+  </defs>
+  <!-- Frozen berm: its transparent upper opening lets the tank enter the artillery pit. -->
+  <g filter="url(#shadow)" stroke="#112332" stroke-width="8" stroke-linejoin="round">
+    <path d="M0 220h288v68H0Z" fill="url(#front)"/>
+    <path d="M0 220h288v18H0Z" fill="#e9fbff" opacity=".82"/>
+    <path d="M0 238h288v50H0Z" fill="#284d60"/>
+    <path d="M0 238h288" stroke="#d9f8ff" stroke-width="4" opacity=".7"/>
+    <path d="M16 248h62v24H16Zm194 0h62v24h-62Z" fill="#487487"/>
+    <path d="M91 244h106v44H91Z" fill="#1a3545"/>
+    <path d="M98 250h92" stroke="#bfeeff" stroke-width="5" stroke-dasharray="15 11"/>
+    <path d="m77 223 12-16 12 16-12 17Zm100 0 12-16 12 16-12 17Z" fill="#e9fbff"/>
+  </g>
+  <path d="M0 276h288" stroke="#e9fbff" stroke-width="4" opacity=".52"/>
+</svg>

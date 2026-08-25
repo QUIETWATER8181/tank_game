@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 288">
+  <defs>
+    <linearGradient id="front" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#9d72aa"/><stop offset=".25" stop-color="#51365e"/><stop offset="1" stop-color="#171523"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="7" stdDeviation="4" flood-color="#090812" flood-opacity=".85"/></filter>
+  </defs>
+  <!-- Corrupted lab sill and side pipes frame the transparent center. -->
+  <g filter="url(#shadow)" stroke="#151b25" stroke-width="8" stroke-linejoin="round">
+    <path d="M0 218h288v70H0Z" fill="url(#front)"/>
+    <path d="M0 218h288v18H0Z" fill="#e1b8e8" opacity=".52"/>
+    <path d="M0 236h288v52H0Z" fill="#221c2b"/>
+    <path d="M0 236h288" stroke="#d88cff" stroke-width="4" opacity=".66"/>
+    <path d="M19 245h42v27H19Zm208 0h42v27h-42Z" fill="#694173"/>
+    <path d="M86 220v-28h12v28m92 0v-28h12v28" fill="#5b3f68"/>
+    <circle cx="92" cy="253" r="7" fill="#d88cff"/><circle cx="196" cy="253" r="7" fill="#d88cff"/>
+    <path d="M109 254h70" stroke="#f4d7ff" stroke-width="4" opacity=".65"/>
+  </g>
+  <path d="M0 274h288" stroke="#f2c9ff" stroke-width="4" opacity=".4"/>
+</svg>
