@@ -6,6 +6,7 @@
   function InputManager(canvas) {
     this.canvas = canvas;
     this.keys = Object.create(null);
+    this.virtualKeys = Object.create(null);
     this.pointer = { x: 0, y: 0, down: false, pressed: false, inside: false };
     this.camera = { x: 0, y: 0 };
     this.bindEvents();
@@ -52,6 +53,35 @@
     this.canvas.addEventListener("pointerleave", function () {
       self.pointer.inside = false;
     });
+
+    document.querySelectorAll("[data-key]").forEach(function (button) {
+      var key = button.getAttribute("data-key");
+      var release = function () {
+        self.virtualKeys[key] = false;
+        button.classList.remove("is-pressed");
+      };
+      button.addEventListener("pointerdown", function (event) {
+        event.preventDefault();
+        self.virtualKeys[key] = true;
+        button.classList.add("is-pressed");
+        if (button.setPointerCapture) { button.setPointerCapture(event.pointerId); }
+        self.canvas.focus();
+      });
+      button.addEventListener("pointerup", release);
+      button.addEventListener("pointercancel", release);
+      button.addEventListener("lostpointercapture", release);
+      button.addEventListener("pointerleave", function (event) {
+        if (event.buttons === 0) { release(); }
+      });
+      button.addEventListener("contextmenu", function (event) { event.preventDefault(); });
+    });
+
+    window.addEventListener("blur", function () {
+      self.virtualKeys = Object.create(null);
+      document.querySelectorAll("[data-key]").forEach(function (button) {
+        button.classList.remove("is-pressed");
+      });
+    });
   };
 
   InputManager.prototype.toWorldPoint = function (clientX, clientY) {
@@ -71,11 +101,12 @@
   };
 
   InputManager.prototype.isDown = function (code) {
-    return Boolean(this.keys[code]);
+    return Boolean(this.keys[code] || this.virtualKeys[code]);
   };
 
   InputManager.prototype.reset = function () {
     this.keys = Object.create(null);
+    this.virtualKeys = Object.create(null);
     this.pointer.down = false;
     this.pointer.pressed = false;
   };

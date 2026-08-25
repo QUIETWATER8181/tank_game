@@ -213,6 +213,94 @@ button:focus-visible {
   cursor: crosshair;
 }
 
+.mobile-controls {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: none;
+  pointer-events: none;
+  user-select: none;
+}
+
+.mobile-controls.is-active {
+  display: block;
+}
+
+.mobile-dpad {
+  position: absolute;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  width: clamp(126px, 28vw, 182px);
+  aspect-ratio: 1;
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  gap: 3px;
+  pointer-events: none;
+}
+
+.mobile-control,
+.mobile-dpad-center {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid rgba(140, 246, 195, 0.65);
+  border-radius: 6px;
+  background: rgba(6, 20, 14, 0.82);
+  color: #d7ffe9;
+  font-size: clamp(15px, 4vw, 23px);
+  font-weight: 900;
+  line-height: 1;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+
+.mobile-control {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.mobile-control.is-pressed,
+.mobile-control:active {
+  border-color: #f7d87c;
+  background: rgba(101, 72, 24, 0.94);
+  color: #fff3bf;
+  transform: scale(0.94);
+}
+
+.mobile-up { grid-area: 1 / 2; }
+.mobile-left { grid-area: 2 / 1; }
+.mobile-dpad-center { grid-area: 2 / 2; border-color: rgba(140, 246, 195, 0.22); background: rgba(8, 27, 19, 0.7); }
+.mobile-right { grid-area: 2 / 3; }
+.mobile-down { grid-area: 3 / 2; }
+
+.mobile-fire-button {
+  position: absolute;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(20px, env(safe-area-inset-bottom));
+  width: clamp(76px, 18vw, 122px);
+  aspect-ratio: 1;
+  border: 2px solid rgba(255, 234, 201, 0.85);
+  border-radius: 50%;
+  background: rgba(146, 44, 32, 0.88);
+  color: #fff3e2;
+  box-shadow: 0 0 0 5px rgba(255, 113, 92, 0.12), 0 8px 20px rgba(0, 0, 0, 0.32);
+  font-size: clamp(14px, 3.5vw, 19px);
+  font-weight: 900;
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+
+.mobile-fire-button.is-pressed,
+.mobile-fire-button:active {
+  border-color: #ffffff;
+  background: #ff715c;
+  box-shadow: 0 0 0 7px rgba(255, 113, 92, 0.2), 0 5px 12px rgba(0, 0, 0, 0.34);
+  transform: scale(0.94);
+}
+
 .hud {
   position: absolute;
   top: 14px;
@@ -1520,6 +1608,15 @@ kbd {
     max-height: calc(100vh - 88px);
   }
 
+  .menu-panel,
+  .pause-panel,
+  .level-clear-panel,
+  .reward-panel,
+  .field-skill-roll-panel {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
   .hud {
     top: 7px;
     left: 7px;
@@ -1558,10 +1655,15 @@ kbd {
   }
 
   .shop-panel { align-items: stretch; padding: 7px; }
-  .shop-dialog { max-height: 100%; }
+  .shop-dialog {
+    height: 100%;
+    max-height: calc(100% - 2px);
+    display: flex;
+    flex-direction: column;
+  }
   .shop-header { padding: 14px 15px 11px; }
   .shop-status { margin-left: 15px; margin-right: 15px; }
-  .shop-items { grid-template-columns: 1fr; max-height: calc(100vh - 190px); padding: 8px 15px 15px; }
+  .shop-items { grid-template-columns: 1fr; flex: 1; min-height: 0; max-height: none; padding: 8px 15px 15px; }
   .shop-item { grid-template-columns: 54px minmax(0, 1fr); gap: 9px; }
   .shop-item > img, .shop-item-glyph { width: 54px; height: 48px; }
   .shop-buy-button { grid-column: 2; justify-self: start; }
@@ -1651,7 +1753,10 @@ kbd {
   }
 
   .help-dialog {
-    max-height: 100%;
+    height: 100%;
+    max-height: calc(100% - 2px);
+    display: flex;
+    flex-direction: column;
   }
 
   .help-header {
@@ -1659,7 +1764,9 @@ kbd {
   }
 
   .help-content {
-    max-height: calc(100vh - 134px);
+    flex: 1;
+    min-height: 0;
+    max-height: none;
     padding: 2px 15px 18px;
   }
 
@@ -1724,4 +1831,61 @@ kbd {
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
   }
+}
+
+@media (max-width: 640px) and (orientation: portrait) {
+  body { overflow: hidden; }
+  .game-shell {
+    height: 100dvh;
+    min-height: 0;
+    grid-template-rows: auto minmax(0, 1fr);
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  .game-stage {
+    height: 100%;
+    max-height: none;
+    aspect-ratio: auto;
+  }
+  #gameCanvas {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 8 / 5;
+    transform: translateY(-50%);
+  }
+  .footer-note { display: none; }
+  .hud { max-height: 34%; overflow: hidden; }
+  .mobile-dpad { width: min(38vw, 154px); }
+  .mobile-fire-button { width: min(23vw, 94px); }
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .game-shell {
+    height: 100dvh;
+    min-height: 0;
+    grid-template-rows: auto minmax(0, 1fr);
+    padding-top: max(4px, env(safe-area-inset-top));
+    padding-bottom: max(4px, env(safe-area-inset-bottom));
+  }
+  .topbar { min-height: 38px; }
+  .brand > span:last-child,
+  .footer-note { display: none; }
+  .game-stage { max-height: 100%; }
+  .mobile-dpad {
+    bottom: max(7px, env(safe-area-inset-bottom));
+    width: min(29vh, 138px);
+  }
+  .mobile-fire-button {
+    bottom: max(11px, env(safe-area-inset-bottom));
+    width: min(22vh, 92px);
+  }
+  .menu-panel h1,
+  .pause-panel h2,
+  .reward-panel h2,
+  .level-clear-panel h2,
+  .field-skill-roll-panel h2 { font-size: 28px; }
+  .identity,
+  .record-summary { display: none; }
 }

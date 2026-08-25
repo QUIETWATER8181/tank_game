@@ -4,6 +4,7 @@
   var TankGame = window.TankGame;
   var Config = TankGame.Config;
   var canvas = document.getElementById("gameCanvas");
+  var mobileControls = document.getElementById("mobileControls");
   var input = new TankGame.InputManager(canvas);
   var game = new TankGame.Game(canvas, input);
   var menuPanel = document.getElementById("menuPanel");
@@ -94,11 +95,15 @@
   var accumulator = 0;
   var previousTime = performance.now();
   var lastCountdownDisplay = null;
+  var mobileDevice = Boolean((navigator && navigator.maxTouchPoints > 0) ||
+    (window.matchMedia && window.matchMedia("(max-width: 640px)").matches));
   updateMusicVolumeInterface(TankGame.Audio.getMusicVolume());
 
   function syncInterface() {
     var state = game.state;
     document.getElementById("gameStage").classList.toggle("is-cinematic", state === Config.states.CINEMATIC);
+    mobileControls.classList.toggle("is-active", mobileDevice &&
+      [Config.states.PLAYING, Config.states.COUNTDOWN].indexOf(state) !== -1);
     menuPanel.hidden = state !== Config.states.MENU;
     shopPanel.hidden = state !== Config.states.SHOP;
     pausePanel.hidden = state !== Config.states.PAUSED;
