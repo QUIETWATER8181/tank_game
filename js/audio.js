@@ -11,6 +11,7 @@
     this.musicPath = null;
     this.musicEnabled = true;
     this.musicVolume = 70;
+    this.musicBlocked = false;
     this.soundEffects = {};
     this.failedSoundEffects = {};
     this.activeSoundEffects = [];
@@ -23,18 +24,13 @@
     this.initializeSoundEffects();
     this.initializeMusic();
     if (this.context) {
-      if (this.context.state === "suspended") {
-        var resumePromise = this.context.resume();
-        if (resumePromise && resumePromise.catch) { resumePromise.catch(function () {}); }
+      if (this.context.state === "suspended" && this.context.resume) {
+        try { this.context.resume(); } catch (error) {}
       }
-      this.playMusic();
       return;
     }
     var AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) {
-      this.playMusic();
-      return;
-    }
+    if (!AudioContextClass) { return; }
     try {
       this.context = new AudioContextClass();
       this.master = this.context.createGain();
@@ -45,12 +41,8 @@
       this.master = null;
     }
     if (this.context && this.context.state === "suspended" && this.context.resume) {
-      try {
-        var initialResume = this.context.resume();
-        if (initialResume && initialResume.catch) { initialResume.catch(function () {}); }
-      } catch (resumeError) {}
+      try { this.context.resume(); } catch (resumeError) {}
     }
-    this.playMusic();
   };
 
   AudioSystem.prototype.initializeSoundEffects = function () {
@@ -165,6 +157,7 @@
   };
 
   AudioSystem.prototype.initializeMusic = function () {
+    var self = this;
     var desiredPath = this.musicPath || TankGame.Config.backgroundMusic;
     if (this.music || !window.Audio || !desiredPath) { return; }
     this.musicPath = desiredPath;
@@ -172,7 +165,17 @@
     this.music.loop = true;
     this.music.preload = "auto";
     this.music.volume = this.musicVolume / 100;
-    this.music.addEventListener("error", function () {});
+    this.music.addEventListener("playing", function () {
+      self.musicBlocked = false;
+    });
+    this.music.addEventListener("error", function () {
+      self.musicBlocked = true;
+    });
+  };
+
+  AudioSystem.prototype.startMusicFromGesture = function () {
+    this.initialize();
+    this.playMusic();
   };
 
   AudioSystem.prototype.setMusicTrack = function (path, restart) {
@@ -240,12 +243,24 @@
   };
 
   AudioSystem.prototype.playMusic = function () {
+    var self = this;
     var playPromise;
     if (!this.musicEnabled || this.musicVolume <= 0) { return; }
     this.initializeMusic();
     if (!this.music) { return; }
-    playPromise = this.music.play();
-    if (playPromise && playPromise.catch) { playPromise.catch(function () {}); }
+    try {
+      playPromise = this.music.play();
+    } catch (error) {
+      this.musicBlocked = true;
+      return;
+    }
+    if (playPromise && playPromise.then) {
+      playPromise.then(function () {
+        self.musicBlocked = false;
+      }).catch(function () {
+        self.musicBlocked = true;
+      });
+    }
   };
 
   AudioSystem.prototype.setMusicEnabled = function (enabled) {
