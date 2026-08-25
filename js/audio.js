@@ -12,6 +12,7 @@
     this.musicEnabled = true;
     this.musicVolume = 70;
     this.musicBlocked = false;
+    this.releaseVersion = "20260825-audio2";
     this.soundEffects = {};
     this.failedSoundEffects = {};
     this.activeSoundEffects = [];
@@ -21,7 +22,6 @@
   }
 
   AudioSystem.prototype.initialize = function () {
-    this.initializeSoundEffects();
     this.initializeMusic();
     if (this.context) {
       if (this.context.state === "suspended" && this.context.resume) {
@@ -45,22 +45,28 @@
     }
   };
 
-  AudioSystem.prototype.initializeSoundEffects = function () {
+  AudioSystem.prototype.resolveMediaPath = function (path) {
+    if (!path || !window.location || !/^https?:$/.test(window.location.protocol)) { return path; }
+    return path + (path.indexOf("?") === -1 ? "?" : "&") + "v=" + this.releaseVersion;
+  };
+
+  AudioSystem.prototype.initializeSoundEffects = function (name) {
     var self = this;
     var configured = TankGame.Config.soundEffects || {};
-    Object.keys(configured).forEach(function (name) {
-      if (self.soundEffects[name] || self.failedSoundEffects[name] || !window.Audio) { return; }
-      var sound = new window.Audio(configured[name]);
+    if (!name || !configured[name]) { return; }
+    [name].forEach(function (effectName) {
+      if (self.soundEffects[effectName] || self.failedSoundEffects[effectName] || !window.Audio) { return; }
+      var sound = new window.Audio(self.resolveMediaPath(configured[effectName]));
       sound.preload = "auto";
       sound.volume = {
         begin: 0.62, again: 0.62, shoot: 0.55, defeat: 0.68,
         explode: 0.68, pickup: 0.62, pageTurn: 0.3, boostPickup: 0.62, hit: 0.56, victory: 0.68, burn: 0.22, trumpCardSlash: 0.72
-      }[name] || 0.45;
+      }[effectName] || 0.45;
       sound.addEventListener("error", function () {
-        delete self.soundEffects[name];
-        self.failedSoundEffects[name] = true;
+        delete self.soundEffects[effectName];
+        self.failedSoundEffects[effectName] = true;
       });
-      self.soundEffects[name] = sound;
+      self.soundEffects[effectName] = sound;
     });
   };
 
@@ -161,7 +167,7 @@
     var desiredPath = this.musicPath || TankGame.Config.backgroundMusic;
     if (this.music || !window.Audio || !desiredPath) { return; }
     this.musicPath = desiredPath;
-    this.music = new window.Audio(desiredPath);
+    this.music = new window.Audio(this.resolveMediaPath(desiredPath));
     this.music.loop = true;
     this.music.preload = "auto";
     this.music.volume = this.musicVolume / 100;
@@ -202,7 +208,7 @@
     this.stopCinematicAudio();
     if (!window.Audio) { return; }
     Object.keys(configured).forEach(function (name) {
-      var sound = new window.Audio(configured[name]);
+      var sound = new window.Audio(self.resolveMediaPath(configured[name]));
       var playPromise;
       sound.loop = true;
       sound.preload = "auto";
@@ -315,7 +321,8 @@
 
   AudioSystem.prototype.play = function (name) {
     var self = this;
-    this.initializeSoundEffects();
+    var aliases = { enemyShoot: "shoot" };
+    this.initializeSoundEffects(aliases[name] || name);
     if (this.playLoaded(name, null, name === "trumpCardSlash" ? 1000 : 0)) { return; }
     if (name === "begin") { this.tone(440, 0.16, "triangle", 0.09, 660); }
     if (name === "again") { this.tone(392, 0.16, "triangle", 0.09, 587); }
@@ -384,7 +391,7 @@
     // be present but still be blocked or unloaded when index.html is opened
     // directly from disk.
     tonePlayed = this.playPageTurnTone();
-    this.initializeSoundEffects();
+    this.initializeSoundEffects("pageTurn");
     source = this.soundEffects.pageTurn;
 
     // The Web Audio cue above is the guaranteed cue. The WAV is an optional
@@ -403,7 +410,7 @@
     return Boolean(tonePlayed || source);
   };
   AudioSystem.prototype.playBurning = function () {
-    this.initializeSoundEffects();
+    this.initializeSoundEffects("burn");
     return this.startBurning();
   };
 
