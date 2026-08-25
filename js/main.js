@@ -342,7 +342,8 @@
   });
 
   startButton.addEventListener("click", function () {
-    TankGame.Audio.initialize();
+    if (TankGame.Audio.startMusicFromGesture) { TankGame.Audio.startMusicFromGesture(); }
+    else { TankGame.Audio.initialize(); }
     game.start();
     syncInterface();
     canvas.focus();
@@ -408,7 +409,8 @@
 
   musicButton.addEventListener("click", function (event) {
     event.stopPropagation();
-    TankGame.Audio.initialize();
+    if (TankGame.Audio.startMusicFromGesture) { TankGame.Audio.startMusicFromGesture(); }
+    else { TankGame.Audio.initialize(); }
     setMusicVolumePanel(musicVolumePanel.hidden);
   });
 
@@ -514,6 +516,9 @@
 
   document.addEventListener("pointerdown", function () {
     TankGame.Audio.initialize();
+  }, { capture: true });
+  document.addEventListener("click", function () {
+    if (TankGame.Audio.startMusicFromGesture) { TankGame.Audio.startMusicFromGesture(); }
   }, { capture: true });
   helpButton.addEventListener("click", function (event) {
     event.stopPropagation();
