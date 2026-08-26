@@ -278,6 +278,44 @@
     if (open) { musicVolumeSlider.focus(); }
   }
 
+  function updateFullscreenButtonLabel() {
+    var landscape = window.matchMedia && window.matchMedia("(orientation: landscape)").matches;
+    var label = mobileDevice ? (landscape ? "退出横屏锁定" : "切换横屏") :
+      (document.fullscreenElement ? "退出全屏" : "全屏");
+    fullscreenButton.textContent = mobileDevice ? (landscape ? "↕" : "⛶") :
+      (document.fullscreenElement ? "×" : "⛶");
+    fullscreenButton.title = label;
+    fullscreenButton.setAttribute("aria-label", label);
+  }
+
+  function toggleMobileLandscape() {
+    var target = document.getElementById("gameStage");
+    var orientation = window.screen && window.screen.orientation;
+    var landscape = window.matchMedia && window.matchMedia("(orientation: landscape)").matches;
+    var lockLandscape = function () {
+      if (!orientation || !orientation.lock) { return Promise.reject(new Error("orientation lock unavailable")); }
+      return orientation.lock("landscape");
+    };
+    if (landscape) {
+      if (orientation && orientation.unlock) { orientation.unlock(); }
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(function () {});
+      }
+      updateFullscreenButtonLabel();
+      return;
+    }
+    lockLandscape().catch(function () {
+      if (!target.requestFullscreen) { return; }
+      var fullscreenPromise = target.requestFullscreen();
+      if (!fullscreenPromise || !fullscreenPromise.then) { return Promise.reject(new Error("fullscreen unavailable")); }
+      return fullscreenPromise.then(function () { return lockLandscape(); });
+    }).then(function () {
+      updateFullscreenButtonLabel();
+    }, function () {
+      updateFullscreenButtonLabel();
+    });
+  }
+
   function setHelpPanel(open) {
     if (open) {
       TankGame.Audio.initialize();
@@ -433,6 +471,10 @@
   });
 
   fullscreenButton.addEventListener("click", function () {
+    if (mobileDevice) {
+      toggleMobileLandscape();
+      return;
+    }
     var target = document.getElementById("gameStage");
     if (!document.fullscreenElement) {
       if (target.requestFullscreen) {
@@ -445,11 +487,11 @@
   });
 
   document.addEventListener("fullscreenchange", function () {
-    var active = Boolean(document.fullscreenElement);
-    fullscreenButton.textContent = active ? "×" : "⛶";
-    fullscreenButton.title = active ? "退出全屏" : "全屏";
-    fullscreenButton.setAttribute("aria-label", fullscreenButton.title);
+    updateFullscreenButtonLabel();
   });
+
+  window.addEventListener("orientationchange", updateFullscreenButtonLabel);
+  updateFullscreenButtonLabel();
 
   modeOptions.forEach(function (option) {
     option.addEventListener("click", function () {

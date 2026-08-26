@@ -274,33 +274,6 @@ button:focus-visible {
 .mobile-right { grid-area: 2 / 3; }
 .mobile-down { grid-area: 3 / 2; }
 
-.mobile-fire-button {
-  position: absolute;
-  right: max(14px, env(safe-area-inset-right));
-  bottom: max(20px, env(safe-area-inset-bottom));
-  width: clamp(76px, 18vw, 122px);
-  aspect-ratio: 1;
-  border: 2px solid rgba(255, 234, 201, 0.85);
-  border-radius: 50%;
-  background: rgba(146, 44, 32, 0.88);
-  color: #fff3e2;
-  box-shadow: 0 0 0 5px rgba(255, 113, 92, 0.12), 0 8px 20px rgba(0, 0, 0, 0.32);
-  font-size: clamp(14px, 3.5vw, 19px);
-  font-weight: 900;
-  pointer-events: auto;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: none;
-}
-
-.mobile-fire-button.is-pressed,
-.mobile-fire-button:active {
-  border-color: #ffffff;
-  background: #ff715c;
-  box-shadow: 0 0 0 7px rgba(255, 113, 92, 0.2), 0 5px 12px rgba(0, 0, 0, 0.34);
-  transform: scale(0.94);
-}
-
 .hud {
   position: absolute;
   top: 14px;
@@ -1858,7 +1831,6 @@ kbd {
   .footer-note { display: none; }
   .hud { max-height: 34%; overflow: hidden; }
   .mobile-dpad { width: min(38vw, 154px); }
-  .mobile-fire-button { width: min(23vw, 94px); }
 }
 
 @media (max-height: 520px) and (orientation: landscape) {
@@ -1876,10 +1848,6 @@ kbd {
   .mobile-dpad {
     bottom: max(7px, env(safe-area-inset-bottom));
     width: min(29vh, 138px);
-  }
-  .mobile-fire-button {
-    bottom: max(11px, env(safe-area-inset-bottom));
-    width: min(22vh, 92px);
   }
   .menu-panel h1,
   .pause-panel h2,
