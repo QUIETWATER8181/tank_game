@@ -17,7 +17,7 @@
         room.seed = message.seed || room.seed;
         room.index = Math.max(0, room.names.indexOf(room.localName));
         emit();
-      } else if (message.type === "state") { room.remote = room.remote || {}; room.remote[message.from] = message.player; if (room.host) { broadcast(message); } emit(); }
+      } else if (message.type === "state") { message.player.remoteId = message.from; message.player.hostile = true; message.player.team = "enemy"; room.remote = room.remote || {}; room.remote[message.from] = message.player; if (room.host) { broadcast(message); } emit(); }
       else if (message.type === "start") { room.seed = message.seed || room.seed; room.started = true; emit(); }
       else if (message.type === "hit") { if (message.target === room.localName) { hitListeners.forEach(function (fn) { fn(message.damage); }); } if (room.host) { broadcast(message); } }
       else if (message.type === "shot") { shotListeners.forEach(function (fn) { fn(message); }); if (room.host) { broadcast(message); } }
@@ -31,7 +31,7 @@
       if (message.from === id || !room || message.code !== room.code) { return; }
       if (message.type === "lobby") { room.names = message.names || room.names; room.seed = message.seed || room.seed; room.index = Math.max(0, room.names.indexOf(room.localName)); emit(); }
       if (message.type === "start") { room.seed = message.seed || room.seed; room.started = true; emit(); }
-      if (message.type === "state") { room.remote = room.remote || {}; room.remote[message.from] = message.player; emit(); }
+      if (message.type === "state") { message.player.remoteId = message.from; message.player.hostile = true; message.player.team = "enemy"; room.remote = room.remote || {}; room.remote[message.from] = message.player; emit(); }
       if (message.type === "hit" && message.target === room.localName) { hitListeners.forEach(function (fn) { fn(message.damage); }); }
       if (message.type === "shot") { shotListeners.forEach(function (fn) { fn(message); }); }
     };

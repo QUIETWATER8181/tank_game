@@ -2294,6 +2294,9 @@
       target.health -= bullet.damage;
     }
     if (target.team === "player") { this.registerPlayerDamage(); }
+    if (this.selectedMode === "online" && !bullet.remote && target.remoteId && TankGame.Multiplayer.sendHit) {
+      TankGame.Multiplayer.sendHit(target.name, bullet.damage);
+    }
     target.hitFlash = 0.12;
     if (target.team === "player" && target.levelRepair) {
       this.applyRepair(target);
