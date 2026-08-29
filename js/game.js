@@ -603,6 +603,10 @@
     this.player.invulnerable = 0;
     this.player.maxHealth = ["endless", "brave"].indexOf(this.selectedMode) !== -1 ? this.endlessBaseStats.maxHealth + this.shopData.upgrades.health * 25 : 100;
     this.player.health = this.player.maxHealth;
+    if (this.selectedMode === "online") {
+      this.player.visualScale = 1.25;
+      this.player.radius = 23 * 1.25;
+    }
     this.player.bulletDamage = this.selectedMode === "online" ? 4 : (["endless", "brave"].indexOf(this.selectedMode) !== -1 ? this.endlessBaseStats.attack + this.shopData.upgrades.attack : Config.bulletDamage);
     if (this.selectedMode === "online") { this.player.maxHealth = 100; this.player.health = 100; }
     this.player.fireRateMultiplier = this.selectedMode === "endless" ? this.endlessBaseStats.fireRate : 1;
@@ -643,8 +647,8 @@
     this.braveLevelDamaged = false;
     this.braveReviveParticles = [];
     this.supplies = [];
-    this.supplyTimer = this.selectedMode === "endless" && this.endlessLevel <= 4 ? 4 :
-      (this.selectedMode === "endless" && this.endlessLevel <= 9 ? 6 : 7);
+    this.supplyTimer = this.selectedMode === "online" ? 3.5 : (this.selectedMode === "endless" && this.endlessLevel <= 4 ? 4 :
+      (this.selectedMode === "endless" && this.endlessLevel <= 9 ? 6 : 7));
     this.earlyRepairSupplyPending = this.selectedMode === "endless" && this.endlessLevel <= 4;
     this.jammerTimer = this.selectedMode === "endless" && this.endlessPermanent.jammer ? this.getJammerCooldown() : 10;
     this.jammerFlash = 0;
@@ -893,7 +897,8 @@
     this.updateRearGuards(deltaTime);
     this.updateSupportAircraft(deltaTime);
     if (this.player.alive) {
-      TankGame.Entities.updatePlayer(this.player, this.input, this.worldMap, deltaTime, this.enemies, function (obstacle) {
+      TankGame.Entities.updatePlayer(this.player, this.input, this.worldMap, deltaTime,
+        this.selectedMode === "online" ? (this.enemies || []).concat(this.remotePlayers || []) : this.enemies, function (obstacle) {
         if (!self.player.paradiseMade || !obstacle || obstacle.kind === undefined) { return; }
         if (self.onFieldWallBroken) { self.onFieldWallBroken(obstacle); }
         TankGame.Map.removeObstacle(self.worldMap, obstacle);
@@ -2250,7 +2255,8 @@
       return;
     }
 
-    var targets = bullet.team === "player" ? (this.selectedMode === "online" ? (this.remotePlayers || []).concat(this.enemies) : this.enemies) : [this.player];
+    var targets = bullet.team === "player" ?
+      (this.selectedMode === "online" ? (bullet.remote ? [this.player] : (this.remotePlayers || []).concat(this.enemies)) : this.enemies) : [this.player];
     var target = targets.find(function (tank) {
       return tank.alive && (!bullet.fieldPiercedObjects || bullet.fieldPiercedObjects.indexOf(tank) === -1) &&
         !(tank.team === "player" && tank.invulnerable > 0) &&
@@ -2288,9 +2294,6 @@
       target.health -= bullet.damage;
     }
     if (target.team === "player") { this.registerPlayerDamage(); }
-    if (this.selectedMode === "online" && target.team === "player" && target.name && TankGame.Multiplayer.sendHit) {
-      TankGame.Multiplayer.sendHit(target.name, bullet.damage);
-    }
     target.hitFlash = 0.12;
     if (target.team === "player" && target.levelRepair) {
       this.applyRepair(target);
@@ -2580,9 +2583,10 @@
   Game.prototype.updateSupplies = function (deltaTime) {
     var self = this;
     this.supplyTimer -= deltaTime;
-    if (this.supplyTimer <= 0 && this.supplies.length < 2) {
+    var supplyLimit = this.selectedMode === "online" ? 4 : 2;
+    if (this.supplyTimer <= 0 && this.supplies.length < supplyLimit) {
       this.spawnSupply();
-      this.supplyTimer = (this.selectedMode === "challenge" ? 15 : 11) + Math.random() * 5;
+      this.supplyTimer = this.selectedMode === "online" ? 5.5 + Math.random() * 2.5 : (this.selectedMode === "challenge" ? 15 : 11) + Math.random() * 5;
     }
     this.supplies.forEach(function (supply) {
       supply.life -= deltaTime;
@@ -2624,7 +2628,9 @@
   };
 
   Game.prototype.spawnSupply = function () {
-    var types = ["repair", "shield", "rapid", "perspective"];
+    var types = this.selectedMode === "online" ?
+      ["repair", "shield", "rapid", "perspective", "perspective", "perspective"] :
+      ["repair", "shield", "rapid", "perspective"];
     var preferredType = this.earlyRepairSupplyPending && this.player.health <= this.player.maxHealth * 0.6 ? "repair" : null;
     var location = this.findSupplyLocation();
     if (!location) { return false; }
@@ -3009,10 +3015,10 @@
     context.restore();
     if (this.isBossBattleActive() && [Config.states.CINEMATIC, Config.states.COUNTDOWN].indexOf(this.state) === -1) { this.drawBossWarParticles(context); }
     if (cinematicActive) { this.cinematic.drawScreenOverlay(context); }
-    if ([Config.states.COUNTDOWN, Config.states.PLAYING, Config.states.PAUSED].indexOf(this.state) !== -1 && this.selectedMode !== "online") {
-      this.drawTacticalRadar(context);
+    if ([Config.states.COUNTDOWN, Config.states.PLAYING, Config.states.PAUSED].indexOf(this.state) !== -1) {
+      if (this.selectedMode !== "online") { this.drawTacticalRadar(context); }
       this.drawPerspectiveIndicators(context);
-      this.drawLowHealthWarning(context);
+      if (this.selectedMode !== "online") { this.drawLowHealthWarning(context); }
     }
   };
 
@@ -3431,7 +3437,8 @@
     var centerY = height / 2;
     var margin = 28;
     if (!player || (!player.levelPerspective && player.perspectiveTimer <= 0)) { return []; }
-    return this.enemies.filter(function (enemy) {
+    var targets = this.selectedMode === "online" ? (this.remotePlayers || []) : this.enemies;
+    return targets.filter(function (enemy) {
       var screenX = enemy.x - this.camera.x;
       var screenY = enemy.y - this.camera.y;
       return enemy.alive && (screenX < 0 || screenX > width || screenY < 0 || screenY > height);

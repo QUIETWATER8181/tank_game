@@ -610,16 +610,18 @@
       canvas.focus();
     }
     if (game.selectedMode === "online") {
-      game.remotePlayers = Object.keys(room.remote || {}).map(function (key) { return room.remote[key]; });
+      game.remotePlayers = Object.keys(room.remote || {}).map(function (key) { return room.remote[key]; }).filter(function (player) { return player && player.remoteId !== room.localId; });
     }
   });
   TankGame.Multiplayer.onHit(function (damage) {
     if (game.selectedMode !== "online" || game.state !== Config.states.PLAYING || !game.player.alive) { return; }
     game.player.health = Math.max(0, game.player.health - Number(damage || 4));
     if (game.player.health <= 0) { game.player.alive = false; }
+    TankGame.Multiplayer.publish(game.player);
   });
   TankGame.Multiplayer.onShot(function (shot) {
-    if (game.selectedMode !== "online" || game.state !== Config.states.PLAYING || !shot) { return; }
+    var activeRoom = TankGame.Multiplayer.getRoom && TankGame.Multiplayer.getRoom();
+    if (game.selectedMode !== "online" || game.state !== Config.states.PLAYING || !shot || (activeRoom && shot.from === activeRoom.localId)) { return; }
     var bullet = TankGame.Entities.createBullet(Number(shot.x), Number(shot.y), Number(shot.angle), "player");
     bullet.damage = Number(shot.damage) || 4;
     bullet.remote = true;
@@ -794,7 +796,7 @@
     if (game.selectedMode === "online" && game.player) {
       TankGame.Multiplayer.publish(game.player);
       var activeRoom = TankGame.Multiplayer.getRoom();
-      if (activeRoom) { game.remotePlayers = Object.keys(activeRoom.remote || {}).map(function (key) { return activeRoom.remote[key]; }); }
+      if (activeRoom) { game.remotePlayers = Object.keys(activeRoom.remote || {}).map(function (key) { return activeRoom.remote[key]; }).filter(function (player) { return player && player.remoteId !== activeRoom.localId; }); }
     }
     var countdownDisplay = game.getCountdownDisplay ? game.getCountdownDisplay() :
       (game.countdown > 0.3 ? String(Math.ceil(Math.max(0, game.countdown))) : "GO");

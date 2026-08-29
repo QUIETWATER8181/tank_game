@@ -12,6 +12,11 @@
       if (message.type === "join" && room.host) {
         if (room.names.indexOf(message.name) === -1 && room.names.length < 10) { room.names.push(message.name); }
         broadcast({ type: "lobby", code: room.code, names: room.names, seed: room.seed }); emit();
+      } else if (message.type === "lobby") {
+        room.names = message.names || room.names;
+        room.seed = message.seed || room.seed;
+        room.index = Math.max(0, room.names.indexOf(room.localName));
+        emit();
       } else if (message.type === "state") { room.remote = room.remote || {}; room.remote[message.from] = message.player; if (room.host) { broadcast(message); } emit(); }
       else if (message.type === "start") { room.seed = message.seed || room.seed; room.started = true; emit(); }
       else if (message.type === "hit") { if (message.target === room.localName) { hitListeners.forEach(function (fn) { fn(message.damage); }); } if (room.host) { broadcast(message); } }
@@ -44,12 +49,12 @@
     onChange: function (fn) { listeners.push(fn); return function () { listeners = listeners.filter(function (item) { return item !== fn; }); }; },
     onHit: function (fn) { hitListeners.push(fn); },
     onShot: function (fn) { shotListeners.push(fn); },
-    host: function (name) { room = { code: String(Math.floor(100000 + Math.random() * 900000)), host: true, index: 0, localName: name, names: [name], seed: (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0, started: false, remote: {} }; setupPeer(); emit(); return room; },
-    join: function (code, name) { room = { code: String(code), host: false, index: 0, localName: name, names: [name], seed: 0, started: false, remote: {} }; setupPeer(); emit(); return room; },
+    host: function (name) { room = { code: String(Math.floor(100000 + Math.random() * 900000)), host: true, index: 0, localId: id, localName: name, names: [name], seed: (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0, started: false, remote: {} }; setupPeer(); emit(); return room; },
+    join: function (code, name) { room = { code: String(code), host: false, index: 0, localId: id, localName: name, names: [name], seed: 0, started: false, remote: {} }; setupPeer(); emit(); return room; },
     start: function () { if (!room || !room.host || room.names.length < 2) { return false; } room.started = true; broadcast({ type: "start", code: room.code, seed: room.seed }); emit(); return true; },
     getRoom: function () { return room; },
     sendHit: function (target, damage) { if (!room || !room.started) { return; } broadcast({ type: "hit", code: room.code, target: target, damage: damage, from: id }); },
     sendShot: function (x, y, angle, damage) { if (!room || !room.started) { return; } broadcast({ type: "shot", code: room.code, from: id, x: x, y: y, angle: angle, damage: damage }); },
-    publish: function (player) { if (!room || !room.started) { return; } var message = { type: "state", code: room.code, from: id, player: { x: player.x, y: player.y, bodyAngle: player.bodyAngle, turretAngle: player.turretAngle, health: player.health, maxHealth: player.maxHealth, name: player.name, alive: player.alive, team: "player" } }; room.remote[id] = message.player; broadcast(message); }
+    publish: function (player) { if (!room || !room.started) { return; } var message = { type: "state", code: room.code, from: id, player: { x: player.x, y: player.y, bodyAngle: player.bodyAngle, turretAngle: player.turretAngle, health: player.health, maxHealth: player.maxHealth, radius: player.radius, visualScale: player.visualScale, name: player.name, alive: player.alive, team: "player", remoteId: id } }; broadcast(message); }
   };
 }());
