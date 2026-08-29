@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>钢铁征途 坦克大战</title>
-  <link rel="stylesheet" href="css/style.css?v=20260829-mobile7">
+  <link rel="stylesheet" href="css/style.css?v=20260829-online1">
 </head>
 <body>
   <main class="game-shell">
@@ -164,6 +164,7 @@
         <p class="eyebrow">超级大运坦克</p>
         <h1>钢铁征途 坦克大战</h1>
         <p class="menu-copy">化身大运，向敌人发起冲锋！</p>
+        <button id="onlineButton" class="online-entry-button" type="button" title="打开联机模式" aria-label="打开联机模式">➡ 联机模式</button>
         <div class="mode-selector" role="radiogroup" aria-label="游戏模式">
           <button class="mode-option is-selected" type="button" data-mode="normal" role="radio" aria-checked="true">
             <strong>普通模式</strong>
@@ -191,6 +192,39 @@
         </div>
         <p id="recordSummary" class="record-summary">本机纪录：暂无</p>
         <p class="identity">by 一杯静水 &amp; 徐同学infinity</p>
+      </section>
+
+      <section id="onlineModePanel" class="overlay-panel online-panel" hidden aria-label="联机模式">
+        <button id="onlineBackButton" class="online-back-button" type="button" title="返回主菜单" aria-label="返回主菜单">←</button>
+        <p class="eyebrow">本地房间 · 同一网络设备</p>
+        <h2>联机模式</h2>
+        <div class="mode-selector online-mode-selector" role="list">
+          <button class="mode-option online-mode-option is-selected" type="button" data-online-mode="field"><strong>野战</strong><span>2～10 人 · 普通地图</span></button>
+          <button class="mode-option online-mode-option is-locked" type="button" disabled><strong>峡谷</strong><span>暂未开放</span></button>
+          <button class="mode-option online-mode-option is-locked" type="button" disabled><strong>河汉</strong><span>暂未开放</span></button>
+          <button class="mode-option online-mode-option is-locked" type="button" disabled><strong>共敌</strong><span>暂未开放</span></button>
+        </div>
+        <button id="fieldModeButton" class="primary-button" type="button">进入野战</button>
+      </section>
+
+      <section id="roomPanel" class="overlay-panel room-panel" hidden aria-label="野战房间">
+        <button id="roomBackButton" class="online-back-button" type="button" title="返回联机模式" aria-label="返回联机模式">←</button>
+        <p class="eyebrow">野战 · 本地房间</p>
+        <h2>准备出发</h2>
+        <form id="roomForm" class="room-form">
+          <label for="playerNameInput">英文昵称</label>
+          <input id="playerNameInput" type="text" maxlength="16" autocomplete="off" spellcheck="false" placeholder="仅限英文，例如 Tanker" required pattern="[A-Za-z]+">
+          <div class="room-actions"><button id="hostRoomButton" class="primary-button" type="button">开房</button><button id="joinRoomButton" class="secondary-button" type="button">入房</button></div>
+          <label for="roomCodeInput">房间号（入房时填写）</label>
+          <input id="roomCodeInput" type="text" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="6 位房间号">
+          <p id="roomStatus" class="room-status" aria-live="polite">请输入英文昵称后开房或入房</p>
+        </form>
+        <div id="roomLobby" class="room-lobby" hidden>
+          <div><span>房间号</span><strong id="roomCodeValue">------</strong></div>
+          <div><span>成员</span><strong id="roomMembersValue">1 / 10</strong></div>
+          <p id="roomMembersList"></p>
+          <button id="startRoomButton" class="primary-button" type="button">房主开启战场</button>
+        </div>
       </section>
 
       <section id="shopPanel" class="shop-panel" hidden aria-labelledby="shopTitle">
@@ -330,7 +364,7 @@
       </section>
     </section>
 
-    <footer class="footer-note">无需联网 · 双击即可运行 · 建议使用 Chrome 或 Edge</footer>
+    <footer class="footer-note">支持本地房间 · 双击即可运行 · 建议使用 Chrome 或 Edge</footer>
   </main>
 
   <script src="js/config.js?v=20260829-mobile7"></script>
@@ -343,7 +377,9 @@
   <script src="js/ai.js?v=20260829-mobile7"></script>
   <script src="js/effects.js?v=20260829-mobile7"></script>
   <script src="js/game.js?v=20260829-mobile7"></script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="js/multiplayer.js?v=20260829-online1"></script>
   <script src="js/field-skills.js?v=20260829-mobile7"></script>
-  <script src="js/main.js?v=20260829-mobile7"></script>
+  <script src="js/main.js?v=20260829-online1"></script>
 </body>
 </html>

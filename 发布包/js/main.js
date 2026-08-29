@@ -8,6 +8,24 @@
   var input = new TankGame.InputManager(canvas);
   var game = new TankGame.Game(canvas, input);
   var menuPanel = document.getElementById("menuPanel");
+  var onlinePanel = document.getElementById("onlineModePanel");
+  var roomPanel = document.getElementById("roomPanel");
+  var onlineButton = document.getElementById("onlineButton");
+  var onlineBackButton = document.getElementById("onlineBackButton");
+  var fieldModeButton = document.getElementById("fieldModeButton");
+  var roomBackButton = document.getElementById("roomBackButton");
+  var roomForm = document.getElementById("roomForm");
+  var playerNameInput = document.getElementById("playerNameInput");
+  var roomCodeInput = document.getElementById("roomCodeInput");
+  var hostRoomButton = document.getElementById("hostRoomButton");
+  var joinRoomButton = document.getElementById("joinRoomButton");
+  var roomStatus = document.getElementById("roomStatus");
+  var roomLobby = document.getElementById("roomLobby");
+  var roomCodeValue = document.getElementById("roomCodeValue");
+  var roomMembersValue = document.getElementById("roomMembersValue");
+  var roomMembersList = document.getElementById("roomMembersList");
+  var startRoomButton = document.getElementById("startRoomButton");
+  var onlineView = null;
   var pausePanel = document.getElementById("pausePanel");
   var countdownPanel = document.getElementById("countdownPanel");
   var countdownValue = document.getElementById("countdownValue");
@@ -104,7 +122,9 @@
     document.getElementById("gameStage").classList.toggle("is-cinematic", state === Config.states.CINEMATIC);
     mobileControls.classList.toggle("is-active", mobileDevice &&
       [Config.states.PLAYING, Config.states.COUNTDOWN].indexOf(state) !== -1);
-    menuPanel.hidden = state !== Config.states.MENU;
+    menuPanel.hidden = state !== Config.states.MENU || Boolean(onlineView);
+    onlinePanel.hidden = state !== Config.states.MENU || onlineView !== "modes";
+    roomPanel.hidden = state !== Config.states.MENU || onlineView !== "room";
     shopPanel.hidden = state !== Config.states.SHOP;
     pausePanel.hidden = state !== Config.states.PAUSED;
     giftPanel.hidden = !giftPanelOpen || state !== Config.states.PAUSED;
@@ -546,6 +566,66 @@
     });
   });
 
+  function showOnlineView(view) { onlineView = view; syncInterface(); }
+  function validName() { return /^[A-Za-z]+$/.test(playerNameInput.value.trim()); }
+  function updateRoomLobby(room) {
+    if (!room) { roomLobby.hidden = true; return; }
+    roomLobby.hidden = false;
+    roomCodeValue.textContent = room.code;
+    roomMembersValue.textContent = room.names.length + " / 10";
+    roomMembersList.textContent = room.names.join("  ·  ");
+    startRoomButton.hidden = !room.host;
+    roomStatus.textContent = room.started ? "战场已开启，正在进入……" : (room.host ? "等待队友加入后开启战场" : "已加入房间，等待房主开启");
+  }
+  onlineButton.addEventListener("click", function () { showOnlineView("modes"); });
+  onlineBackButton.addEventListener("click", function () { showOnlineView(null); });
+  fieldModeButton.addEventListener("click", function () { showOnlineView("room"); });
+  roomBackButton.addEventListener("click", function () { showOnlineView("modes"); });
+  roomForm.addEventListener("submit", function (event) { event.preventDefault(); });
+  hostRoomButton.addEventListener("click", function () {
+    var name = playerNameInput.value.trim();
+    if (!validName()) { roomStatus.textContent = "昵称仅限英文字母"; playerNameInput.focus(); return; }
+    updateRoomLobby(TankGame.Multiplayer.host(name));
+  });
+  joinRoomButton.addEventListener("click", function () {
+    var name = playerNameInput.value.trim();
+    var code = roomCodeInput.value.trim();
+    if (!validName()) { roomStatus.textContent = "昵称仅限英文字母"; playerNameInput.focus(); return; }
+    if (!/^\d{6}$/.test(code)) { roomStatus.textContent = "请输入 6 位房间号"; roomCodeInput.focus(); return; }
+    updateRoomLobby(TankGame.Multiplayer.join(code, name));
+  });
+  startRoomButton.addEventListener("click", function () {
+    var room = TankGame.Multiplayer.getRoom();
+    if (!room || !room.host) { return; }
+    if (!TankGame.Multiplayer.start()) { roomStatus.textContent = "至少需要 2 名玩家才能开始"; }
+  });
+  TankGame.Multiplayer.onChange(function (room) {
+    if (!room) { return; }
+    updateRoomLobby(room);
+    if (room.started && game.state === Config.states.MENU) {
+      game.configureOnline(room);
+      game.start();
+      onlineView = null;
+      syncInterface();
+      canvas.focus();
+    }
+    if (game.selectedMode === "online") {
+      game.remotePlayers = Object.keys(room.remote || {}).map(function (key) { return room.remote[key]; });
+    }
+  });
+  TankGame.Multiplayer.onHit(function (damage) {
+    if (game.selectedMode !== "online" || game.state !== Config.states.PLAYING || !game.player.alive) { return; }
+    game.player.health = Math.max(0, game.player.health - Number(damage || 4));
+    if (game.player.health <= 0) { game.player.alive = false; }
+  });
+  TankGame.Multiplayer.onShot(function (shot) {
+    if (game.selectedMode !== "online" || game.state !== Config.states.PLAYING || !shot) { return; }
+    var bullet = TankGame.Entities.createBullet(Number(shot.x), Number(shot.y), Number(shot.angle), "player");
+    bullet.damage = Number(shot.damage) || 4;
+    bullet.remote = true;
+    game.bullets.push(bullet);
+  });
+
   pauseButton.addEventListener("click", togglePause);
 
   pauseGiftButton.addEventListener("click", function () {
@@ -594,11 +674,13 @@
 
   pauseMenuButton.addEventListener("click", function () {
     game.reset();
+    onlineView = null;
     syncInterface();
   });
 
   resetButton.addEventListener("click", function () {
     game.reset();
+    onlineView = null;
     syncInterface();
   });
 
@@ -643,6 +725,7 @@
   menuButtons.forEach(function (button) {
     button.addEventListener("click", function () {
       game.reset();
+      onlineView = null;
       syncInterface();
     });
   });
@@ -708,6 +791,11 @@
     }
 
     game.render(accumulator / Config.fixedStep);
+    if (game.selectedMode === "online" && game.player) {
+      TankGame.Multiplayer.publish(game.player);
+      var activeRoom = TankGame.Multiplayer.getRoom();
+      if (activeRoom) { game.remotePlayers = Object.keys(activeRoom.remote || {}).map(function (key) { return activeRoom.remote[key]; }); }
+    }
     var countdownDisplay = game.getCountdownDisplay ? game.getCountdownDisplay() :
       (game.countdown > 0.3 ? String(Math.ceil(Math.max(0, game.countdown))) : "GO");
     if (countdownDisplay !== lastCountdownDisplay) {
@@ -722,8 +810,8 @@
         (game.selectedMode === "brave" ? "勇者行动 · 第 " + game.braveLevel + " 关" : "准备战斗"));
     levelValue.textContent = game.selectedMode === "endless" ? "第 " + game.endlessLevel + " 关" :
       (game.selectedMode === "brave" ? "第 " + game.braveLevel + " 关" : game.challengeLevel + " / " + game.maxChallengeLevel);
-    modeValue.textContent = game.selectedMode === "challenge" ? "挑战" :
-      (game.selectedMode === "endless" ? "无尽" : (game.selectedMode === "brave" ? "勇者" : "普通"));
+    modeValue.textContent = game.selectedMode === "online" ? "野战" : (game.selectedMode === "challenge" ? "挑战" :
+      (game.selectedMode === "endless" ? "无尽" : (game.selectedMode === "brave" ? "勇者" : "普通")));
     var displayedLives = game.selectedMode === "brave" ? game.braveRevives : game.lives;
     if (game.selectedMode === "endless") { displayedLives += game.endlessFieldRevives || 0; }
     livesValue.textContent = String(displayedLives);

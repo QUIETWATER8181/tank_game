@@ -386,6 +386,19 @@
         context.restore();
       }
 
+      if (tank.name && tank.alive) {
+        context.save();
+        context.font = "700 13px Consolas, monospace";
+        context.textAlign = "center";
+        context.textBaseline = "bottom";
+        context.fillStyle = tank.team === "player" ? "#d9f4ff" : "#ffd166";
+        context.strokeStyle = "rgba(3, 8, 6, 0.9)";
+        context.lineWidth = 4;
+        context.strokeText(tank.name, tank.x, drawY - 45 * scale);
+        context.fillText(tank.name, tank.x, drawY - 45 * scale);
+        context.restore();
+      }
+
       if (boss && tank.bossShieldCharges > 0) {
         context.save();
         context.translate(tank.x, drawY);

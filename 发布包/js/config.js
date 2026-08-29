@@ -139,13 +139,19 @@
         detectionRange: 1120, attackRange: 700, reactionTime: 0.18,
         pathInterval: 0.38, fireCooldown: 1.05, aimError: 0.035,
         strafeChance: 0.62, preferredRange: 350
+      }),
+      online: Object.freeze({
+        id: "online", label: "野战", lives: 1, enemyCount: 4, enemyHealth: 50, enemyDamage: 25,
+        enemySpeed: 66, enemyTurnSpeed: 1.45, detectionRange: 720, attackRange: 510,
+        reactionTime: 0.7, pathInterval: 1.25, fireCooldown: 1.85, aimError: 0.12
       })
     }),
     partsSettlement: Object.freeze({
       normal: Object.freeze({ scorePerParts: 100, partsPerStep: 10, victoryBonus: 30 }),
       challenge: Object.freeze({ scorePerParts: 100, partsPerStep: 10, victoryMultiplier: 2 }),
       endless: Object.freeze({ scorePerParts: 500, partsPerStep: 10, scoreMultiplierInterval: 5, scoreMultiplier: 1.2 }),
-      brave: Object.freeze({ scorePerParts: 100, partsPerStep: 10, scoreMultiplier: 2 })
+      brave: Object.freeze({ scorePerParts: 100, partsPerStep: 10, scoreMultiplier: 2 }),
+      online: Object.freeze({ scorePerParts: 100, partsPerStep: 10, victoryBonus: 0 })
     }),
     shop: Object.freeze({
       categories: Object.freeze([

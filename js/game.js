@@ -12,7 +12,7 @@
     this.elapsed = 0;
     this.camera = { x: 0, y: 0 };
     this.cinematic = null;
-    this.mapRunSeed = (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0;
+    this.mapRunSeed = this.onlineRoom && this.onlineRoom.seed ? this.onlineRoom.seed : (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0;
     this.worldMap = null;
     this.player = null;
     this.enemies = [];
@@ -55,6 +55,9 @@
     this.bossFirePits = [];
     this.selectedMode = "normal";
     this.mode = Config.modes.normal;
+    this.onlineRoom = null;
+    this.onlinePlayerIndex = 0;
+    this.remotePlayers = [];
     this.challengeLevel = 1;
     this.maxChallengeLevel = Config.modes.challenge.levels.length;
     this.lastCompletedLevel = 0;
@@ -117,6 +120,14 @@
       this.markedTarget = null;
       this.updateLevelMusic();
     }
+  };
+
+  Game.prototype.configureOnline = function (room) {
+    this.onlineRoom = room || null;
+    this.onlinePlayerIndex = room && Number.isFinite(room.index) ? room.index : 0;
+    this.remotePlayers = [];
+    this.selectedMode = "online";
+    this.mode = Config.modes.online;
   };
 
   Game.prototype.loadShopData = function () {
@@ -570,14 +581,30 @@
     var enemyCount;
     var eliteIndex = -1;
     var bossIndex = -1;
-    this.worldMap = TankGame.Map.create({ seed: this.getMapSeed(), level: this.getMapLevel(), mode: this.selectedMode });
-    this.player = TankGame.Entities.createTank(this.worldMap.playerSpawn.x, this.worldMap.playerSpawn.y, "player");
+    this.worldMap = TankGame.Map.create({ seed: this.getMapSeed(), level: this.getMapLevel(), mode: this.selectedMode === "online" ? "normal" : this.selectedMode });
+    var onlineSpawns = [this.worldMap.playerSpawn].concat(this.worldMap.enemySpawns.slice(4, 9));
+    if (this.selectedMode === "online") {
+      var spawnGuard = 0;
+      var spawnSeed = this.mapRunSeed >>> 0;
+      var spawnRandom = function () { spawnSeed = (Math.imul(spawnSeed, 1664525) + 1013904223) >>> 0; return spawnSeed / 4294967296; };
+      while (onlineSpawns.length < 10 && spawnGuard < 300) {
+        spawnGuard += 1;
+        var candidate = { x: 180 + spawnRandom() * (Config.worldWidth - 360), y: 180 + spawnRandom() * (Config.worldHeight - 360) };
+        if (TankGame.Map.circleCollides(this.worldMap, { x: candidate.x, y: candidate.y, radius: 32 })) { continue; }
+        if (onlineSpawns.some(function (spawn) { return Math.hypot(spawn.x - candidate.x, spawn.y - candidate.y) < 220; })) { continue; }
+        onlineSpawns.push(candidate);
+      }
+    }
+    var playerSpawn = this.selectedMode === "online" ? (onlineSpawns[this.onlinePlayerIndex % onlineSpawns.length] || this.worldMap.playerSpawn) : this.worldMap.playerSpawn;
+    this.player = TankGame.Entities.createTank(playerSpawn.x, playerSpawn.y, "player");
+    this.player.name = this.onlineRoom && this.onlineRoom.names ? this.onlineRoom.names[this.onlinePlayerIndex] : "XPZ";
     this.player.bodyAngle = -Math.PI / 2;
     this.player.turretAngle = -Math.PI / 2;
     this.player.invulnerable = 0;
     this.player.maxHealth = ["endless", "brave"].indexOf(this.selectedMode) !== -1 ? this.endlessBaseStats.maxHealth + this.shopData.upgrades.health * 25 : 100;
     this.player.health = this.player.maxHealth;
-    this.player.bulletDamage = ["endless", "brave"].indexOf(this.selectedMode) !== -1 ? this.endlessBaseStats.attack + this.shopData.upgrades.attack : Config.bulletDamage;
+    this.player.bulletDamage = this.selectedMode === "online" ? 4 : (["endless", "brave"].indexOf(this.selectedMode) !== -1 ? this.endlessBaseStats.attack + this.shopData.upgrades.attack : Config.bulletDamage);
+    if (this.selectedMode === "online") { this.player.maxHealth = 100; this.player.health = 100; }
     this.player.fireRateMultiplier = this.selectedMode === "endless" ? this.endlessBaseStats.fireRate : 1;
     var speedLevel = this.selectedMode === "endless" ? Math.min(5, this.endlessPermanent.speed || 0) : 0;
     this.player.moveSpeedMultiplier = speedLevel ? Math.round((1.4 + (speedLevel - 1) * 0.05) * 100) / 100 : 1;
@@ -635,7 +662,7 @@
       this.maxCombo = 0;
     }
     this.markedTarget = null;
-    enemyCount = levelConfig ? levelConfig.enemyCount : (this.mode.enemyCount || this.worldMap.enemySpawns.slice(0, 3).length);
+    enemyCount = this.selectedMode === "online" ? 0 : (levelConfig ? levelConfig.enemyCount : (this.mode.enemyCount || this.worldMap.enemySpawns.slice(0, 3).length));
     if (this.selectedMode === "brave") {
       bossIndex = 0;
     } else if (this.selectedMode === "endless" && this.endlessLevel % 10 === 0) {
@@ -651,6 +678,7 @@
       enemy.health = levelConfig ? levelConfig.enemyHealth : self.mode.enemyHealth;
       enemy.maxHealth = enemy.health;
       enemy.bulletDamage = levelConfig && levelConfig.enemyDamage ? levelConfig.enemyDamage : (self.mode.enemyDamage || Config.bulletDamage);
+      if (self.selectedMode === "online") { enemy.health = 50; enemy.maxHealth = 50; enemy.bulletDamage = 25; }
       enemy.jammedTimer = 0;
       enemy.bodyAngle = index === 0 ? Math.PI / 2 : Math.PI;
       enemy.turretAngle = enemy.bodyAngle;
@@ -747,7 +775,7 @@
 
   Game.prototype.start = function () {
     this.elapsed = 0;
-    this.mapRunSeed = (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0;
+    this.mapRunSeed = this.onlineRoom && this.onlineRoom.seed ? this.onlineRoom.seed : (Date.now() ^ Math.floor(Math.random() * 0xFFFFFFFF)) >>> 0;
     this.challengeLevel = 1;
     this.braveLevel = 1;
     if (this.selectedMode === "brave") {
@@ -826,6 +854,7 @@
     this.resetWorld(false);
     this.updateLevelMusic();
     this.setState(Config.states.MENU);
+    if (this.selectedMode === "online") { this.setMode("normal"); this.onlineRoom = null; this.remotePlayers = []; }
   };
 
   Game.prototype.update = function (deltaTime) {
@@ -894,7 +923,7 @@
     TankGame.Effects.update(deltaTime);
     this.updatePlayerLifeCycle(deltaTime);
     this.updateCamera(deltaTime, false);
-    if (this.enemies.length === 0 && this.state === Config.states.PLAYING) {
+    if (this.enemies.length === 0 && this.state === Config.states.PLAYING && this.selectedMode !== "online") {
       this.completeLevel();
     }
   };
@@ -1164,6 +1193,9 @@
       var offset = bulletCount === 1 ? 0 : -spread + (spread * 2 * bulletIndex / (bulletCount - 1));
       var bullet = TankGame.Entities.createBullet(x, y, tank.turretAngle + offset, tank.team);
       bullet.damage = (tank.bulletDamage || Config.bulletDamage) * (splitLevel ? 0.7 : 1);
+      if (this.selectedMode === "online" && tank === this.player && TankGame.Multiplayer.sendShot) {
+        TankGame.Multiplayer.sendShot(x, y, tank.turretAngle + offset, bullet.damage);
+      }
       if (tank.team === "player" && this.runShop.redBullet) { bullet.redBullet = true; bullet.damage *= 2; }
       if (playerShotVariant === "bomb") {
         bullet.bossBomb = true;
@@ -2218,7 +2250,7 @@
       return;
     }
 
-    var targets = bullet.team === "player" ? this.enemies : [this.player];
+    var targets = bullet.team === "player" ? (this.selectedMode === "online" ? (this.remotePlayers || []).concat(this.enemies) : this.enemies) : [this.player];
     var target = targets.find(function (tank) {
       return tank.alive && (!bullet.fieldPiercedObjects || bullet.fieldPiercedObjects.indexOf(tank) === -1) &&
         !(tank.team === "player" && tank.invulnerable > 0) &&
@@ -2256,6 +2288,9 @@
       target.health -= bullet.damage;
     }
     if (target.team === "player") { this.registerPlayerDamage(); }
+    if (this.selectedMode === "online" && target.team === "player" && target.name && TankGame.Multiplayer.sendHit) {
+      TankGame.Multiplayer.sendHit(target.name, bullet.damage);
+    }
     target.hitFlash = 0.12;
     if (target.team === "player" && target.levelRepair) {
       this.applyRepair(target);
@@ -2939,6 +2974,9 @@
     this.enemies.forEach(function (enemy) {
       if (!cinematicActive || enemy !== this.cinematic.boss) { TankGame.Entities.drawTank(context, enemy); }
     }, this);
+    (this.remotePlayers || []).forEach(function (remote) {
+      if (remote && remote.alive !== false) { TankGame.Entities.drawTank(context, remote); }
+    });
     this.drawMarkedTarget(context);
     this.drawMortarWarnings(context);
     this.drawRearGuards(context);
@@ -2971,7 +3009,7 @@
     context.restore();
     if (this.isBossBattleActive() && [Config.states.CINEMATIC, Config.states.COUNTDOWN].indexOf(this.state) === -1) { this.drawBossWarParticles(context); }
     if (cinematicActive) { this.cinematic.drawScreenOverlay(context); }
-    if ([Config.states.COUNTDOWN, Config.states.PLAYING, Config.states.PAUSED].indexOf(this.state) !== -1) {
+    if ([Config.states.COUNTDOWN, Config.states.PLAYING, Config.states.PAUSED].indexOf(this.state) !== -1 && this.selectedMode !== "online") {
       this.drawTacticalRadar(context);
       this.drawPerspectiveIndicators(context);
       this.drawLowHealthWarning(context);
