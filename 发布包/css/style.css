@@ -304,6 +304,12 @@ button:focus-visible {
     transform: none;
   }
 
+  .game-shell.is-landscape-fallback .mobile-dpad {
+    left: auto;
+    right: max(12px, env(safe-area-inset-bottom));
+    bottom: max(12px, env(safe-area-inset-left));
+  }
+
   .game-shell.is-landscape-fallback .footer-note {
     display: none;
   }

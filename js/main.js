@@ -294,7 +294,10 @@
     var target = document.getElementById("gameStage");
     var shell = document.querySelector(".game-shell");
     var orientation = window.screen && window.screen.orientation;
-    var landscape = window.matchMedia && window.matchMedia("(orientation: landscape)").matches;
+    var isLandscape = function () {
+      return Boolean(window.matchMedia && window.matchMedia("(orientation: landscape)").matches);
+    };
+    var landscape = isLandscape();
     var lockLandscape = function () {
       var lock;
       if (!orientation || !orientation.lock) { return Promise.reject(new Error("orientation lock unavailable")); }
@@ -303,7 +306,31 @@
     };
     var exitFullscreen = function () {
       if (!document.fullscreenElement || !document.exitFullscreen) { return Promise.resolve(); }
-      return Promise.resolve(document.exitFullscreen()).catch(function () {});
+      try {
+        return Promise.resolve(document.exitFullscreen()).catch(function () {});
+      } catch (error) {
+        return Promise.resolve();
+      }
+    };
+    var confirmLandscape = function () {
+      if (isLandscape()) { return Promise.resolve(); }
+      return new Promise(function (resolve) {
+        var timer;
+        var finish = function () {
+          window.removeEventListener("orientationchange", check);
+          window.removeEventListener("resize", check);
+          window.clearTimeout(timer);
+          resolve();
+        };
+        var check = function () {
+          if (isLandscape()) { finish(); }
+        };
+        window.addEventListener("orientationchange", check);
+        window.addEventListener("resize", check);
+        timer = window.setTimeout(finish, 1200);
+      }).then(function () {
+        if (!isLandscape()) { return Promise.reject(new Error("landscape lock did not rotate viewport")); }
+      });
     };
     var usePortraitFallback = function () {
       return exitFullscreen().then(function () {
@@ -321,7 +348,9 @@
     var requestTarget = target.requestFullscreen ? target : document.documentElement;
     var fullscreenPromise = document.fullscreenElement ? Promise.resolve() :
       (requestTarget && requestTarget.requestFullscreen ? requestTarget.requestFullscreen() : Promise.reject(new Error("fullscreen unavailable")));
-    var afterFullscreen = fullscreenPromise.then(function () { return lockLandscape(); });
+    var afterFullscreen = fullscreenPromise.then(function () {
+      return lockLandscape().then(confirmLandscape);
+    });
     afterFullscreen.then(function () {
       shell.classList.remove("is-landscape-fallback");
       updateFullscreenButtonLabel();
