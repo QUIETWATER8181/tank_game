@@ -144,7 +144,8 @@
     countdownLabel.textContent = game.selectedMode === "challenge" ? "第 " + game.challengeLevel + " 关 · 准备战斗" :
       (game.selectedMode === "endless" ? "无尽模式 · 第 " + game.endlessLevel + " 关" :
         (game.selectedMode === "brave" ? "勇者行动 · 第 " + game.braveLevel + " 关" : "准备战斗"));
-    pauseButton.disabled = state !== Config.states.PLAYING && state !== Config.states.PAUSED;
+    pauseButton.hidden = game.selectedMode === "online";
+    pauseButton.disabled = game.selectedMode === "online" || (state !== Config.states.PLAYING && state !== Config.states.PAUSED);
     pauseButton.textContent = state === Config.states.PAUSED ? "▶" : "Ⅱ";
     pauseButton.title = state === Config.states.PAUSED ? "继续" : "暂停";
     pauseButton.setAttribute("aria-label", pauseButton.title);
@@ -405,6 +406,7 @@
   }
 
   function togglePause() {
+    if (game.selectedMode === "online") { return; }
     if (game.state === Config.states.PLAYING) {
       game.pause();
     } else if (game.state === Config.states.PAUSED) {
@@ -610,11 +612,11 @@
       canvas.focus();
     }
     if (game.selectedMode === "online") {
-      game.remotePlayers = Object.keys(room.remote || {}).map(function (key) { return room.remote[key]; }).filter(function (player) { return player && player.remoteId !== room.localId; });
+      game.remotePlayers = Object.keys(room.remote || {}).map(function (key) { return room.remote[key]; }).filter(function (player) { return player && player.remoteId !== room.localId && !player.ghost; });
     }
   });
   TankGame.Multiplayer.onHit(function (damage) {
-    if (game.selectedMode !== "online" || game.state !== Config.states.PLAYING || !game.player.alive) { return; }
+    if (game.selectedMode !== "online" || game.state !== Config.states.PLAYING || !game.player.alive || game.player.ghost) { return; }
     game.player.health = Math.max(0, game.player.health - Number(damage || 4));
     if (game.player.health <= 0) { game.player.alive = false; }
     TankGame.Multiplayer.publish(game.player);
@@ -762,7 +764,7 @@
       event.preventDefault();
       return;
     }
-    if ((event.code === "Escape" || event.code === "KeyP") && game.state !== Config.states.MENU) {
+    if ((event.code === "Escape" || event.code === "KeyP") && game.state !== Config.states.MENU && game.selectedMode !== "online") {
       event.preventDefault();
       togglePause();
     }
@@ -774,7 +776,7 @@
   });
 
   window.addEventListener("blur", function () {
-    if (game.state === Config.states.PLAYING) {
+    if (game.state === Config.states.PLAYING && game.selectedMode !== "online") {
       game.pause();
       syncInterface();
     }
@@ -796,8 +798,9 @@
     if (game.selectedMode === "online" && game.player) {
       TankGame.Multiplayer.publish(game.player);
       var activeRoom = TankGame.Multiplayer.getRoom();
-      if (activeRoom) { game.remotePlayers = Object.keys(activeRoom.remote || {}).map(function (key) { return activeRoom.remote[key]; }).filter(function (player) { return player && player.remoteId !== activeRoom.localId; }); }
+      if (activeRoom) { game.remotePlayers = Object.keys(activeRoom.remote || {}).map(function (key) { return activeRoom.remote[key]; }).filter(function (player) { return player && player.remoteId !== activeRoom.localId && !player.ghost; }); }
     }
+    if (game.selectedMode === "online" && game.player.ghost) { statusText.textContent = "观战中 · 幽灵坦克"; }
     var countdownDisplay = game.getCountdownDisplay ? game.getCountdownDisplay() :
       (game.countdown > 0.3 ? String(Math.ceil(Math.max(0, game.countdown))) : "GO");
     if (countdownDisplay !== lastCountdownDisplay) {

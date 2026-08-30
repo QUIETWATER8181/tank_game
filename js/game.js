@@ -835,10 +835,12 @@
   };
 
   Game.prototype.pause = function () {
+    if (this.selectedMode === "online") { return; }
     if (this.state === Config.states.PLAYING) { this.setState(Config.states.PAUSED); }
   };
 
   Game.prototype.resume = function () {
+    if (this.selectedMode === "online") { return; }
     if (this.state === Config.states.PAUSED) { this.setState(Config.states.PLAYING); }
   };
 
@@ -994,6 +996,14 @@
 
   Game.prototype.updatePlayerLifeCycle = function (deltaTime) {
     if (this.player.alive) { return; }
+    if (this.selectedMode === "online") {
+      this.player.ghost = true;
+      this.player.alive = true;
+      this.player.health = 0;
+      this.playerDeathHandled = true;
+      this.bullets = this.bullets.filter(function (bullet) { return bullet.remote; });
+      return;
+    }
     if (this.selectedMode === "brave" && this.braveRevives > 0) {
       this.braveRevives -= 1;
       this.reviveBravePlayer();
@@ -1115,7 +1125,7 @@
   Game.prototype.updateCombat = function (deltaTime) {
     var self = this;
 
-    if (this.player.alive && (this.input.pointer.down || this.input.isDown("Space")) && this.player.fireCooldown <= 0) {
+    if (this.player.alive && !this.player.ghost && (this.input.pointer.down || this.input.isDown("Space")) && this.player.fireCooldown <= 0) {
       this.fire(this.player);
       this.player.fireCooldown = Config.playerFireCooldown * (this.player.fireRateMultiplier || 1) * (this.player.levelRapid || this.player.rapidTimer > 0 ? 0.48 : 1);
     }
@@ -2256,7 +2266,7 @@
     }
 
     var targets = bullet.team === "player" ?
-      (this.selectedMode === "online" ? (bullet.remote ? [this.player] : (this.remotePlayers || []).concat(this.enemies)) : this.enemies) : [this.player];
+      (this.selectedMode === "online" ? (bullet.remote ? (this.player.ghost ? [] : [this.player]) : (this.remotePlayers || []).concat(this.enemies)) : this.enemies) : [this.player];
     var target = targets.find(function (tank) {
       return tank.alive && (!bullet.fieldPiercedObjects || bullet.fieldPiercedObjects.indexOf(tank) === -1) &&
         !(tank.team === "player" && tank.invulnerable > 0) &&
@@ -2347,7 +2357,7 @@
 
   Game.prototype.damagePlayerFromSpecial = function (damage, sourceX, sourceY) {
     var player = this.player;
-    if (!player.alive || player.invulnerable > 0) { return false; }
+    if (!player.alive || (this.selectedMode === "online" && player.ghost) || player.invulnerable > 0) { return false; }
     if (player.frontShieldCharges > 0 && this.isFrontShieldHit(player, { previousX: sourceX, previousY: sourceY })) {
       player.frontShieldCharges -= 1;
       TankGame.Effects.burst(player.x, player.y, "#72cfff", 12, 150);
@@ -2602,7 +2612,7 @@
       }
       var dx = supply.x - self.player.x;
       var dy = supply.y - self.player.y;
-      if (self.player.alive && dx * dx + dy * dy < 38 * 38) {
+      if (self.player.alive && !self.player.ghost && dx * dx + dy * dy < 38 * 38) {
         self.collectSupply(supply);
         supply.life = 0;
       }
@@ -2951,6 +2961,16 @@
     }
     var cinematicView = cinematicActive ? this.cinematic.getCameraView() : null;
     var bounds = cinematicActive ? this.cinematic.getBounds(120) : this.getCameraBounds(80);
+    if (!cinematicActive && this.selectedMode === "online" && this.player.ghost) {
+      var ghostViewWidth = Config.viewportWidth / 0.625;
+      var ghostViewHeight = Config.viewportHeight / 0.625;
+      bounds = {
+        left: Math.max(0, this.player.x - ghostViewWidth / 2 - 80),
+        top: Math.max(0, this.player.y - ghostViewHeight / 2 - 80),
+        right: Math.min(Config.worldWidth, this.player.x + ghostViewWidth / 2 + 80),
+        bottom: Math.min(Config.worldHeight, this.player.y + ghostViewHeight / 2 + 80)
+      };
+    }
     context.clearRect(0, 0, viewportWidth, viewportHeight);
     context.save();
     if (this.shake > 0) {
@@ -2961,7 +2981,13 @@
       context.scale(cinematicView.zoom, cinematicView.zoom);
       context.translate(-cinematicView.focusX, -cinematicView.focusY);
     } else {
-      context.translate(-this.camera.x, -this.camera.y);
+      if (this.selectedMode === "online" && this.player.ghost) {
+        context.translate(Config.viewportWidth / 2, Config.viewportHeight / 2);
+        context.scale(0.625, 0.625);
+        context.translate(-this.player.x, -this.player.y);
+      } else {
+        context.translate(-this.camera.x, -this.camera.y);
+      }
     }
     this.drawGround(context, bounds);
     this.drawCampusGrid(context, bounds);
@@ -2990,7 +3016,7 @@
     this.drawMortarWarnings(context);
     this.drawRearGuards(context);
     this.drawBraveReviveShield(context);
-    if (this.player.alive && (this.player.paradiseMade || this.player.invulnerable <= 0 || Math.floor(this.elapsed * 10) % 2 === 0)) {
+    if (this.player.alive && (this.player.ghost || this.player.paradiseMade || this.player.invulnerable <= 0 || Math.floor(this.elapsed * 10) % 2 === 0)) {
       TankGame.Entities.drawTank(context, this.player);
     }
     if (cinematicActive) {

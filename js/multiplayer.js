@@ -55,6 +55,6 @@
     getRoom: function () { return room; },
     sendHit: function (target, damage) { if (!room || !room.started) { return; } broadcast({ type: "hit", code: room.code, target: target, damage: damage, from: id }); },
     sendShot: function (x, y, angle, damage) { if (!room || !room.started) { return; } broadcast({ type: "shot", code: room.code, from: id, x: x, y: y, angle: angle, damage: damage }); },
-    publish: function (player) { if (!room || !room.started) { return; } var message = { type: "state", code: room.code, from: id, player: { x: player.x, y: player.y, bodyAngle: player.bodyAngle, turretAngle: player.turretAngle, health: player.health, maxHealth: player.maxHealth, radius: player.radius, visualScale: player.visualScale, name: player.name, alive: player.alive, team: "player", remoteId: id } }; broadcast(message); }
+    publish: function (player) { if (!room || !room.started) { return; } var message = { type: "state", code: room.code, from: id, player: { x: player.x, y: player.y, bodyAngle: player.bodyAngle, turretAngle: player.turretAngle, health: player.health, maxHealth: player.maxHealth, radius: player.radius, visualScale: player.visualScale, name: player.name, alive: player.alive, ghost: Boolean(player.ghost), team: "player", remoteId: id } }; broadcast(message); }
   };
 }());

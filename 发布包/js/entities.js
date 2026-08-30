@@ -39,7 +39,7 @@
 
   function drawSpriteLayer(context, image, tank, angle, drawY, definition, shadow) {
     context.save();
-    context.globalAlpha = shadow ? 0.48 : 1;
+    context.globalAlpha = shadow ? 0.48 : (tank.ghost ? 0.28 : 1);
     context.translate(tank.x, drawY);
     context.rotate(angle);
     context.scale((tank.visualScale || 1) * definition.scale, (tank.visualScale || 1) * definition.scale);
@@ -265,14 +265,18 @@
       distance = direction * speed * deltaTime;
       nextX = tank.x + Math.cos(tank.bodyAngle) * distance;
       nextY = tank.y + Math.sin(tank.bodyAngle) * distance;
+      if (tank.ghost) {
+        nextX = Math.max(tank.radius, Math.min(Config.worldWidth - tank.radius, nextX));
+        nextY = Math.max(tank.radius, Math.min(Config.worldHeight - tank.radius, nextY));
+      }
 
       breakParadiseWalls(tank, worldMap, { x: nextX, y: tank.y, radius: tank.radius }, onWallBroken);
-      if ((tank.voidWalker && !tank.wallLocked || !TankGame.Map.circleCollides(worldMap, { x: nextX, y: tank.y, radius: tank.radius })) &&
+      if ((tank.ghost || (tank.voidWalker && !tank.wallLocked) || !TankGame.Map.circleCollides(worldMap, { x: nextX, y: tank.y, radius: tank.radius })) &&
           !TankGame.Collision.tankCollidesWithWreck({ x: nextX, y: tank.y, radius: tank.radius }, wrecks)) {
         tank.x = nextX;
       }
       breakParadiseWalls(tank, worldMap, { x: tank.x, y: nextY, radius: tank.radius }, onWallBroken);
-      if ((tank.voidWalker && !tank.wallLocked || !TankGame.Map.circleCollides(worldMap, { x: tank.x, y: nextY, radius: tank.radius })) &&
+      if ((tank.ghost || (tank.voidWalker && !tank.wallLocked) || !TankGame.Map.circleCollides(worldMap, { x: tank.x, y: nextY, radius: tank.radius })) &&
           !TankGame.Collision.tankCollidesWithWreck({ x: tank.x, y: nextY, radius: tank.radius }, wrecks)) {
         tank.y = nextY;
       }
@@ -308,7 +312,7 @@
       }
       if (!drawTankSprites(context, tank, drawY, shadow)) {
         context.save();
-        context.globalAlpha = shadow ? 0.48 : 1;
+        context.globalAlpha = shadow ? 0.48 : (tank.ghost ? 0.28 : 1);
         context.translate(tank.x, drawY);
         context.rotate(tank.bodyAngle);
         context.scale(scale, scale);
@@ -337,7 +341,7 @@
         context.restore();
 
         context.save();
-        context.globalAlpha = shadow ? 0.48 : 1;
+        context.globalAlpha = shadow ? 0.48 : (tank.ghost ? 0.28 : 1);
         context.translate(tank.x, drawY);
         context.rotate(tank.turretAngle);
         context.scale(scale, scale);
@@ -361,7 +365,7 @@
       }
 
       context.save();
-      context.globalAlpha = shadow ? 0.48 : 1;
+      context.globalAlpha = shadow ? 0.48 : (tank.ghost ? 0.28 : 1);
       context.translate(tank.x, drawY);
       context.rotate(tank.bodyAngle);
       context.scale(scale, scale);
