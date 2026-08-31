@@ -107,6 +107,8 @@
   var defeatMode = document.getElementById("defeatMode");
   var victoryStats = document.getElementById("victoryStats");
   var defeatStats = document.getElementById("defeatStats");
+  var onlineLeaderboard = document.getElementById("onlineLeaderboard");
+  var onlineLeaderboardDefeat = document.getElementById("onlineLeaderboardDefeat");
   var recordSummary = document.getElementById("recordSummary");
   var retryButtons = document.querySelectorAll(".retry-button");
   var menuButtons = document.querySelectorAll(".menu-button");
@@ -149,6 +151,10 @@
     pauseButton.textContent = state === Config.states.PAUSED ? "▶" : "Ⅱ";
     pauseButton.title = state === Config.states.PAUSED ? "继续" : "暂停";
     pauseButton.setAttribute("aria-label", pauseButton.title);
+    var onlineRoom = TankGame.Multiplayer.getRoom && TankGame.Multiplayer.getRoom();
+    retryButtons.forEach(function (button) {
+      button.hidden = game.selectedMode === "online" && !(onlineRoom && onlineRoom.host);
+    });
 
     if (state === Config.states.MENU) {
       statusText.textContent = "准备就绪";
@@ -181,6 +187,7 @@
         (game.selectedMode === "brave" ? "勇者行动 · 第 " + game.resultLevel + " 关" : game.mode.label));
     renderStats(victoryStats);
     renderStats(defeatStats);
+    renderOnlineLeaderboard();
     renderShop();
     updateRecordSummary();
     if (state === Config.states.REWARD) {
@@ -297,6 +304,21 @@
     musicVolumePanel.hidden = !open;
     musicButton.setAttribute("aria-expanded", String(open));
     if (open) { musicVolumeSlider.focus(); }
+  }
+
+  function renderOnlineLeaderboard() {
+    var result = game.onlineResult;
+    var containers = [onlineLeaderboard, onlineLeaderboardDefeat].filter(Boolean);
+    if (!containers.length) { return; }
+    if (game.selectedMode !== "online" || !result || !result.standings) {
+      containers.forEach(function (container) { container.hidden = true; container.innerHTML = ""; });
+      return;
+    }
+    var html = "<h3>野战结算 · 存活排行</h3><table><thead><tr><th>排名</th><th>玩家</th><th>存活时长</th><th>击杀</th></tr></thead><tbody>" +
+      result.standings.map(function (entry, index) {
+        return "<tr><td>" + (index + 1) + "</td><td>" + String(entry.name || "玩家").replace(/[&<>\"']/g, "") + "</td><td>" + formatTime(entry.survivalTime) + "</td><td>" + Number(entry.kills || 0) + "</td></tr>";
+      }).join("") + "</tbody></table>";
+    containers.forEach(function (container) { container.hidden = false; container.innerHTML = html; });
   }
 
   function updateFullscreenButtonLabel() {
@@ -604,6 +626,11 @@
   TankGame.Multiplayer.onChange(function (room) {
     if (!room) { return; }
     updateRoomLobby(room);
+    if (room.ended && room.result && game.selectedMode === "online" && game.state === Config.states.PLAYING) {
+      game.finishOnlineMatch(room.result);
+      syncInterface();
+      return;
+    }
     if (room.started && game.state === Config.states.MENU) {
       game.configureOnline(room);
       game.start();
@@ -611,16 +638,33 @@
       syncInterface();
       canvas.focus();
     }
+    if (room.started && game.selectedMode === "online" && Number(room.round || 0) !== Number(game.onlineRound || 0) && game.state !== Config.states.MENU) {
+      game.configureOnline(room);
+      game.start();
+      onlineView = null;
+      syncInterface();
+      canvas.focus();
+      return;
+    }
     if (game.selectedMode === "online") {
       game.remotePlayers = Object.keys(room.remote || {}).map(function (key) { return room.remote[key]; }).filter(function (player) { return player && player.remoteId !== room.localId && !player.ghost; });
     }
   });
-  TankGame.Multiplayer.onHit(function (damage) {
+  TankGame.Multiplayer.onHit(function (message) {
     if (game.selectedMode !== "online" || game.state !== Config.states.PLAYING || !game.player.alive || game.player.ghost) { return; }
+    var damage = message && typeof message === "object" ? message.damage : message;
     game.player.health = Math.max(0, game.player.health - Number(damage || 4));
     if (game.player.health <= 0) { game.player.alive = false; }
     TankGame.Multiplayer.publish(game.player);
   });
+  if (TankGame.Multiplayer.onKill) {
+    TankGame.Multiplayer.onKill(function (message) {
+      if (game.selectedMode === "online" && message && message.killer === game.player.name) {
+        game.onlineKills += 1;
+        game.stats.kills = game.onlineKills;
+      }
+    });
+  }
   TankGame.Multiplayer.onShot(function (shot) {
     var activeRoom = TankGame.Multiplayer.getRoom && TankGame.Multiplayer.getRoom();
     if (game.selectedMode !== "online" || game.state !== Config.states.PLAYING || !shot || (activeRoom && shot.from === activeRoom.localId)) { return; }
@@ -719,6 +763,11 @@
 
   retryButtons.forEach(function (button) {
     button.addEventListener("click", function () {
+      if (game.selectedMode === "online") {
+        var room = TankGame.Multiplayer.getRoom && TankGame.Multiplayer.getRoom();
+        if (room && room.host && TankGame.Multiplayer.restart) { TankGame.Multiplayer.restart(); }
+        return;
+      }
       game.start();
       TankGame.Audio.initialize();
       syncInterface();
@@ -797,6 +846,7 @@
     game.render(accumulator / Config.fixedStep);
     if (game.selectedMode === "online" && game.player) {
       TankGame.Multiplayer.publish(game.player);
+      if (TankGame.Multiplayer.checkEnd) { TankGame.Multiplayer.checkEnd(); }
       var activeRoom = TankGame.Multiplayer.getRoom();
       if (activeRoom) { game.remotePlayers = Object.keys(activeRoom.remote || {}).map(function (key) { return activeRoom.remote[key]; }).filter(function (player) { return player && player.remoteId !== activeRoom.localId && !player.ghost; }); }
     }

@@ -261,7 +261,7 @@
       if (input.isDown("KeyS")) { direction -= 1; }
 
       tank.bodyAngle = wrapAngle(tank.bodyAngle + turn * Config.playerTurnSpeed * deltaTime);
-      speed = (direction >= 0 ? Config.playerSpeed : Config.playerReverseSpeed) * (tank.moveSpeedMultiplier || 1);
+      speed = (direction >= 0 ? Config.playerSpeed : Config.playerReverseSpeed) * (tank.moveSpeedMultiplier || 1) * (tank.ghost ? 5 : 1);
       distance = direction * speed * deltaTime;
       nextX = tank.x + Math.cos(tank.bodyAngle) * distance;
       nextY = tank.y + Math.sin(tank.bodyAngle) * distance;

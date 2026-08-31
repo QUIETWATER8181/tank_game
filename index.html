@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>钢铁征途 坦克大战</title>
-  <link rel="stylesheet" href="css/style.css?v=20260830-online3">
+  <link rel="stylesheet" href="css/style.css?v=20260831-online4">
 </head>
 <body>
   <main class="game-shell">
@@ -336,10 +336,11 @@
         <h2>战斗胜利</h2>
         <p class="result-score">最终得分 <strong id="victoryScore">0000</strong></p>
         <p class="result-mode">完成模式：<strong id="victoryMode">普通模式</strong></p>
+        <div id="onlineLeaderboard" class="online-leaderboard" hidden></div>
 
         <div id="victoryStats" class="result-stats"></div>
         <div class="result-actions">
-          <button class="primary-button retry-button" type="button">再次挑战</button>
+          <button id="victoryRetryButton" class="primary-button retry-button" type="button">再次挑战</button>
           <button class="secondary-button menu-button" type="button">返回主菜单</button>
         </div>
       </section>
@@ -356,6 +357,7 @@
         <h2>战斗失败</h2>
         <p class="result-score">本局得分 <strong id="defeatScore">0000</strong></p>
         <p class="result-mode">本局模式：<strong id="defeatMode">普通模式</strong></p>
+        <div id="onlineLeaderboardDefeat" class="online-leaderboard" hidden></div>
         <div id="defeatStats" class="result-stats"></div>
         <div class="result-actions">
           <button class="primary-button retry-button" type="button">重新出击</button>
@@ -378,8 +380,8 @@
   <script src="js/effects.js?v=20260829-mobile7"></script>
   <script src="js/game.js?v=20260829-mobile7"></script>
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="js/multiplayer.js?v=20260830-online3"></script>
+  <script src="js/multiplayer.js?v=20260831-online4"></script>
   <script src="js/field-skills.js?v=20260829-mobile7"></script>
-  <script src="js/main.js?v=20260830-online3"></script>
+  <script src="js/main.js?v=20260831-online4"></script>
 </body>
 </html>

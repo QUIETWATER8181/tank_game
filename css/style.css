@@ -889,6 +889,12 @@ button:focus-visible {
 .room-lobby strong { color:#d9f4ff; font:800 20px Consolas,monospace; }
 .room-lobby p { min-height:22px; margin:10px 0 14px; color:#cbd7d1; }
 .room-lobby .primary-button { width:100%; }
+.online-leaderboard { width:min(560px,100%); margin:14px 0 4px; padding:12px 14px; border:1px solid rgba(114,207,255,.45); background:rgba(7,25,32,.78); text-align:left; }
+.online-leaderboard h3 { margin:0 0 8px; color:#d9f4ff; font-size:15px; }
+.online-leaderboard table { width:100%; border-collapse:collapse; color:#cbd7d1; font-size:13px; }
+.online-leaderboard th,.online-leaderboard td { padding:6px 8px; border-bottom:1px solid rgba(255,255,255,.12); text-align:left; }
+.online-leaderboard th { color:#72cfff; font-weight:700; }
+.online-leaderboard tr:last-child td { border-bottom:0; }
 
 .mode-selector {
   display: grid;

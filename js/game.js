@@ -58,6 +58,10 @@
     this.onlineRoom = null;
     this.onlinePlayerIndex = 0;
     this.remotePlayers = [];
+    this.onlineKills = 0;
+    this.onlineMatchEnded = false;
+    this.onlineResult = null;
+    this.onlineRound = 0;
     this.challengeLevel = 1;
     this.maxChallengeLevel = Config.modes.challenge.levels.length;
     this.lastCompletedLevel = 0;
@@ -128,6 +132,25 @@
     this.remotePlayers = [];
     this.selectedMode = "online";
     this.mode = Config.modes.online;
+    this.onlineKills = 0;
+    this.onlineMatchEnded = false;
+    this.onlineResult = null;
+    this.onlineRound = room && Number(room.round) || 0;
+  };
+
+  Game.prototype.finishOnlineMatch = function (result) {
+    if (this.selectedMode !== "online" || this.onlineMatchEnded) { return; }
+    this.onlineMatchEnded = true;
+    this.onlineResult = result || null;
+    this.player.ghost = this.player.ghost || !this.player.alive;
+    this.settleParts(Boolean(result && result.winner === this.player.name));
+    if (result && result.winner === this.player.name) {
+      this.setState(Config.states.VICTORY);
+      TankGame.Audio.play("victory");
+    } else {
+      this.setState(Config.states.DEFEAT);
+      TankGame.Audio.play("defeat");
+    }
   };
 
   Game.prototype.loadShopData = function () {
@@ -606,6 +629,7 @@
     if (this.selectedMode === "online") {
       this.player.visualScale = 1.25;
       this.player.radius = 23 * 1.25;
+      this.player.survivalTime = 0;
     }
     this.player.bulletDamage = this.selectedMode === "online" ? 4 : (["endless", "brave"].indexOf(this.selectedMode) !== -1 ? this.endlessBaseStats.attack + this.shopData.upgrades.attack : Config.bulletDamage);
     if (this.selectedMode === "online") { this.player.maxHealth = 100; this.player.health = 100; }
@@ -881,6 +905,7 @@
       return;
     }
     this.elapsed += deltaTime;
+    if (this.selectedMode === "online" && !this.player.ghost) { this.player.survivalTime = this.elapsed; }
     this.levelElapsed += deltaTime;
     if (this.comboTimer > 0) {
       this.comboTimer = Math.max(0, this.comboTimer - deltaTime);
@@ -2305,7 +2330,7 @@
     }
     if (target.team === "player") { this.registerPlayerDamage(); }
     if (this.selectedMode === "online" && !bullet.remote && target.remoteId && TankGame.Multiplayer.sendHit) {
-      TankGame.Multiplayer.sendHit(target.name, bullet.damage);
+      TankGame.Multiplayer.sendHit(target.name, bullet.damage, this.player.name);
     }
     target.hitFlash = 0.12;
     if (target.team === "player" && target.levelRepair) {
@@ -2327,6 +2352,11 @@
         target.wreckParticles = this.createWreckParticles(target);
       } else {
         target.alive = false;
+        if (this.selectedMode === "online" && bullet.team === "player" && !bullet.remote) {
+          this.onlineKills += 1;
+          this.stats.kills = this.onlineKills;
+          if (TankGame.Multiplayer.sendKill) { TankGame.Multiplayer.sendKill(this.player.name); }
+        }
       }
       if (target.isBoss || target.isBossClone || target.isElite) { this.deactivateBossThreats(target); }
       TankGame.Effects.burst(target.x, target.y, "#ffb15c", 30, 230);
