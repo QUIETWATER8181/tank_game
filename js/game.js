@@ -62,6 +62,9 @@
     this.onlineMatchEnded = false;
     this.onlineResult = null;
     this.onlineRound = 0;
+    this.onlineClockStart = 0;
+    this.onlineCombatStart = 0;
+    this.onlineLastAbsolute = 0;
     this.challengeLevel = 1;
     this.maxChallengeLevel = Config.modes.challenge.levels.length;
     this.lastCompletedLevel = 0;
@@ -136,12 +139,52 @@
     this.onlineMatchEnded = false;
     this.onlineResult = null;
     this.onlineRound = room && Number(room.round) || 0;
+    this.onlineClockStart = room && Number(room.roundStartedAt) || 0;
+    this.onlineCombatStart = room && Number(room.combatStartedAt) || 0;
+    this.onlineLastAbsolute = 0;
+  };
+
+  Game.prototype.getOnlineNow = function () {
+    return TankGame.Multiplayer && TankGame.Multiplayer.now ? TankGame.Multiplayer.now() : Date.now();
+  };
+
+  Game.prototype.syncOnlineClock = function () {
+    if (this.selectedMode !== "online" || !this.player || !this.onlineCombatStart) { return; }
+    var now = this.getOnlineNow();
+    this.elapsed = Math.max(0, (now - this.onlineCombatStart) / 1000);
+    if (!this.player.ghost) { this.player.survivalTime = this.elapsed; }
+    if (this.player.shieldExpiresAt) {
+      this.player.shieldTimer = Math.max(0, (this.player.shieldExpiresAt - now) / 1000);
+      if (this.player.shieldTimer <= 0) { this.player.shieldCharges = 0; this.player.shieldExpiresAt = 0; }
+    }
+    if (this.player.rapidExpiresAt) {
+      this.player.rapidTimer = Math.max(0, (this.player.rapidExpiresAt - now) / 1000);
+      if (this.player.rapidTimer <= 0) { this.player.rapidExpiresAt = 0; }
+    }
+    if (this.player.perspectiveExpiresAt) {
+      this.player.perspectiveTimer = Math.max(0, (this.player.perspectiveExpiresAt - now) / 1000);
+      if (this.player.perspectiveTimer <= 0) { this.player.perspectiveExpiresAt = 0; }
+    }
+    if (this.player.fireReadyAt) {
+      this.player.fireCooldown = Math.max(0, (this.player.fireReadyAt - now) / 1000);
+      if (this.player.fireCooldown <= 0) { this.player.fireReadyAt = 0; }
+    }
+    this.supplies.forEach(function (supply) {
+      if (supply.expiresAt) { supply.life = Math.max(0, (supply.expiresAt - now) / 1000); }
+    });
+    this.supplies = this.supplies.filter(function (supply) { return supply.life > 0; });
+    this.onlineLastAbsolute = now;
   };
 
   Game.prototype.finishOnlineMatch = function (result) {
     if (this.selectedMode !== "online" || this.onlineMatchEnded) { return; }
     this.onlineMatchEnded = true;
     this.onlineResult = result || null;
+    if (result && Number.isFinite(Number(result.elapsed))) { this.elapsed = Math.max(0, Number(result.elapsed)); }
+    if (result && result.standings) {
+      var localStanding = result.standings.find(function (entry) { return entry.name === this.player.name; }, this);
+      if (localStanding) { this.player.survivalTime = Math.max(0, Number(localStanding.survivalTime) || 0); }
+    }
     this.player.ghost = this.player.ghost || !this.player.alive;
     this.settleParts(Boolean(result && result.winner === this.player.name));
     if (result && result.winner === this.player.name) {
@@ -673,6 +716,7 @@
     this.supplies = [];
     this.supplyTimer = this.selectedMode === "online" ? 3.5 : (this.selectedMode === "endless" && this.endlessLevel <= 4 ? 4 :
       (this.selectedMode === "endless" && this.endlessLevel <= 9 ? 6 : 7));
+    this.onlineNextSupplyAt = this.selectedMode === "online" ? (this.onlineCombatStart || this.getOnlineNow()) + 3500 : 0;
     this.earlyRepairSupplyPending = this.selectedMode === "endless" && this.endlessLevel <= 4;
     this.jammerTimer = this.selectedMode === "endless" && this.endlessPermanent.jammer ? this.getJammerCooldown() : 10;
     this.jammerFlash = 0;
@@ -820,6 +864,12 @@
     this.activateRunShop();
     this.input.reset();
     this.resetWorld(false);
+    if (this.selectedMode === "online" && this.onlineRoom) {
+      this.onlineClockStart = Number(this.onlineRoom.roundStartedAt) || this.getOnlineNow();
+      this.onlineCombatStart = Number(this.onlineRoom.combatStartedAt) || (this.onlineClockStart + 3000);
+      this.onlineNextSupplyAt = this.onlineCombatStart + 3500;
+      this.onlineLastAbsolute = this.getOnlineNow();
+    }
     this.updateLevelMusic();
     this.beginLevel();
   };
@@ -895,7 +945,15 @@
     }
     this.updateTargetMark();
     if (this.state === Config.states.COUNTDOWN) {
-      this.updateCountdown(deltaTime);
+      if (this.selectedMode === "online" && this.onlineCombatStart) {
+        this.countdown = Math.max(0, (this.onlineCombatStart - this.getOnlineNow()) / 1000);
+        if (this.countdown <= 0) {
+          this.setState(Config.states.PLAYING);
+          TankGame.Audio.play("go");
+        }
+      } else {
+        this.updateCountdown(deltaTime);
+      }
       this.updateCamera(deltaTime, false);
       TankGame.Effects.update(deltaTime);
       return;
@@ -904,8 +962,14 @@
       this.updateCamera(deltaTime, false);
       return;
     }
+    if (this.selectedMode === "online") { this.syncOnlineClock(); }
     this.elapsed += deltaTime;
-    if (this.selectedMode === "online" && !this.player.ghost) { this.player.survivalTime = this.elapsed; }
+    if (this.selectedMode === "online") {
+      var absoluteNow = this.getOnlineNow();
+      if (this.onlineCombatStart) { this.elapsed = Math.max(0, (absoluteNow - this.onlineCombatStart) / 1000); }
+      if (!this.player.ghost) { this.player.survivalTime = this.elapsed; }
+      this.onlineLastAbsolute = absoluteNow;
+    }
     this.levelElapsed += deltaTime;
     if (this.comboTimer > 0) {
       this.comboTimer = Math.max(0, this.comboTimer - deltaTime);
@@ -931,15 +995,16 @@
         TankGame.Map.removeObstacle(self.worldMap, obstacle);
       });
       this.updateVoidWalker(deltaTime);
+      if (this.selectedMode === "online") { this.syncOnlineClock(); }
       this.player.invulnerable = Math.max(0, this.player.invulnerable - deltaTime);
       this.player.reviveShieldTimer = Math.max(0, (this.player.reviveShieldTimer || 0) - deltaTime);
       if (this.player.reviveShieldTimer <= 0) { this.braveReviveParticles = []; }
-      if (!this.player.levelShield) {
+      if (!this.player.levelShield && this.selectedMode !== "online") {
         this.player.shieldTimer = Math.max(0, (this.player.shieldTimer || 0) - deltaTime);
         if (this.player.shieldTimer <= 0) { this.player.shieldCharges = 0; }
       }
-      if (!this.player.levelRapid) { this.player.rapidTimer = Math.max(0, (this.player.rapidTimer || 0) - deltaTime); }
-      if (!this.player.levelPerspective) { this.player.perspectiveTimer = Math.max(0, (this.player.perspectiveTimer || 0) - deltaTime); }
+      if (!this.player.levelRapid && this.selectedMode !== "online") { this.player.rapidTimer = Math.max(0, (this.player.rapidTimer || 0) - deltaTime); }
+      if (!this.player.levelPerspective && this.selectedMode !== "online") { this.player.perspectiveTimer = Math.max(0, (this.player.perspectiveTimer || 0) - deltaTime); }
       this.updateTracks(deltaTime);
     }
     this.updateSupplies(deltaTime);
@@ -1022,6 +1087,7 @@
   Game.prototype.updatePlayerLifeCycle = function (deltaTime) {
     if (this.player.alive) { return; }
     if (this.selectedMode === "online") {
+      if (!this.player.deathAt) { this.player.deathAt = this.getOnlineNow(); }
       this.player.ghost = true;
       this.player.alive = true;
       this.player.health = 0;
@@ -1153,6 +1219,7 @@
     if (this.player.alive && !this.player.ghost && (this.input.pointer.down || this.input.isDown("Space")) && this.player.fireCooldown <= 0) {
       this.fire(this.player);
       this.player.fireCooldown = Config.playerFireCooldown * (this.player.fireRateMultiplier || 1) * (this.player.levelRapid || this.player.rapidTimer > 0 ? 0.48 : 1);
+      if (this.selectedMode === "online") { this.player.fireReadyAt = this.getOnlineNow() + this.player.fireCooldown * 1000; }
     }
 
     this.bullets.forEach(function (bullet) { self.updateBullet(bullet, deltaTime); });
@@ -2019,6 +2086,7 @@
     if (player.health <= 0) {
       player.health = 0;
       player.alive = false;
+      if (this.selectedMode === "online") { player.deathAt = this.getOnlineNow(); }
       this.wrecks.push({ x: player.x, y: player.y, angle: player.bodyAngle, life: 9, playerDeathWreck: true });
     }
   };
@@ -2299,6 +2367,12 @@
     });
     if (!target) { return; }
 
+    if (this.selectedMode === "online" && bullet.remote) {
+      bullet.alive = false;
+      TankGame.Effects.burst(bullet.x, bullet.y, "#fff0b3", 8, 120);
+      return;
+    }
+
     var canPierceTarget = bullet.team === "player" && bullet.fieldPierceRemaining > 0;
     if (!canPierceTarget) { bullet.alive = false; }
     if (bullet.bossBomb) {
@@ -2330,7 +2404,7 @@
     }
     if (target.team === "player") { this.registerPlayerDamage(); }
     if (this.selectedMode === "online" && !bullet.remote && target.remoteId && TankGame.Multiplayer.sendHit) {
-      TankGame.Multiplayer.sendHit(target.name, bullet.damage, this.player.name);
+      TankGame.Multiplayer.sendHit(target.name, bullet.damage, this.player.name, this.onlineKills + (target.health <= 0 ? 1 : 0));
     }
     target.hitFlash = 0.12;
     if (target.team === "player" && target.levelRepair) {
@@ -2352,10 +2426,14 @@
         target.wreckParticles = this.createWreckParticles(target);
       } else {
         target.alive = false;
+        if (this.selectedMode === "online" && target === this.player && !target.deathAt) {
+          target.deathAt = this.getOnlineNow();
+          target.survivalTime = Math.max(0, (target.deathAt - this.onlineCombatStart) / 1000);
+        }
         if (this.selectedMode === "online" && bullet.team === "player" && !bullet.remote) {
           this.onlineKills += 1;
           this.stats.kills = this.onlineKills;
-          if (TankGame.Multiplayer.sendKill) { TankGame.Multiplayer.sendKill(this.player.name); }
+          if (TankGame.Multiplayer.sendKill) { TankGame.Multiplayer.sendKill(this.player.name, this.onlineKills); }
         }
       }
       if (target.isBoss || target.isBossClone || target.isElite) { this.deactivateBossThreats(target); }
@@ -2408,6 +2486,7 @@
     if (player.health <= 0) {
       player.health = 0;
       player.alive = false;
+      if (this.selectedMode === "online") { player.deathAt = this.getOnlineNow(); }
       this.wrecks.push({ x: player.x, y: player.y, angle: player.bodyAngle, life: 9, playerDeathWreck: true });
     }
     return true;
@@ -2625,14 +2704,23 @@
 
   Game.prototype.updateSupplies = function (deltaTime) {
     var self = this;
-    this.supplyTimer -= deltaTime;
+    var onlineNow = this.selectedMode === "online" ? this.getOnlineNow() : 0;
+    if (this.selectedMode !== "online") { this.supplyTimer -= deltaTime; }
     var supplyLimit = this.selectedMode === "online" ? 4 : 2;
-    if (this.supplyTimer <= 0 && this.supplies.length < supplyLimit) {
+    if ((this.selectedMode === "online" ? onlineNow >= this.onlineNextSupplyAt : this.supplyTimer <= 0) && this.supplies.length < supplyLimit) {
       this.spawnSupply();
-      this.supplyTimer = this.selectedMode === "online" ? 5.5 + Math.random() * 2.5 : (this.selectedMode === "challenge" ? 15 : 11) + Math.random() * 5;
+      if (this.selectedMode === "online") {
+        this.onlineNextSupplyAt = onlineNow + (5.5 + Math.random() * 2.5) * 1000;
+      } else {
+        this.supplyTimer = (this.selectedMode === "challenge" ? 15 : 11) + Math.random() * 5;
+      }
     }
     this.supplies.forEach(function (supply) {
-      supply.life -= deltaTime;
+      if (self.selectedMode === "online") {
+        supply.life = supply.expiresAt ? Math.max(0, (supply.expiresAt - onlineNow) / 1000) : supply.life;
+      } else {
+        supply.life -= deltaTime;
+      }
       supply.pulse += deltaTime * 4;
       if (supply.airborne) {
         supply.dropHeight = Math.max(0, supply.dropHeight - 170 * deltaTime);
@@ -2681,7 +2769,7 @@
       x: location.x,
       y: location.y,
       type: preferredType || types[Math.floor(Math.random() * types.length)],
-      life: 28, pulse: 0, airborne: false, dropHeight: 0
+      life: 28, expiresAt: this.selectedMode === "online" ? this.getOnlineNow() + 28000 : 0, pulse: 0, airborne: false, dropHeight: 0
     });
     this.earlyRepairSupplyPending = false;
     return true;
@@ -2969,13 +3057,14 @@
   };
 
   Game.prototype.collectSupply = function (supply) {
+    var onlineNow = this.selectedMode === "online" ? this.getOnlineNow() : 0;
     if (supply.type === "repair") { this.applyRepair(this.player); }
     if (supply.type === "shield") {
       this.player.shieldCharges = 3;
-      if (!this.player.levelShield) { this.player.shieldTimer = 25; }
+      if (!this.player.levelShield) { this.player.shieldTimer = 25; this.player.shieldExpiresAt = onlineNow ? onlineNow + 25000 : 0; }
     }
-    if (supply.type === "rapid") { this.player.rapidTimer = Math.max(this.player.rapidTimer || 0, 10); }
-    if (supply.type === "perspective") { this.player.perspectiveTimer = Math.max(this.player.perspectiveTimer || 0, 15); }
+    if (supply.type === "rapid") { this.player.rapidTimer = Math.max(this.player.rapidTimer || 0, 10); if (onlineNow) { this.player.rapidExpiresAt = onlineNow + 10000; } }
+    if (supply.type === "perspective") { this.player.perspectiveTimer = Math.max(this.player.perspectiveTimer || 0, 15); if (onlineNow) { this.player.perspectiveExpiresAt = onlineNow + 15000; } }
     this.score += 25;
     TankGame.Effects.burst(supply.x, supply.y, "#f7d87c", 22, 150);
     TankGame.Audio.play("boostPickup");

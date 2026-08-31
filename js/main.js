@@ -154,7 +154,7 @@
     var onlineRoom = TankGame.Multiplayer.getRoom && TankGame.Multiplayer.getRoom();
     retryButtons.forEach(function (button) {
       button.hidden = game.selectedMode === "online" && !(onlineRoom && onlineRoom.host);
-      if (game.selectedMode === "online") { button.textContent = "房主重开本局"; }
+      button.textContent = game.selectedMode === "online" ? "房主重开本局" : (button.id === "victoryRetryButton" ? "再次挑战" : "重新出击");
     });
 
     if (state === Config.states.MENU) {
@@ -655,13 +655,18 @@
     if (game.selectedMode !== "online" || game.state !== Config.states.PLAYING || !game.player.alive || game.player.ghost) { return; }
     var damage = message && typeof message === "object" ? message.damage : message;
     game.player.health = Math.max(0, game.player.health - Number(damage || 4));
-    if (game.player.health <= 0) { game.player.alive = false; }
+    if (game.player.health <= 0) {
+      game.player.alive = false;
+      game.player.deathAt = game.getOnlineNow ? game.getOnlineNow() : Date.now();
+      game.player.survivalTime = Math.max(0, (game.player.deathAt - game.onlineCombatStart) / 1000);
+    }
     TankGame.Multiplayer.publish(game.player);
   });
   if (TankGame.Multiplayer.onKill) {
     TankGame.Multiplayer.onKill(function (message) {
-      if (game.selectedMode === "online" && message && message.killer === game.player.name) {
-        game.onlineKills += 1;
+      var activeRoom = TankGame.Multiplayer.getRoom && TankGame.Multiplayer.getRoom();
+      if (game.selectedMode === "online" && message && message.from !== (activeRoom && activeRoom.localId) && message.killer === game.player.name) {
+        game.onlineKills = Math.max(game.onlineKills, Number(message.kills) || 0);
         game.stats.kills = game.onlineKills;
       }
     });
@@ -832,6 +837,15 @@
     }
   });
 
+  document.addEventListener("visibilitychange", function () {
+    if (game.selectedMode !== "online" || !game.player) { return; }
+    // Reconcile absolute timers immediately when a throttled tab becomes visible.
+    if (game.syncOnlineClock) { game.syncOnlineClock(); }
+    if (TankGame.Multiplayer.publish) { game.player.onlineKills = game.onlineKills; TankGame.Multiplayer.publish(game.player); }
+    if (TankGame.Multiplayer.checkEnd) { TankGame.Multiplayer.checkEnd(); }
+    syncInterface();
+  });
+
   function frame(currentTime) {
     var frameTime = Math.min((currentTime - previousTime) / 1000, Config.maxFrameTime);
     previousTime = currentTime;
@@ -846,6 +860,7 @@
 
     game.render(accumulator / Config.fixedStep);
     if (game.selectedMode === "online" && game.player) {
+      game.player.onlineKills = game.onlineKills;
       TankGame.Multiplayer.publish(game.player);
       if (TankGame.Multiplayer.checkEnd) { TankGame.Multiplayer.checkEnd(); }
       var activeRoom = TankGame.Multiplayer.getRoom();
