@@ -154,6 +154,7 @@
     var onlineRoom = TankGame.Multiplayer.getRoom && TankGame.Multiplayer.getRoom();
     retryButtons.forEach(function (button) {
       button.hidden = game.selectedMode === "online" && !(onlineRoom && onlineRoom.host);
+      if (game.selectedMode === "online") { button.textContent = "房主重开本局"; }
     });
 
     if (state === Config.states.MENU) {
