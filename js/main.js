@@ -7,6 +7,11 @@
   var mobileControls = document.getElementById("mobileControls");
   var input = new TankGame.InputManager(canvas);
   var game = new TankGame.Game(canvas, input);
+  if (TankGame.Audio.prewarmCriticalAssets) {
+    (window.requestIdleCallback || function (callback) { window.setTimeout(callback, 180); })(function () {
+      TankGame.Audio.prewarmCriticalAssets();
+    });
+  }
   var menuPanel = document.getElementById("menuPanel");
   var onlinePanel = document.getElementById("onlineModePanel");
   var roomPanel = document.getElementById("roomPanel");
@@ -197,7 +202,7 @@
         rewardSummary.textContent = "第 " + game.rewardLevel + " 关完成 · 获得零件 +" + (game.partsReward || 0) + " · 随机三选一";
       rewardOptions.innerHTML = game.rewardOptions.map(function (reward, index) {
         var level = game.endlessPermanent[reward.id] || 0;
-        var detail = reward.id === "maxHealth" ? "+" + game.getEndlessRewardAmount(reward.id, game.rewardLevel) + " 生命上限" : reward.id === "attack" ? "+" + game.getEndlessRewardAmount(reward.id, game.rewardLevel) + " 攻击力" : reward.id === "splitBullet" ? "选择后发射 " + (level + 2) + " 颗子弹，每颗 70% 伤害" : reward.id === "explosive" ? "碎片伤害 " + Math.round((0.25 + level * 0.05) * 100) + "%" : reward.id === "speed" ? "移速提升 " + (40 + level * 5) + "%" : reward.id === "supportCall" ? "支援冷却 " + Math.max(9, 24 - level * 3).toFixed(1) + " 秒" : reward.description;
+        var detail = reward.id === "maxHealth" ? "+" + game.getEndlessRewardAmount(reward.id, game.rewardLevel) + " 生命上限" : reward.id === "attack" ? "+" + game.getEndlessRewardAmount(reward.id, game.rewardLevel) + " 攻击力" : reward.id === "splitBullet" ? "选择后发射 " + (level + 2) + " 颗子弹，每颗 70% 伤害" : reward.id === "explosive" ? "碎片伤害 " + Math.round((0.25 + level * 0.05) * 100) + "%" : reward.id === "speed" ? "移速提升 " + (40 + level * 5) + "%" : reward.id === "supportCall" ? "支援冷却 " + game.getSupportCooldown().toFixed(1) + " 秒" : reward.description;
         return "<button class=\"reward-option\" type=\"button\" data-reward-index=\"" + index + "\"><strong>" + reward.label + "</strong><span>" + detail + "</span>" + (level ? "<em>Lv." + level + "</em>" : "") + "</button>";
       }).join("");
     }
@@ -268,7 +273,7 @@
       var image = item.image ? '<img src="' + item.image + '" alt="" aria-hidden="true">' : '<span class="shop-item-glyph">◆</span>';
       var modeText = item.allowedModes ? "适用：" + item.allowedModes.map(function (modeId) { return Config.modes[modeId].label.replace("模式", ""); }).join(" / ") : "适用：所有模式";
       var disabled = !available || (shopCategory !== "skins" && capped) || (shopCategory === "skins" && equipped);
-      return '<article class="shop-item ' + (equipped ? "is-equipped" : "") + '">' + image + '<div class="shop-item-copy"><h3>' + item.label + '</h3><p>' + item.description + '</p><span>' + (shopCategory === "skins" ? (owned ? "已解锁" : "未解锁") : (level ? "持有 " + level + " / " + item.maxLevel : "未购买")) + '</span><small>' + modeText + '</small></div><button class="shop-buy-button" type="button" data-shop-id="' + item.id + '" ' + (disabled ? "disabled" : "") + '>' + action + '</button></article>';
+      return '<article class="shop-item ' + (equipped ? "is-equipped" : "") + '">' + image + '<div class="shop-item-copy"><h3>' + item.label + '</h3><p>' + item.description + '</p><span>' + (shopCategory === "skins" ? (owned ? "已解锁" : "未解锁") : (level ? "持有 " + level + " / " + item.maxLevel : "未购买")) + '</span><small>' + modeText + '</small></div><button class="shop-buy-button" type="button" data-shop-id="' + item.id + '" title="普通点击购买 1 次；按住 Shift 点击可尽可能多购买" aria-label="购买 ' + item.label + '" ' + (disabled ? "disabled" : "") + '>' + action + '</button></article>';
     }).join("");
   }
 
@@ -457,14 +462,21 @@
     var button = event.target.closest("[data-shop-id]");
     var item;
     var result;
+    var bulk;
     if (!button) { return; }
     item = game.getShopItem(shopCategory, button.dataset.shopId);
     if (shopCategory === "skins" && game.shopData.skins[button.dataset.shopId]) {
       game.equipSkin(button.dataset.shopId);
       shopStatus.textContent = "已装备 " + item.label;
     } else {
-      result = game.purchaseShopItem(shopCategory, button.dataset.shopId);
-      shopStatus.textContent = result.ok ? "已获得 " + item.label : (result.reason === "parts" ? "零件不足，还需要 " + (result.cost - game.parts) + " 零件" : (result.reason === "exclusive" ? "炸弹、迫击炮、红色子弹只能三选一" : (result.reason === "mode" ? "当前模式不可使用该商品" : "该商品已达到上限")));
+      result = event.shiftKey ? game.purchaseShopItemMax(shopCategory, button.dataset.shopId) : game.purchaseShopItem(shopCategory, button.dataset.shopId);
+      if (event.shiftKey && result.purchased) {
+        shopStatus.textContent = "已购买 " + item.label + " ×" + result.purchased + "，共消耗 " + result.cost + " 零件";
+        bulk = true;
+      }
+      if (!bulk) {
+        shopStatus.textContent = result.ok ? "已获得 " + item.label : (result.reason === "parts" ? "零件不足，还需要 " + ((result.nextCost !== undefined ? result.nextCost : result.cost) - game.parts) + " 零件" : (result.reason === "exclusive" ? "炸弹、迫击炮、红色子弹只能三选一" : (result.reason === "mode" ? "当前模式不可使用该商品" : "该商品已达到上限")));
+      }
     }
     renderShop();
     syncInterface();
@@ -592,6 +604,26 @@
   });
 
   function showOnlineView(view) { onlineView = view; syncInterface(); }
+  var peerLoadPromise = null;
+  function loadPeerJS() {
+    var script;
+    if (window.Peer) { return Promise.resolve(); }
+    if (peerLoadPromise) { return peerLoadPromise; }
+    peerLoadPromise = new Promise(function (resolve, reject) {
+      script = document.querySelector("script[data-peerjs]");
+      if (!script) {
+        script = document.createElement("script");
+        script.src = "https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js";
+        script.async = true;
+        script.fetchPriority = "low";
+        script.dataset.peerjs = "true";
+        document.head.appendChild(script);
+      }
+      script.addEventListener("load", function () { resolve(); }, { once: true });
+      script.addEventListener("error", function () { reject(new Error("PeerJS unavailable")); }, { once: true });
+    });
+    return peerLoadPromise;
+  }
   function validName() { return /^[A-Za-z]+$/.test(playerNameInput.value.trim()); }
   function updateRoomLobby(room) {
     if (!room) { roomLobby.hidden = true; return; }
@@ -610,14 +642,16 @@
   hostRoomButton.addEventListener("click", function () {
     var name = playerNameInput.value.trim();
     if (!validName()) { roomStatus.textContent = "昵称仅限英文字母"; playerNameInput.focus(); return; }
-    updateRoomLobby(TankGame.Multiplayer.host(name));
+    roomStatus.textContent = "正在连接联机服务……";
+    loadPeerJS().catch(function () {}).then(function () { updateRoomLobby(TankGame.Multiplayer.host(name)); });
   });
   joinRoomButton.addEventListener("click", function () {
     var name = playerNameInput.value.trim();
     var code = roomCodeInput.value.trim();
     if (!validName()) { roomStatus.textContent = "昵称仅限英文字母"; playerNameInput.focus(); return; }
     if (!/^\d{6}$/.test(code)) { roomStatus.textContent = "请输入 6 位房间号"; roomCodeInput.focus(); return; }
-    updateRoomLobby(TankGame.Multiplayer.join(code, name));
+    roomStatus.textContent = "正在连接联机服务……";
+    loadPeerJS().catch(function () {}).then(function () { updateRoomLobby(TankGame.Multiplayer.join(code, name)); });
   });
   startRoomButton.addEventListener("click", function () {
     var room = TankGame.Multiplayer.getRoom();
@@ -654,7 +688,7 @@
   TankGame.Multiplayer.onHit(function (message) {
     if (game.selectedMode !== "online" || game.state !== Config.states.PLAYING || !game.player.alive || game.player.ghost) { return; }
     var damage = message && typeof message === "object" ? message.damage : message;
-    game.player.health = Math.max(0, game.player.health - Number(damage || 4));
+    game.player.health = Math.max(0, game.player.health - game.getPlayerDamage(Number(damage || 4), game.player));
     if (game.player.health <= 0) {
       game.player.alive = false;
       game.player.deathAt = game.getOnlineNow ? game.getOnlineNow() : Date.now();
@@ -910,6 +944,10 @@
       powerValue.textContent = "透视 " + Math.ceil(game.player.perspectiveTimer);
     } else if (game.player.levelRepair) {
       powerValue.textContent = "维修待命";
+    } else if (game.runShop.blueShield) {
+      powerValue.textContent = "蓝盾 · 单次上限 20%";
+    } else if (game.shopData.items.airSupport > 0 && game.airSupportTimer > 0) {
+      powerValue.textContent = "空援 " + Math.ceil(game.airSupportTimer) + "秒";
     } else if (game.selectedMode === "endless" && game.endlessPermanent.splitBullet) {
       powerValue.textContent = "分裂弹 " + (game.endlessPermanent.splitBullet + 1) + "发";
     } else {

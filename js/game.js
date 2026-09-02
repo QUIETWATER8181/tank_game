@@ -32,8 +32,8 @@
     this.rearGuardCooldown = 0;
     this.supportAircraft = [];
     this.supportTimer = 30;
-    this.supportAircraftImage = new Image();
-    this.supportAircraftImage.src = "assets/images/cinematic/helicopter-body.png";
+    this.airSupportTimer = 45;
+    this.supportAircraftImage = null;
     this.bossLasers = [];
     this.markedTarget = null;
     this.score = 0;
@@ -42,7 +42,7 @@
     this.partsTotalReward = 0;
     this.partsGrantedTotal = 0;
     this.shopData = this.loadShopData();
-    this.runShop = { healing: 0, frenzy: 0, instantKill: 0, mudTruck: 0, bomb: 0, mortar: 0, redBullet: 0 };
+    this.runShop = { healing: 0, frenzy: 0, instantKill: 0, blueShield: 0, mudTruck: 0, bomb: 0, mortar: 0, redBullet: 0 };
     this.shopHealingTimer = 10;
     this.comboCount = 0;
     this.comboTimer = 0;
@@ -198,7 +198,7 @@
 
   Game.prototype.loadShopData = function () {
     var parsed;
-    var data = { upgrades: { health: 0, attack: 0, speed: 0 }, boosts: { healing: 0, frenzy: 0, instantKill: 0 }, items: { mudTruck: 0, bomb: 0, mortar: 0, redBullet: 0 }, skins: { default: true }, equippedSkin: "default" };
+    var data = { upgrades: { health: 0, attack: 0, speed: 0 }, boosts: { healing: 0, frenzy: 0, instantKill: 0, blueShield: 0 }, items: { mudTruck: 0, bomb: 0, mortar: 0, redBullet: 0, airSupport: 0 }, skins: { default: true }, equippedSkin: "default" };
     try {
       parsed = JSON.parse(window.localStorage.getItem("xpz-tank-shop")) || {};
       ["upgrades", "boosts", "items"].forEach(function (category) {
@@ -211,6 +211,7 @@
       if (parsed.equippedSkin && data.skins[parsed.equippedSkin]) { data.equippedSkin = parsed.equippedSkin; }
     } catch (error) { }
     data.upgrades.speed = Math.min(20, data.upgrades.speed);
+    data.items.airSupport = Math.min(30, data.items.airSupport || 0);
     this.normalizeWeaponShopItems(data);
     return data;
   };
@@ -270,6 +271,26 @@
     return { ok: true, cost: cost };
   };
 
+  Game.prototype.purchaseShopItemMax = function (category, id) {
+    var purchased = 0;
+    var totalCost = 0;
+    var result = { ok: false, reason: "max" };
+    if (!this.getShopItem(category, id)) { return { ok: false, purchased: 0, cost: 0, reason: "invalid" }; }
+    do {
+      result = this.purchaseShopItem(category, id);
+      if (!result.ok) { break; }
+      purchased += 1;
+      totalCost += result.cost;
+    } while (true);
+    return {
+      ok: purchased > 0,
+      purchased: purchased,
+      cost: totalCost,
+      reason: result.reason,
+      nextCost: result.cost
+    };
+  };
+
   Game.prototype.equipSkin = function (id) {
     if (this.shopData.skins[id]) { this.shopData.equippedSkin = id; this.saveShopData(); return true; }
     return false;
@@ -289,10 +310,10 @@
 
   Game.prototype.activateRunShop = function () {
     var allowed = ["endless", "brave"].indexOf(this.selectedMode) !== -1;
-    this.runShop = { healing: 0, frenzy: 0, instantKill: 0, mudTruck: 0, bomb: 0, mortar: 0, redBullet: 0 };
+    this.runShop = { healing: 0, frenzy: 0, instantKill: 0, blueShield: 0, mudTruck: 0, bomb: 0, mortar: 0, redBullet: 0 };
     if (!allowed) { return; }
     this.normalizeWeaponShopItems(this.shopData);
-    ["healing", "frenzy", "instantKill"].forEach(function (id) {
+    ["healing", "frenzy", "instantKill", "blueShield"].forEach(function (id) {
       this.runShop[id] = this.shopData.boosts[id] || 0;
       this.shopData.boosts[id] = 0;
     }, this);
@@ -691,6 +712,7 @@
       this.player.bulletDamage = Math.round(this.player.bulletDamage * (1 + 0.15 * this.runShop.frenzy));
     }
     this.player.skin = this.shopData.equippedSkin;
+    this.player.blueShieldActive = Boolean(this.runShop.blueShield);
     this.player.trackingTime = this.selectedMode === "endless" ? Math.min(5, this.endlessPermanent.tracking ? 2 + (this.endlessPermanent.tracking - 1) * 0.5 : 0) : 0;
     this.player.levelRepair = this.selectedMode === "endless" && this.endlessTemp.repair;
     this.player.levelShield = this.selectedMode === "endless" && this.endlessTemp.shield;
@@ -721,6 +743,7 @@
     this.jammerTimer = this.selectedMode === "endless" && this.endlessPermanent.jammer ? this.getJammerCooldown() : 10;
     this.jammerFlash = 0;
     this.supportTimer = this.getSupportCooldown();
+    this.airSupportTimer = this.getAirSupportCooldown();
     this.tracks = [];
     this.trackTimer = 0;
     this.wrecks = [];
@@ -1300,6 +1323,7 @@
       var offset = bulletCount === 1 ? 0 : -spread + (spread * 2 * bulletIndex / (bulletCount - 1));
       var bullet = TankGame.Entities.createBullet(x, y, tank.turretAngle + offset, tank.team);
       bullet.damage = (tank.bulletDamage || Config.bulletDamage) * (splitLevel ? 0.7 : 1);
+      bullet.futureTech = tank.team === "player" && tank.skin === "futureTech";
       if (this.selectedMode === "online" && tank === this.player && TankGame.Multiplayer.sendShot) {
         TankGame.Multiplayer.sendShot(x, y, tank.turretAngle + offset, bullet.damage);
       }
@@ -1366,7 +1390,7 @@
       var teleportPath = this.movePlayerSafely(tank, tank.turretAngle, 48, startX, startY);
       this.spawnFrontStepTrails(teleportPath, tank.bodyAngle, tank.turretAngle);
     }
-    this.muzzleFlashes.push({ x: x, y: y, life: 0.09, color: tank.team === "player" ? "#c8ffe5" : "#ff9a78" });
+    this.muzzleFlashes.push({ x: x, y: y, life: tank.skin === "futureTech" ? 0.14 : 0.09, color: tank.skin === "futureTech" ? "#38dfff" : (tank.team === "player" ? "#c8ffe5" : "#ff9a78") });
     if (tank.team === "player") {
       this.stats.shots += 1;
       TankGame.Audio.play("shoot");
@@ -2072,7 +2096,7 @@
       return;
     }
     if (this.consumeTemporaryShield(player, player.x, player.y)) { return; }
-    player.health -= enemy.bulletDamage;
+    player.health -= this.getPlayerDamage(enemy.bulletDamage, player);
     this.registerPlayerDamage();
     player.hitFlash = 0.16;
     if (player.levelRepair) {
@@ -2400,7 +2424,7 @@
       Math.random() < Math.min(1, this.runShop.instantKill * 0.001)) {
       target.health = 0;
     } else {
-      target.health -= bullet.damage;
+      target.health -= target.team === "player" ? this.getPlayerDamage(bullet.damage, target) : bullet.damage;
     }
     if (target.team === "player") { this.registerPlayerDamage(); }
     if (this.selectedMode === "online" && !bullet.remote && target.remoteId && TankGame.Multiplayer.sendHit) {
@@ -2472,7 +2496,7 @@
       return false;
     }
     if (this.consumeTemporaryShield(player, player.x, player.y)) { return false; }
-    player.health -= damage;
+    player.health -= this.getPlayerDamage(damage, player);
     this.registerPlayerDamage();
     player.hitFlash = 0.16;
     if (player.levelRepair) {
@@ -2566,6 +2590,7 @@
       fragment.lifetime = Config.bulletLifetime * 0.6;
       fragment.armingTime = 0.1;
       fragment.fragment = true;
+      fragment.futureTech = this.player.skin === "futureTech";
       this.bullets.push(fragment);
     }
     TankGame.Effects.burst(x, y, "#ffd166", 10, 180);
@@ -2586,6 +2611,7 @@
       fragment.mortarFragment = true;
       fragment.playerMortar = true;
       fragment.bossBomb = true;
+      fragment.futureTech = this.player.skin === "futureTech";
       fragment.explosionRadius = 0;
       fragment.startX = x;
       fragment.startY = y;
@@ -2611,6 +2637,7 @@
       fragment.fragment = true;
       fragment.bossBomb = true;
       fragment.playerBomb = true;
+      fragment.futureTech = this.player.skin === "futureTech";
       fragment.explosionRadius = 56;
       this.bullets.push(fragment);
     }
@@ -2619,7 +2646,7 @@
 
   Game.prototype.getJammerCooldown = function () {
     var level = Math.min(21, Math.max(1, this.endlessPermanent.jammer || 1));
-    return Math.max(5.4, 10 - (level - 1) * 0.23);
+    return Math.max(6, 10 - (level - 1) * 0.2);
   };
 
   Game.prototype.updateJammer = function (deltaTime) {
@@ -2629,8 +2656,8 @@
     this.jammerTimer = this.getJammerCooldown();
     this.enemies.forEach(function (enemy) {
       if (!enemy.alive) { return; }
-      enemy.jammedTimer = 0.8;
-      enemy.avoidTimer = Math.max(enemy.avoidTimer, 0.8);
+      enemy.jammedTimer = 0.65;
+      enemy.avoidTimer = Math.max(enemy.avoidTimer, 0.65);
       enemy.avoidDirection = -1;
     });
     this.jammerFlash = 0.45;
@@ -2777,12 +2804,37 @@
 
   Game.prototype.getSupportCooldown = function () {
     var level = Math.min(9, Math.max(1, this.endlessPermanent.supportCall || 1));
-    return Math.max(9, 24 - (level - 1) * 3);
+    return Math.max(2, 20 - (level - 1) * 3);
+  };
+
+  Game.prototype.getAirSupportCooldown = function () {
+    var level = Math.min(30, Math.max(0, this.shopData.items.airSupport || 0));
+    return Math.max(15, 45 - level);
+  };
+
+  Game.prototype.getPlayerDamage = function (damage, player) {
+    var amount = Math.max(0, Number(damage) || 0);
+    if (["endless", "brave"].indexOf(this.selectedMode) !== -1 && this.runShop.blueShield && player && player.maxHealth > 0) {
+      return Math.min(amount, player.maxHealth * 0.2);
+    }
+    return amount;
+  };
+
+  Game.prototype.grantRandomAirSupport = function () {
+    var types = ["repair", "shield", "rapid", "perspective"];
+    var supply = { x: this.player.x, y: this.player.y, type: types[Math.floor(Math.random() * types.length)], airSupport: true };
+    this.collectSupply(supply);
+    return supply.type;
   };
 
   Game.prototype.callSupportAircraft = function () {
     var location = this.findSupplyLocation();
     if (!location) { return false; }
+    if (!this.supportAircraftImage) {
+      this.supportAircraftImage = new Image();
+      this.supportAircraftImage.decoding = "async";
+      this.supportAircraftImage.src = "assets/images/cinematic/helicopter-body.png";
+    }
     this.supportAircraft.push({
       x: location.x - 760,
       y: location.y - 130,
@@ -2799,10 +2851,19 @@
 
   Game.prototype.updateSupportAircraft = function (deltaTime) {
     var self = this;
-    if (this.selectedMode === "endless" && this.endlessPermanent.supportCall && this.player.alive) {
+    var hasPermanentSupport = this.selectedMode === "endless" && this.endlessPermanent.supportCall && this.player.alive;
+    var hasPurchasedSupport = (this.shopData.items.airSupport || 0) > 0 && this.player.alive;
+    if (hasPermanentSupport) {
       this.supportTimer = Math.max(0, this.supportTimer - deltaTime);
       if (this.supportTimer <= 0 && this.supportAircraft.length === 0) {
         if (this.callSupportAircraft()) { this.supportTimer = this.getSupportCooldown(); }
+      }
+    }
+    if (hasPurchasedSupport) {
+      this.airSupportTimer = Math.max(0, this.airSupportTimer - deltaTime);
+      if (this.airSupportTimer <= 0) {
+        this.grantRandomAirSupport();
+        this.airSupportTimer = this.getAirSupportCooldown();
       }
     }
     this.supportAircraft.forEach(function (aircraft) {
@@ -2928,7 +2989,7 @@
 
   Game.prototype.applyFireDamage = function (tank) {
     if (!tank || !tank.alive) { return; }
-    tank.health = Math.max(0, (tank.health || 0) - 2);
+    tank.health = Math.max(0, (tank.health || 0) - (tank.team === "player" ? this.getPlayerDamage(2, tank) : 2));
     tank.hitFlash = 0.08;
     TankGame.Effects.burst(tank.x, tank.y - 14, "#ff8a24", 5, 55);
     if (tank.team === "player") { this.registerPlayerDamage(); }
@@ -3764,7 +3825,7 @@
       context.save();
       context.translate(aircraft.x, aircraft.y);
       context.globalAlpha = 0.82;
-      if (this.supportAircraftImage.complete && this.supportAircraftImage.naturalWidth > 0) {
+      if (this.supportAircraftImage && this.supportAircraftImage.complete && this.supportAircraftImage.naturalWidth > 0) {
         context.drawImage(this.supportAircraftImage, -110, -80, 220, 160);
       } else {
         context.fillStyle = "#303738";

@@ -11,14 +11,28 @@
     boss: { scale: 0.27, muzzleDistance: 56, pixelated: false }
   };
   var tankSprites = {};
+  var futureTechSprites = {};
 
   Object.keys(tankSpriteDefinitions).forEach(function (key) {
     var hull = new Image();
     var turret = new Image();
+    hull.decoding = "async";
+    turret.decoding = "async";
     hull.src = "assets/images/tanks/" + key + "-hull.png";
     turret.src = "assets/images/tanks/" + key + "-turret.png";
     tankSprites[key] = { hull: hull, turret: turret };
   });
+
+  function getFutureTechSprites() {
+    if (futureTechSprites.hull && futureTechSprites.turret) { return futureTechSprites; }
+    ["hull", "turret"].forEach(function (layer) {
+      var image = new Image();
+      image.decoding = "async";
+      image.src = "assets/images/tanks/future-tech-" + layer + ".png";
+      futureTechSprites[layer] = image;
+    });
+    return futureTechSprites;
+  }
 
   function wrapAngle(angle) {
     while (angle > Math.PI) { angle -= Math.PI * 2; }
@@ -47,7 +61,7 @@
     context.shadowColor = "rgba(0, 0, 0, 0.6)";
     context.shadowBlur = 8 / definition.scale;
     context.shadowOffsetY = 5 / definition.scale;
-    if (tank.team === "player" && tank.skin && tank.skin !== "default") {
+    if (tank.team === "player" && tank.skin && tank.skin !== "default" && tank.skin !== "futureTech") {
       context.filter = tank.skin === "red" ? "hue-rotate(320deg) saturate(1.8)" :
         (tank.skin === "yellow" ? "hue-rotate(28deg) saturate(1.9) brightness(1.12)" :
           (tank.skin === "blue" ? "hue-rotate(175deg) saturate(1.7) brightness(0.96)" : "hue-rotate(72deg) saturate(1.35) brightness(0.9)"));
@@ -63,10 +77,87 @@
     context.restore();
   }
 
+  function drawFutureTechEffects(context, tank, drawY, foreground) {
+    var time = (typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) / 1000;
+    var scale = tank.visualScale || 1;
+    var pulse = 0.82 + Math.sin(time * 5.5 + tank.x * 0.01) * 0.18;
+    var spin = time * 1.7;
+    context.save();
+    context.translate(tank.x, drawY);
+    context.globalAlpha = tank.ghost ? 0.25 : 1;
+    context.globalCompositeOperation = "lighter";
+    if (!foreground) {
+      context.fillStyle = "rgba(35, 73, 255, " + (0.08 + pulse * 0.05) + ")";
+      context.shadowColor = "#315dff";
+      context.shadowBlur = 24 * scale;
+      context.beginPath();
+      context.ellipse(0, 3 * scale, 43 * scale, 32 * scale, tank.bodyAngle, 0, Math.PI * 2);
+      context.fill();
+      context.restore();
+      return;
+    }
+    context.shadowBlur = 18;
+    context.shadowColor = "#27dfff";
+    context.strokeStyle = "rgba(40, 224, 255, 0.32)";
+    context.lineWidth = 1.6 * scale;
+    context.beginPath();
+    context.arc(0, 0, (34 + pulse * 2) * scale, spin, spin + Math.PI * 1.35);
+    context.stroke();
+    context.strokeStyle = "rgba(151, 86, 255, 0.62)";
+    context.beginPath();
+    context.arc(0, 0, 39 * scale, -spin * 0.8, -spin * 0.8 + Math.PI * 1.1);
+    context.stroke();
+    context.setLineDash([5 * scale, 4 * scale]);
+    context.strokeStyle = "rgba(54, 196, 255, 0.78)";
+    context.lineWidth = 1.8 * scale;
+    context.beginPath();
+    context.arc(0, 0, 44 * scale, spin * 0.6, spin * 0.6 + Math.PI * 1.6);
+    context.stroke();
+    context.setLineDash([]);
+    [0, Math.PI * 0.5, Math.PI, Math.PI * 1.5].forEach(function (offset, index) {
+      var angle = spin * (index % 2 ? -0.45 : 0.55) + offset;
+      var distance = (39 + (index % 2) * 5) * scale;
+      context.fillStyle = index % 2 ? "#a472ff" : "#65efff";
+      context.shadowColor = context.fillStyle;
+      context.shadowBlur = 10 * scale;
+      context.beginPath();
+      context.arc(Math.cos(angle) * distance, Math.sin(angle) * distance, 1.7 * scale, 0, Math.PI * 2);
+      context.fill();
+    });
+    context.restore();
+  }
+
+  function drawFutureTechBulletTrail(context, bullet, x, y) {
+    var directionX = Math.cos(bullet.angle);
+    var directionY = Math.sin(bullet.angle);
+    var distances = [10, 21, 35, 52];
+    context.save();
+    context.globalCompositeOperation = "lighter";
+    context.lineCap = "round";
+    distances.forEach(function (distance, index) {
+      var alpha = 0.5 - index * 0.095;
+      var tailX = x - directionX * distance;
+      var tailY = y - directionY * distance;
+      context.strokeStyle = index % 2 ? "rgba(117, 89, 255, " + alpha + ")" : "rgba(38, 207, 255, " + alpha + ")";
+      context.lineWidth = Math.max(1, 5 - index);
+      context.shadowColor = index % 2 ? "#8d65ff" : "#25d9ff";
+      context.shadowBlur = 12;
+      context.beginPath();
+      context.moveTo(x - directionX * Math.max(1, distance - 11), y - directionY * Math.max(1, distance - 11));
+      context.lineTo(tailX, tailY);
+      context.stroke();
+      context.fillStyle = "rgba(105, 224, 255, " + (alpha * 0.55) + ")";
+      context.beginPath();
+      context.arc(tailX, tailY, Math.max(1, bullet.radius * (0.7 - index * 0.11)), 0, Math.PI * 2);
+      context.fill();
+    });
+    context.restore();
+  }
+
   function drawTankSprites(context, tank, drawY, shadow) {
     var key = getTankSpriteKey(tank);
     var definition = tankSpriteDefinitions[key];
-    var sprites = tankSprites[key];
+    var sprites = tank.team === "player" && tank.skin === "futureTech" ? getFutureTechSprites() : tankSprites[key];
     if (!sprites || !spriteReady(sprites.hull) || !spriteReady(sprites.turret)) { return false; }
     drawSpriteLayer(context, sprites.hull, tank, tank.bodyAngle, drawY, definition, shadow);
     drawSpriteLayer(context, sprites.turret, tank, tank.turretAngle, drawY, definition, shadow);
@@ -310,6 +401,7 @@
         drawBurningEffect(context, tank, drawY);
         return;
       }
+      if (tank.team === "player" && tank.skin === "futureTech") { drawFutureTechEffects(context, tank, drawY, false); }
       if (!drawTankSprites(context, tank, drawY, shadow)) {
         context.save();
         context.globalAlpha = shadow ? 0.48 : (tank.ghost ? 0.28 : 1);
@@ -389,6 +481,7 @@
         context.fillRect(tank.x - 24 * scale, drawY - 37 * scale, 48 * scale * Math.max(0, tank.health / (tank.maxHealth || 50)), 4);
         context.restore();
       }
+      if (tank.team === "player" && tank.skin === "futureTech") { drawFutureTechEffects(context, tank, drawY, true); }
 
       if (tank.name && tank.alive) {
         context.save();
@@ -432,6 +525,22 @@
         context.beginPath();
         context.arc(0, 0, 39, -0.72, 0.72);
         context.stroke();
+        context.restore();
+      }
+
+      if (tank.team === "player" && tank.blueShieldActive) {
+        context.save();
+        context.translate(tank.x, drawY);
+        context.globalCompositeOperation = "lighter";
+        context.strokeStyle = "rgba(58, 218, 255, 0.78)";
+        context.lineWidth = 2.5;
+        context.shadowColor = "#36dfff";
+        context.shadowBlur = 16;
+        context.setLineDash([8, 5]);
+        context.beginPath();
+        context.arc(0, 0, 31 + Math.sin(performance.now() / 140) * 1.5, 0, Math.PI * 2);
+        context.stroke();
+        context.setLineDash([]);
         context.restore();
       }
 
@@ -519,6 +628,7 @@
       if (bullet.fixedTurretMortar || bullet.mortarProjectile) {
         var progress = 1 - Math.max(0, bullet.flightTimer) / bullet.flightDuration;
         var height = Math.sin(progress * Math.PI) * (bullet.mortarFragment ? 28 : 56);
+        if (bullet.futureTech) { drawFutureTechBulletTrail(context, bullet, bullet.x, bullet.y - height); }
         context.save();
         context.shadowColor = "#ff6b51";
         context.shadowBlur = 15;
@@ -533,20 +643,21 @@
         context.restore();
         return;
       }
+      if (bullet.futureTech) { drawFutureTechBulletTrail(context, bullet, bullet.x, bullet.y); }
       context.save();
-      context.strokeStyle = bullet.fieldArmor ? "rgba(255, 68, 54, 0.88)" :
+      context.strokeStyle = bullet.futureTech ? "rgba(62, 220, 255, 0.92)" : (bullet.fieldArmor ? "rgba(255, 68, 54, 0.88)" :
         (bullet.redBullet ? "rgba(255, 68, 54, 0.92)" :
           (bullet.team === "player" ? "rgba(183, 255, 220, 0.7)" :
             (bullet.bossBomb ? "rgba(255, 176, 0, 0.82)" :
-              (bullet.bossBurst ? "rgba(255, 215, 0, 0.78)" : "rgba(255, 143, 113, 0.72)"))));
+              (bullet.bossBurst ? "rgba(255, 215, 0, 0.78)" : "rgba(255, 143, 113, 0.72)")))));
       context.lineWidth = 3;
       context.beginPath();
       context.moveTo(bullet.previousX, bullet.previousY);
       context.lineTo(bullet.x, bullet.y);
       context.stroke();
-      context.shadowColor = bullet.fieldArmor ? "#ff3b30" : (bullet.redBullet ? "#ff3028" : (bullet.team === "player" ? "#8cf6c3" : (bullet.bossBomb || bullet.bossBurst ? "#ffd700" : "#ff715c")));
+      context.shadowColor = bullet.futureTech ? "#28dfff" : (bullet.fieldArmor ? "#ff3b30" : (bullet.redBullet ? "#ff3028" : (bullet.team === "player" ? "#8cf6c3" : (bullet.bossBomb || bullet.bossBurst ? "#ffd700" : "#ff715c"))));
       context.shadowBlur = bullet.bossBomb ? 20 : 12;
-      context.fillStyle = bullet.fieldArmor ? "#ff453a" : (bullet.redBullet ? "#ff3028" : (bullet.bossBomb ? "#ff8c00" : (bullet.bossBurst ? "#fff2a8" : "#fff7cf")));
+      context.fillStyle = bullet.futureTech ? "#d9fbff" : (bullet.fieldArmor ? "#ff453a" : (bullet.redBullet ? "#ff3028" : (bullet.bossBomb ? "#ff8c00" : (bullet.bossBurst ? "#fff2a8" : "#fff7cf"))));
       context.beginPath();
       context.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
       context.fill();

@@ -5,7 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>钢铁征途 坦克大战</title>
-  <link rel="stylesheet" href="css/style.css?v=20260831-online4">
+  <link rel="stylesheet" href="css/style.css?v=20260902-features2">
+  <link rel="preload" as="image" href="assets/images/tanks/player-hull.png" fetchpriority="high">
+  <link rel="preload" as="image" href="assets/images/tanks/player-turret.png" fetchpriority="high">
+  <link rel="preload" as="image" href="assets/images/tanks/enemy-hull.png" fetchpriority="high">
+  <link rel="preload" as="image" href="assets/images/tanks/enemy-turret.png" fetchpriority="high">
+  <link rel="preload" as="image" href="assets/images/tanks/future-tech-hull.png" fetchpriority="low">
+  <link rel="preload" as="image" href="assets/images/tanks/future-tech-turret.png" fetchpriority="low">
+  <link rel="preload" as="audio" href="music/MEGALOVANIA-Toby Fox.mp3">
 </head>
 <body>
   <main class="game-shell">
@@ -120,12 +127,12 @@
                 <p><strong>追踪弹</strong><span>子弹自动追踪标记目标，持续时间最高 5 秒。</span></p>
                 <p><strong>分裂弹</strong><span>发射扇形子弹，最多 5 颗，每颗造成当前攻击力的 70%。</span></p>
                 <p><strong>爆裂弹</strong><span>命中后产生碎片，碎片伤害最高为攻击力的 50%。</span></p>
-                <p><strong>信号干扰器</strong><span>周期性干扰敌军 0.95 秒，升级后冷却缩短。</span></p>
+                <p><strong>信号干扰器</strong><span>周期性干扰敌军 0.65 秒，升级后冷却缩短，最低 6 秒。</span></p>
                 <p><strong>你跑不过我</strong><span>提升移动速度，最高提升 60%。</span></p>
                 <p><strong>勇者无畏</strong><span>每关开始提供一次性前方护盾，等级提升可抵挡次数。</span></p>
                 <p><strong>前车之鉴</strong><span>每次开火时向炮口方向安全冲刺一小段距离。</span></p>
                 <p><strong>后顾之忧</strong><span>每 2 秒向车尾发射消弹方块，方块在距车尾 100 像素处停止；等级越高可消除的敌方子弹越多。</span></p>
-                <p><strong>呼叫支援</strong><span>定期召唤支援飞机，初始冷却 24 秒，每级降低 3 秒，最低 9 秒。</span></p>
+                <p><strong>呼叫支援</strong><span>定期召唤支援飞机，初始冷却 20 秒，每级降低 3 秒，最低 2 秒。</span></p>
                 <p><strong>虚空行者</strong><span>允许短时间穿墙，单次在墙内停留时间有限。</span></p>
               </div>
             </section>
@@ -145,7 +152,7 @@
 
             <section class="help-section help-section-last help-page">
               <h3>补给与 HUD</h3>
-              <p>维修包恢复生命；护盾补给提供 3 次伤害抵挡；快速装填提供短时速射；透视补给标记屏幕外敌军。顶部 HUD 会显示模式、关卡、能源、生命、敌军数量、装填状态和当前增益。</p>
+              <p>维修包恢复生命；护盾补给提供 3 次伤害抵挡；快速装填提供短时速射；透视补给标记屏幕外敌军。空中支援每隔 45 秒自动获得随机临时增益，每次购买使局内冷却缩短 1 秒。蓝盾在无尽模式和勇者行动中限制单次承伤不超过生命上限的 20%。顶部 HUD 会显示模式、关卡、能源、生命、敌军数量、装填状态和当前增益。</p>
             </section>
           </div>
           <footer class="help-pagination" aria-label="帮助分页">
@@ -285,22 +292,22 @@
         <div id="fieldSkillWheel" class="field-skill-wheel" aria-label="场地技能轮盘">
           <div id="fieldSkillWheelDisc" class="field-skill-wheel-disc">
             <span class="wheel-icon wheel-icon-1" title="机械飞升" aria-label="机械飞升">
-              <img src="field-skill-icons/mechanical-ascension.svg" alt="" aria-hidden="true">
+              <img src="field-skill-icons/mechanical-ascension.svg" alt="" aria-hidden="true" decoding="async" loading="lazy">
             </span>
             <span class="wheel-icon wheel-icon-2" title="不死图腾" aria-label="不死图腾">
-              <img src="field-skill-icons/undying-totem.svg" alt="" aria-hidden="true">
+              <img src="field-skill-icons/undying-totem.svg" alt="" aria-hidden="true" decoding="async" loading="lazy">
             </span>
             <span class="wheel-icon wheel-icon-3" title="密命王牌" aria-label="密命王牌">
-              <img src="field-skill-icons/trump-card.svg" alt="" aria-hidden="true">
+              <img src="field-skill-icons/trump-card.svg" alt="" aria-hidden="true" decoding="async" loading="lazy">
             </span>
             <span class="wheel-icon wheel-icon-4" title="巫毒子弹" aria-label="巫毒子弹">
-              <img src="field-skill-icons/voodoo-bullet.svg" alt="" aria-hidden="true">
+              <img src="field-skill-icons/voodoo-bullet.svg" alt="" aria-hidden="true" decoding="async" loading="lazy">
             </span>
             <span class="wheel-icon wheel-icon-5" title="天堂制造" aria-label="天堂制造">
-              <img src="field-skill-icons/paradise-made.svg" alt="" aria-hidden="true">
+              <img src="field-skill-icons/paradise-made.svg" alt="" aria-hidden="true" decoding="async" loading="lazy">
             </span>
             <span class="wheel-icon wheel-icon-6" title="凛冽寒冬" aria-label="凛冽寒冬">
-              <img src="field-skill-icons/bitter-winter.svg" alt="" aria-hidden="true">
+              <img src="field-skill-icons/bitter-winter.svg" alt="" aria-hidden="true" decoding="async" loading="lazy">
             </span>
           </div>
           <button id="fieldSkillRollButton" class="field-skill-roll-button" type="button">开始</button>
@@ -369,19 +376,18 @@
     <footer class="footer-note">支持本地房间 · 双击即可运行 · 建议使用 Chrome 或 Edge</footer>
   </main>
 
-  <script src="js/config.js?v=20260829-mobile7"></script>
-  <script src="js/audio.js?v=20260829-mobile7"></script>
-  <script src="js/input.js?v=20260829-mobile7"></script>
-  <script src="js/collision.js?v=20260829-mobile7"></script>
-  <script src="js/entities.js?v=20260829-mobile7"></script>
-  <script src="js/cinematic.js?v=20260829-mobile7"></script>
-  <script src="js/map.js?v=20260829-mobile7"></script>
-  <script src="js/ai.js?v=20260829-mobile7"></script>
-  <script src="js/effects.js?v=20260829-mobile7"></script>
-  <script src="js/game.js?v=20260831-online5"></script>
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="js/multiplayer.js?v=20260831-online5"></script>
-  <script src="js/field-skills.js?v=20260829-mobile7"></script>
-  <script src="js/main.js?v=20260831-online5"></script>
+  <script defer src="js/config.js?v=20260902-features1"></script>
+  <script defer src="js/audio.js?v=20260902-features1"></script>
+  <script defer src="js/input.js?v=20260902-features1"></script>
+  <script defer src="js/collision.js?v=20260902-features1"></script>
+  <script defer src="js/entities.js?v=20260902-features1"></script>
+  <script defer src="js/cinematic.js?v=20260902-features1"></script>
+  <script defer src="js/map.js?v=20260902-features1"></script>
+  <script defer src="js/ai.js?v=20260902-features1"></script>
+  <script defer src="js/effects.js?v=20260902-features1"></script>
+  <script defer src="js/game.js?v=20260902-features1"></script>
+  <script defer src="js/multiplayer.js?v=20260902-features1"></script>
+  <script defer src="js/field-skills.js?v=20260902-features1"></script>
+  <script defer src="js/main.js?v=20260902-features1"></script>
 </body>
 </html>

@@ -19,6 +19,7 @@
     this.maxSoundChannels = 16;
     this.burningSounds = [];
     this.cinematicSounds = [];
+    this.prewarmScheduled = false;
   }
 
   AudioSystem.prototype.initialize = function () {
@@ -68,6 +69,14 @@
       });
       self.soundEffects[effectName] = sound;
     });
+  };
+
+  AudioSystem.prototype.prewarmCriticalAssets = function () {
+    var self = this;
+    var names = ["begin", "again", "shoot", "hit", "explode", "boostPickup"];
+    if (this.prewarmScheduled || !window.Audio) { return; }
+    this.prewarmScheduled = true;
+    names.forEach(function (name) { self.initializeSoundEffects(name); });
   };
 
   AudioSystem.prototype.playLoaded = function (name, onFailure, maxDuration) {

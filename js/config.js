@@ -168,20 +168,23 @@
       boosts: Object.freeze([
         Object.freeze({ id: "healing", label: "治疗", description: "单次无尽模式或勇者行动中，每 10 秒回复 100 生命。", price: 500, maxLevel: 1, allowedModes: ["endless", "brave"], effect: "每 10 秒 +100 生命" }),
         Object.freeze({ id: "frenzy", label: "狂暴", description: "单次无尽模式或勇者行动中，攻击力 +15%，移速 +5%。", price: 5000, maxLevel: 1, allowedModes: ["endless", "brave"], effect: "攻击 +15% · 移速 +5%" }),
-        Object.freeze({ id: "instantKill", label: "瞬杀", description: "每次购买使击中普通坦克或炮台时的瞬杀概率提高 0.1%，最高 100%。", price: 10086, maxLevel: 1000, allowedModes: ["endless", "brave"], effect: "每级 +0.1% · 最高 100%" })
+        Object.freeze({ id: "instantKill", label: "瞬杀", description: "每次购买使击中普通坦克或炮台时的瞬杀概率提高 0.1%，最高 100%。", price: 10086, maxLevel: 1000, allowedModes: ["endless", "brave"], effect: "每级 +0.1% · 最高 100%" }),
+        Object.freeze({ id: "blueShield", label: "蓝盾", description: "无尽模式和勇者行动中，玩家单次承受伤害最高为生命上限的 20%。", price: 1000000, maxLevel: 1, allowedModes: ["endless", "brave"], effect: "单次伤害上限 · 生命上限 20%" })
       ]),
       items: Object.freeze([
         Object.freeze({ id: "mudTruck", label: "泥头车", description: "无尽模式开局获得前车之鉴；冲撞伤害为当前攻击力 200%，移速和体型各提升 10%，可撞毁可破坏墙壁。", price: 5000, maxLevel: 1, allowedModes: ["endless"], effect: "前车之鉴 · 冲撞强化" }),
         Object.freeze({ id: "bomb", label: "炸弹", description: "每次购买使子弹突变为炸弹的概率提高 10%，最高 100%。", price: 2608, maxLevel: 10, allowedModes: ["endless", "brave"], effect: "每级 +10% · 范围爆炸" }),
         Object.freeze({ id: "mortar", label: "迫击炮", description: "每次购买使子弹突变为迫击炮弹的概率提高 1%，最高 100%。", price: 2604, maxLevel: 100, allowedModes: ["endless", "brave"], effect: "每级 +1% · 范围爆炸" }),
-        Object.freeze({ id: "redBullet", label: "红色子弹", description: "无尽模式和勇者行动中，发射的子弹全部变为红色子弹，攻击力翻倍。", price: 9999, maxLevel: 1, allowedModes: ["endless", "brave"], effect: "全部子弹 · 攻击翻倍" })
+        Object.freeze({ id: "redBullet", label: "红色子弹", description: "无尽模式和勇者行动中，发射的子弹全部变为红色子弹，攻击力翻倍。", price: 9999, maxLevel: 1, allowedModes: ["endless", "brave"], effect: "全部子弹 · 攻击翻倍" }),
+        Object.freeze({ id: "airSupport", label: "空中支援", description: "所有模式每隔 45 秒自动获得一次随机临时增益；每次购买使局内冷却缩短 1 秒。", price: 100000, maxLevel: 30, effect: "每 45 秒自动获得 · 每级 -1 秒" })
       ]),
       skins: Object.freeze([
         Object.freeze({ id: "default", label: "原皮", description: "出厂涂装，已解锁。", price: 0, image: "assets/images/tanks/player-hull.png" }),
         Object.freeze({ id: "red", label: "红皮", description: "参考红色涂装。", price: 5000, image: "assets/images/tanks/red.jpg" }),
         Object.freeze({ id: "yellow", label: "黄皮", description: "参考黄色涂装。", price: 5000, image: "assets/images/tanks/yellow.jpg" }),
         Object.freeze({ id: "blue", label: "蓝皮", description: "参考蓝色涂装。", price: 5000, image: "assets/images/tanks/blue.jpg" }),
-        Object.freeze({ id: "green", label: "绿皮", description: "参考绿色涂装。", price: 5000, image: "assets/images/tanks/green.jpg" })
+        Object.freeze({ id: "green", label: "绿皮", description: "参考绿色涂装。", price: 5000, image: "assets/images/tanks/green.jpg" }),
+        Object.freeze({ id: "futureTech", label: "未来科技", description: "蓝紫复合装甲与量子反应堆，伴随电路辉光和能量环特效。", price: 100000, image: "assets/images/tanks/future-tech-preview.png" })
       ])
     }),
     endlessRewards: Object.freeze({
@@ -198,12 +201,12 @@
         Object.freeze({ id: "tracking", label: "追踪弹", description: "子弹自动追踪敌人，初始持续 2 秒，最高 5 秒。", maxLevel: 7 }),
         Object.freeze({ id: "splitBullet", label: "分裂弹", description: "同时射出多颗扇形子弹，每颗造成当前攻击力 70% 的伤害，最多 5 颗。", maxLevel: 4 }),
         Object.freeze({ id: "explosive", label: "爆裂弹", description: "命中后发射碎片，初始造成攻击力 25% 的伤害，每级提高 5%，最高 50%。", maxLevel: 6 }),
-        Object.freeze({ id: "jammer", label: "信号干扰器", description: "干扰敌人 0.95 秒；升级缩短冷却，满级冷却 5.4 秒。", maxLevel: 21 }),
+        Object.freeze({ id: "jammer", label: "信号干扰器", description: "每次干扰敌人 0.65 秒；升级缩短冷却，最低 6 秒。", maxLevel: 21 }),
         Object.freeze({ id: "speed", label: "你跑不过我", description: "初始提升 40% 移速，每级提高 5%，最高 60%。", maxLevel: 5 }),
         Object.freeze({ id: "braveShield", label: "勇者无畏", description: "每关开始获得一次性前方护盾，等级提升抵挡次数。" }),
         Object.freeze({ id: "frontStep", label: "前车之鉴", description: "每次发射时向前冲出一段距离。", maxLevel: 1 }),
         Object.freeze({ id: "rearShot", label: "后顾之忧", description: "每 2 秒向尾部发射消弹方块，方块停止运动在距车尾 100 像素处，最多消除 1～5 颗敌方子弹。", maxLevel: 5 }),
-        Object.freeze({ id: "supportCall", label: "呼叫支援", description: "支援飞机定期空投随机临时增益，初始冷却 24 秒，每级降低 3 秒，最低 9 秒。", maxLevel: 9 }),
+        Object.freeze({ id: "supportCall", label: "呼叫支援", description: "支援飞机定期空投随机临时增益，初始冷却 20 秒，每级降低 3 秒，最低 2 秒。", maxLevel: 9 }),
         Object.freeze({ id: "voidWalker", label: "虚空行者", description: "可以穿墙，但本局最多在墙内停留 5 秒。" })
       ])
     }),

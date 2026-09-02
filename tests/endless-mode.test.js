@@ -254,10 +254,10 @@ game.endlessPermanent.explosive = 6;
 assert.strictEqual(game.getExplosiveDamageMultiplier(), 0.5);
 assert.strictEqual(game.createRewardOptions([reward("explosive")], 3).length, 0);
 game.endlessPermanent.jammer = 21;
-assert.strictEqual(game.getJammerCooldown(), 5.4);
+assert.strictEqual(game.getJammerCooldown(), 6);
 game.jammerTimer = 0;
 game.updateJammer(0);
-assert.ok(game.enemies.every(function (enemy) { return enemy.jammedTimer === 0.8; }));
+assert.ok(game.enemies.every(function (enemy) { return enemy.jammedTimer === 0.65; }));
 assert.strictEqual(game.createRewardOptions([reward("jammer")], 3).length, 0);
 
 game.endlessPermanent.voidWalker = 3;
@@ -320,9 +320,9 @@ game.supportTimer = 0;
 game.supportAircraft = [];
 game.updateSupportAircraft(1 / 60);
 assert.strictEqual(game.supportAircraft.length, 1);
-assert.strictEqual(game.getSupportCooldown(), 24);
+assert.strictEqual(game.getSupportCooldown(), 20);
 game.endlessPermanent.supportCall = 9;
-assert.strictEqual(game.getSupportCooldown(), 9);
+assert.strictEqual(game.getSupportCooldown(), 2);
 for (var supportFrame = 0; supportFrame < 240; supportFrame += 1) { game.updateSupportAircraft(1 / 60); }
 assert.ok(game.supplies.some(function (supply) { return supply.support && supply.airborne; }));
 
