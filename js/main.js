@@ -114,6 +114,10 @@
   var defeatStats = document.getElementById("defeatStats");
   var onlineLeaderboard = document.getElementById("onlineLeaderboard");
   var onlineLeaderboardDefeat = document.getElementById("onlineLeaderboardDefeat");
+  var victoryContinueButton = document.getElementById("victoryContinueButton");
+  var victoryCloseRoomButton = document.getElementById("victoryCloseRoomButton");
+  var defeatContinueButton = document.getElementById("defeatContinueButton");
+  var defeatCloseRoomButton = document.getElementById("defeatCloseRoomButton");
   var recordSummary = document.getElementById("recordSummary");
   var retryButtons = document.querySelectorAll(".retry-button");
   var menuButtons = document.querySelectorAll(".menu-button");
@@ -141,6 +145,8 @@
     fieldSkillRollPanel.hidden = state !== Config.states.FIELD_ROLL;
     victoryPanel.hidden = state !== Config.states.VICTORY;
     defeatPanel.hidden = state !== Config.states.DEFEAT;
+    victoryPanel.classList.toggle("online-result-active", game.selectedMode === "online");
+    defeatPanel.classList.toggle("online-result-active", game.selectedMode === "online");
     levelHud.hidden = ["challenge", "endless", "brave"].indexOf(game.selectedMode) === -1;
     fieldSkillHud.hidden = game.selectedMode !== "endless";
     crystalHud.hidden = game.selectedMode !== "endless";
@@ -158,9 +164,20 @@
     pauseButton.setAttribute("aria-label", pauseButton.title);
     var onlineRoom = TankGame.Multiplayer.getRoom && TankGame.Multiplayer.getRoom();
     retryButtons.forEach(function (button) {
-      button.hidden = game.selectedMode === "online" && !(onlineRoom && onlineRoom.host);
+      button.hidden = game.selectedMode === "online";
       button.textContent = game.selectedMode === "online" ? "房主重开本局" : (button.id === "victoryRetryButton" ? "再次挑战" : "重新出击");
     });
+    menuButtons.forEach(function (button) { button.hidden = game.selectedMode === "online"; });
+    [victoryContinueButton, defeatContinueButton].forEach(function (button) {
+      if (button) { button.hidden = game.selectedMode !== "online" || !onlineRoom || !onlineRoom.result; }
+    });
+    [victoryCloseRoomButton, defeatCloseRoomButton].forEach(function (button) {
+      if (button) { button.hidden = game.selectedMode !== "online" || !onlineRoom || !onlineRoom.result; }
+    });
+    if (game.selectedMode === "online" && onlineRoom) {
+      [victoryContinueButton, defeatContinueButton].forEach(function (button) { if (button) { button.textContent = "继续游戏"; } });
+      [victoryCloseRoomButton, defeatCloseRoomButton].forEach(function (button) { if (button) { button.textContent = onlineRoom.host ? "关房" : "退出房间"; } });
+    }
 
     if (state === Config.states.MENU) {
       statusText.textContent = "准备就绪";
@@ -630,9 +647,18 @@
     roomLobby.hidden = false;
     roomCodeValue.textContent = room.code;
     roomMembersValue.textContent = room.names.length + " / 10";
-    roomMembersList.textContent = room.names.join("  ·  ");
+    roomMembersList.textContent = room.names.map(function (name) {
+      return name + ((room.readyNames || []).indexOf(name) !== -1 ? " · 已确认" : "");
+    }).join("  ·  ");
     startRoomButton.hidden = !room.host;
-    roomStatus.textContent = room.started ? "战场已开启，正在进入……" : (room.host ? "等待队友加入后开启战场" : "已加入房间，等待房主开启");
+    if (room.started) {
+      roomStatus.textContent = "战场已开启，正在进入……";
+    } else if (room.phase === "lobby" && room.result) {
+      roomStatus.textContent = room.host ? "选择继续游戏的玩家将加入下一局" : "等待房主开启下一局";
+    } else {
+      roomStatus.textContent = room.host ? "等待队友加入后开启战场" : "已加入房间，等待房主开启";
+    }
+    startRoomButton.textContent = room.host && room.phase === "lobby" && room.result ? "房主开启下一局" : "房主开启战场";
   }
   onlineButton.addEventListener("click", function () { showOnlineView("modes"); });
   onlineBackButton.addEventListener("click", function () { showOnlineView(null); });
@@ -656,17 +682,54 @@
   startRoomButton.addEventListener("click", function () {
     var room = TankGame.Multiplayer.getRoom();
     if (!room || !room.host) { return; }
-    if (!TankGame.Multiplayer.start()) { roomStatus.textContent = "至少需要 2 名玩家才能开始"; }
+    if (!TankGame.Multiplayer.start()) { roomStatus.textContent = room.result ? "至少需要 2 名玩家选择继续游戏" : "至少需要 2 名玩家才能开始"; }
+  });
+  function returnToOnlineLobby(room) {
+    if (!room || game.selectedMode !== "online") { return; }
+    if (game.returnToOnlineLobby) { game.returnToOnlineLobby(); }
+    onlineView = "room";
+    syncInterface();
+    canvas.focus();
+  }
+  function closeOnlineRoom() {
+    var room = TankGame.Multiplayer.getRoom && TankGame.Multiplayer.getRoom();
+    if (!room) { return; }
+    if (room.host && TankGame.Multiplayer.close) { TankGame.Multiplayer.close(); }
+    else if (TankGame.Multiplayer.leave) { TankGame.Multiplayer.leave(); }
+    game.reset();
+    onlineView = null;
+    syncInterface();
+  }
+  function continueOnlineGame() {
+    if (!TankGame.Multiplayer.continueGame || !TankGame.Multiplayer.continueGame()) { return; }
+    returnToOnlineLobby(TankGame.Multiplayer.getRoom());
+  }
+  [victoryContinueButton, defeatContinueButton].forEach(function (button) {
+    if (button) { button.addEventListener("click", continueOnlineGame); }
+  });
+  [victoryCloseRoomButton, defeatCloseRoomButton].forEach(function (button) {
+    if (button) { button.addEventListener("click", closeOnlineRoom); }
   });
   TankGame.Multiplayer.onChange(function (room) {
     if (!room) { return; }
     updateRoomLobby(room);
+    if (room.closed || room.excluded) {
+      game.reset();
+      onlineView = null;
+      if (TankGame.Multiplayer.clear) { TankGame.Multiplayer.clear(); }
+      syncInterface();
+      return;
+    }
+    if (room.phase === "lobby" && game.selectedMode === "online" && game.state !== Config.states.MENU) {
+      returnToOnlineLobby(room);
+      return;
+    }
     if (room.ended && room.result && game.selectedMode === "online" && game.state === Config.states.PLAYING) {
       game.finishOnlineMatch(room.result);
       syncInterface();
       return;
     }
-    if (room.started && game.state === Config.states.MENU) {
+    if (room.started && game.state === Config.states.MENU && !room.excluded) {
       game.configureOnline(room);
       game.start();
       onlineView = null;
@@ -710,6 +773,7 @@
     if (game.selectedMode !== "online" || game.state !== Config.states.PLAYING || !shot || (activeRoom && shot.from === activeRoom.localId)) { return; }
     var bullet = TankGame.Entities.createBullet(Number(shot.x), Number(shot.y), Number(shot.angle), "player");
     bullet.damage = Number(shot.damage) || 4;
+    bullet.speed = Number(shot.speed) || Config.bulletSpeed;
     bullet.remote = true;
     game.bullets.push(bullet);
   });
@@ -946,7 +1010,7 @@
       powerValue.textContent = "维修待命";
     } else if (game.runShop.blueShield) {
       powerValue.textContent = "蓝盾 · 单次上限 20%";
-    } else if (game.shopData.items.airSupport > 0 && game.airSupportTimer > 0) {
+    } else if (game.runShop.airSupport > 0 && game.airSupportTimer > 0) {
       powerValue.textContent = "空援 " + Math.ceil(game.airSupportTimer) + "秒";
     } else if (game.selectedMode === "endless" && game.endlessPermanent.splitBullet) {
       powerValue.textContent = "分裂弹 " + (game.endlessPermanent.splitBullet + 1) + "发";

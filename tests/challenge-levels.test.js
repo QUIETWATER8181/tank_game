@@ -77,6 +77,15 @@ assert.ok(game.enemies[0].mode.fireCooldown < levelOneFireCooldown);
 game.completeLevel();
 assert.strictEqual(game.state, TankGame.Config.states.VICTORY);
 assert.strictEqual(game.lastCompletedLevel, 3);
+assert.strictEqual(game.partsTotalReward, game.score * 10, "挑战模式三关通关应按累计积分结算并乘以 10");
+
+var failedSettlement = createGame();
+failedSettlement.setMode("challenge");
+failedSettlement.start();
+failedSettlement.score = 321;
+failedSettlement.player.alive = false;
+failedSettlement.updatePlayerLifeCycle(0.016);
+assert.strictEqual(failedSettlement.partsTotalReward, 321, "挑战模式未完成三关时应按 1 积分兑换 1 零件");
 
 var failedRun = createGame();
 failedRun.setMode("challenge");

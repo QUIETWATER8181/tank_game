@@ -12,6 +12,7 @@
   };
   var tankSprites = {};
   var futureTechSprites = {};
+  var silverTankSprites = {};
 
   Object.keys(tankSpriteDefinitions).forEach(function (key) {
     var hull = new Image();
@@ -32,6 +33,17 @@
       futureTechSprites[layer] = image;
     });
     return futureTechSprites;
+  }
+
+  function getSilverTankSprites() {
+    if (silverTankSprites.hull && silverTankSprites.turret) { return silverTankSprites; }
+    ["hull", "turret"].forEach(function (layer) {
+      var image = new Image();
+      image.decoding = "async";
+      image.src = "assets/images/tanks/silver-tank-" + layer + ".png";
+      silverTankSprites[layer] = image;
+    });
+    return silverTankSprites;
   }
 
   function wrapAngle(angle) {
@@ -61,7 +73,7 @@
     context.shadowColor = "rgba(0, 0, 0, 0.6)";
     context.shadowBlur = 8 / definition.scale;
     context.shadowOffsetY = 5 / definition.scale;
-    if (tank.team === "player" && tank.skin && tank.skin !== "default" && tank.skin !== "futureTech") {
+    if (tank.team === "player" && tank.skin && tank.skin !== "default" && tank.skin !== "futureTech" && tank.skin !== "silverTank") {
       context.filter = tank.skin === "red" ? "hue-rotate(320deg) saturate(1.8)" :
         (tank.skin === "yellow" ? "hue-rotate(28deg) saturate(1.9) brightness(1.12)" :
           (tank.skin === "blue" ? "hue-rotate(175deg) saturate(1.7) brightness(0.96)" : "hue-rotate(72deg) saturate(1.35) brightness(0.9)"));
@@ -157,7 +169,8 @@
   function drawTankSprites(context, tank, drawY, shadow) {
     var key = getTankSpriteKey(tank);
     var definition = tankSpriteDefinitions[key];
-    var sprites = tank.team === "player" && tank.skin === "futureTech" ? getFutureTechSprites() : tankSprites[key];
+    var sprites = tank.team === "player" && tank.skin === "futureTech" ? getFutureTechSprites() :
+      (tank.team === "player" && tank.skin === "silverTank" ? getSilverTankSprites() : tankSprites[key]);
     if (!sprites || !spriteReady(sprites.hull) || !spriteReady(sprites.turret)) { return false; }
     drawSpriteLayer(context, sprites.hull, tank, tank.bodyAngle, drawY, definition, shadow);
     drawSpriteLayer(context, sprites.turret, tank, tank.turretAngle, drawY, definition, shadow);
@@ -448,11 +461,15 @@
         context.strokeStyle = boss ? "#ffd700" : (elite ? "#e3b957" : "#d9eee4");
         context.lineWidth = 3;
         context.stroke();
-        context.fillStyle = "#10231c";
-        context.font = "700 9px Consolas, monospace";
-        context.textAlign = "center";
-        context.textBaseline = "middle";
-        context.fillText(tank.team === "player" ? "XPZ" : (boss ? "B" : (elite ? "EL" : (shadow ? "S" : "EN"))), 0, 1);
+        // Enemy classes use a compact center marker; player tanks intentionally
+        // have no embedded name or label in the canvas fallback.
+        if (tank.team !== "player") {
+          context.fillStyle = "#10231c";
+          context.font = "700 9px Consolas, monospace";
+          context.textAlign = "center";
+          context.textBaseline = "middle";
+          context.fillText(boss ? "B" : (elite ? "EL" : (shadow ? "S" : "EN")), 0, 1);
+        }
         context.restore();
       }
 

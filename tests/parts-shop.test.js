@@ -36,6 +36,8 @@ function createGame() {
 
 var game = createGame();
 
+assert.strictEqual(game.player.name, "", "单人模式玩家坦克上方不应显示 XPZ 名字");
+
 assert.strictEqual(game.redeemGiftCode("quietwater").ok, true);
 assert.strictEqual(game.redeemGiftCode(" QUIETWATER ").amount, 10000);
 assert.strictEqual(game.parts, 20000);
@@ -43,8 +45,8 @@ assert.strictEqual(game.redeemGiftCode("wrong-code").reason, "invalid");
 
 assert.strictEqual(game.getPartsReward("normal", 500, false), 50);
 assert.strictEqual(game.getPartsReward("normal", 500, true), 80);
-assert.strictEqual(game.getPartsReward("challenge", 600, false), 60);
-assert.strictEqual(game.getPartsReward("challenge", 600, true), 120);
+assert.strictEqual(game.getPartsReward("challenge", 600, false), 600);
+assert.strictEqual(game.getPartsReward("challenge", 600, true), 6000);
 assert.strictEqual(game.getPartsReward("endless", 1000, false), 20);
 assert.strictEqual(game.getPartsReward("brave", 150, false), 10);
 
@@ -64,7 +66,11 @@ assert.strictEqual(game.getShopCost("upgrades", "attack"), 300);
 assert.strictEqual(game.getShopCost("upgrades", "speed"), 1000);
 assert.strictEqual(game.purchaseShopItem("upgrades", "speed").ok, true);
 assert.strictEqual(game.getShopCost("upgrades", "speed"), 2000);
+assert.strictEqual(game.getShopItem("boosts", "rapidBullet").price, 4000, "急速炮弹售价应为 4000 零件");
+assert.strictEqual(game.isShopItemAvailable("boosts", "rapidBullet", "normal"), true, "急速炮弹应适用于所有模式");
 assert.strictEqual(game.getShopItem("skins", "futureTech").price, 100000, "未来科技皮肤售价应为 100000 零件");
+assert.strictEqual(game.getShopItem("skins", "silverTank").price, 30000, "银色战车售价应为 30000 零件");
+assert.strictEqual(game.getShopItem("skins", "silverTank").image, "assets/images/tanks/silver-tank-preview.png", "银色战车应使用独立预览图");
 assert.strictEqual(game.getShopItem("items", "airSupport").price, 100000, "空中支援售价应为 100000 零件");
 assert.strictEqual(game.getShopItem("items", "airSupport").maxLevel, 30, "空中支援上限应为 30 次");
 
@@ -76,6 +82,8 @@ assert.strictEqual(airSupportGame.shopData.items.airSupport, 30);
 airSupportGame.start();
 assert.strictEqual(airSupportGame.getAirSupportCooldown(), 15, "30 次空中支援应将局内冷却降至 15 秒");
 assert.strictEqual(airSupportGame.airSupportTimer, 15, "空中支援应在开局初始化冷却");
+assert.strictEqual(airSupportGame.shopData.items.airSupport, 0, "空中支援作为道具应在开局消耗库存");
+assert.strictEqual(airSupportGame.runShop.airSupport, 30, "空中支援购买次数应转入当前对局");
 airSupportGame.airSupportTimer = 0;
 airSupportGame.supportAircraft = [];
 airSupportGame.updateSupportAircraft(0.016);
@@ -143,6 +151,14 @@ futureTechGame.start();
 futureTechGame.fire(futureTechGame.player);
 assert.strictEqual(futureTechGame.player.skin, "futureTech");
 assert.strictEqual(futureTechGame.bullets[0].futureTech, true, "未来科技皮肤发射的子弹应携带专属拖尾标记");
+
+var silverTankGame = createGame();
+silverTankGame.parts = 30000;
+assert.strictEqual(silverTankGame.purchaseShopItem("skins", "silverTank").ok, true, "银色战车应可购买");
+assert.strictEqual(silverTankGame.shopData.skins.silverTank, true, "购买银色战车后应解锁");
+assert.strictEqual(silverTankGame.shopData.equippedSkin, "silverTank", "购买银色战车后应自动装备");
+silverTankGame.start();
+assert.strictEqual(silverTankGame.player.skin, "silverTank", "开局玩家应使用银色战车皮肤");
 
 game.shopData.boosts.healing = 1;
 game.shopData.items.bomb = 10;

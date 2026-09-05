@@ -47,6 +47,7 @@ function makeMap(obstacles) {
 }
 
 var purchaseGame = createGame("endless");
+var originalRandom = Math.random;
 purchaseGame.parts = 100000;
 assert.strictEqual(purchaseGame.purchaseShopItem("items", "mortar").ok, true);
 assert.strictEqual(purchaseGame.shopData.items.mortar, 1);
@@ -54,6 +55,49 @@ purchaseGame.start();
 assert.strictEqual(purchaseGame.runShop.mortar, 1);
 assert.strictEqual(purchaseGame.shopData.items.mortar, 0);
 assert.strictEqual(createGame("endless").shopData.items.mortar, 0);
+
+var rapidGame = createGame("normal");
+rapidGame.parts = 4000;
+assert.strictEqual(rapidGame.purchaseShopItem("boosts", "rapidBullet").ok, true);
+rapidGame.start();
+assert.strictEqual(rapidGame.runShop.rapidBullet, 1);
+assert.strictEqual(rapidGame.shopData.boosts.rapidBullet, 0);
+rapidGame.state = TankGame.Config.states.PLAYING;
+rapidGame.player.turretAngle = 0;
+rapidGame.fire(rapidGame.player);
+assert.strictEqual(rapidGame.bullets[0].speed, TankGame.Config.bulletSpeed * 2);
+
+var rapidSpecialGame = createGame("endless");
+rapidSpecialGame.start();
+rapidSpecialGame.state = TankGame.Config.states.PLAYING;
+rapidSpecialGame.runShop = { rapidBullet: 1, bomb: 10, mortar: 0 };
+rapidSpecialGame.player.turretAngle = 0;
+Math.random = function () { return 0; };
+rapidSpecialGame.fire(rapidSpecialGame.player);
+Math.random = originalRandom;
+assert.strictEqual(rapidSpecialGame.bullets[0].speed, TankGame.Config.bulletSpeed * 0.68 * 2);
+
+var rapidMortarGame = createGame("endless");
+rapidMortarGame.start();
+rapidMortarGame.state = TankGame.Config.states.PLAYING;
+rapidMortarGame.runShop = { rapidBullet: 1, bomb: 0, mortar: 100 };
+rapidMortarGame.player.turretAngle = 0;
+Math.random = function () { return 0; };
+rapidMortarGame.fire(rapidMortarGame.player);
+Math.random = originalRandom;
+assert.strictEqual(rapidMortarGame.bullets[0].speed, TankGame.Config.bulletSpeed * 2);
+assert.strictEqual(rapidMortarGame.bullets[0].flightDuration, 0.36);
+
+rapidMortarGame.endlessPermanent = { explosive: 1 };
+rapidMortarGame.bullets = [];
+rapidMortarGame.spawnFragments(100, 100, 10);
+rapidMortarGame.spawnMortarFragments(100, 100, 10);
+rapidMortarGame.spawnBombFragments(100, 100, 10);
+assert.ok(rapidMortarGame.bullets.every(function (bullet) {
+  return bullet.speed === TankGame.Config.bulletSpeed * 2 ||
+    bullet.speed === TankGame.Config.bulletSpeed * 0.72 * 2 ||
+    bullet.speed === TankGame.Config.bulletSpeed * 0.68 * 2;
+}), "急速炮弹应使所有碎片子弹速度翻倍");
 
 var stackedInventoryGame = createGame("endless");
 stackedInventoryGame.shopData.items.mortar = 50;
@@ -71,7 +115,6 @@ game.player.turretAngle = 0;
 var target = TankGame.Entities.createTank(700, 450, "enemy");
 game.enemies = [target];
 game.markedTarget = target;
-var originalRandom = Math.random;
 Math.random = function () { return 0; };
 game.fire(game.player);
 Math.random = originalRandom;

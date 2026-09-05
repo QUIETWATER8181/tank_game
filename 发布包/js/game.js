@@ -42,7 +42,7 @@
     this.partsTotalReward = 0;
     this.partsGrantedTotal = 0;
     this.shopData = this.loadShopData();
-    this.runShop = { healing: 0, frenzy: 0, instantKill: 0, blueShield: 0, mudTruck: 0, bomb: 0, mortar: 0, redBullet: 0 };
+    this.runShop = { healing: 0, frenzy: 0, instantKill: 0, blueShield: 0, rapidBullet: 0, mudTruck: 0, bomb: 0, mortar: 0, redBullet: 0, airSupport: 0 };
     this.shopHealingTimer = 10;
     this.comboCount = 0;
     this.comboTimer = 0;
@@ -196,9 +196,17 @@
     }
   };
 
+  Game.prototype.returnToOnlineLobby = function () {
+    if (this.selectedMode !== "online") { return; }
+    this.input.reset();
+    this.remotePlayers = [];
+    this.onlineMatchEnded = false;
+    this.setState(Config.states.MENU);
+  };
+
   Game.prototype.loadShopData = function () {
     var parsed;
-    var data = { upgrades: { health: 0, attack: 0, speed: 0 }, boosts: { healing: 0, frenzy: 0, instantKill: 0, blueShield: 0 }, items: { mudTruck: 0, bomb: 0, mortar: 0, redBullet: 0, airSupport: 0 }, skins: { default: true }, equippedSkin: "default" };
+    var data = { upgrades: { health: 0, attack: 0, speed: 0 }, boosts: { healing: 0, frenzy: 0, instantKill: 0, blueShield: 0, rapidBullet: 0 }, items: { mudTruck: 0, bomb: 0, mortar: 0, redBullet: 0, airSupport: 0 }, skins: { default: true }, equippedSkin: "default" };
     try {
       parsed = JSON.parse(window.localStorage.getItem("xpz-tank-shop")) || {};
       ["upgrades", "boosts", "items"].forEach(function (category) {
@@ -310,20 +318,20 @@
 
   Game.prototype.activateRunShop = function () {
     var allowed = ["endless", "brave"].indexOf(this.selectedMode) !== -1;
-    this.runShop = { healing: 0, frenzy: 0, instantKill: 0, blueShield: 0, mudTruck: 0, bomb: 0, mortar: 0, redBullet: 0 };
-    if (!allowed) { return; }
-    this.normalizeWeaponShopItems(this.shopData);
-    ["healing", "frenzy", "instantKill", "blueShield"].forEach(function (id) {
-      this.runShop[id] = this.shopData.boosts[id] || 0;
-      this.shopData.boosts[id] = 0;
-    }, this);
-    if (this.selectedMode === "endless") {
-      this.runShop.mudTruck = this.shopData.items.mudTruck || 0;
-      this.shopData.items.mudTruck = 0;
+    this.runShop = { healing: 0, frenzy: 0, instantKill: 0, blueShield: 0, rapidBullet: 0, mudTruck: 0, bomb: 0, mortar: 0, redBullet: 0, airSupport: 0 };
+    if (allowed) {
+      ["healing", "frenzy", "instantKill", "blueShield"].forEach(function (id) {
+        this.runShop[id] = this.shopData.boosts[id] || 0;
+        this.shopData.boosts[id] = 0;
+      }, this);
     }
-    ["bomb", "mortar", "redBullet"].forEach(function (id) {
-      this.runShop[id] = this.shopData.items[id] || 0;
-      this.shopData.items[id] = 0;
+    this.runShop.rapidBullet = this.shopData.boosts.rapidBullet || 0;
+    this.shopData.boosts.rapidBullet = 0;
+    this.normalizeWeaponShopItems(this.shopData);
+    Config.shop.items.forEach(function (item) {
+      if (!this.isShopItemAvailable("items", item.id)) { return; }
+      this.runShop[item.id] = this.shopData.items[item.id] || 0;
+      this.shopData.items[item.id] = 0;
     }, this);
     this.shopHealingTimer = 10;
     this.saveShopData();
@@ -618,6 +626,18 @@
     return reward;
   };
 
+  Game.prototype.applyPlayerBulletSpeed = function (bullet) {
+    if (!bullet || bullet.team !== "player" || !this.runShop.rapidBullet || bullet.rapidBullet) { return bullet; }
+    bullet.speed *= 2;
+    bullet.rapidBullet = true;
+    if (bullet.mortarProjectile && bullet.flightDuration > 0) {
+      bullet.flightDuration /= 2;
+      bullet.flightTimer = bullet.flightDuration;
+      bullet.lifetime = bullet.flightDuration;
+    }
+    return bullet;
+  };
+
   Game.prototype.settleParts = function (isVictory) {
     var totalReward = this.getPartsReward(this.selectedMode, this.score, isVictory);
     this.partsTotalReward = totalReward;
@@ -684,7 +704,7 @@
     }
     var playerSpawn = this.selectedMode === "online" ? (onlineSpawns[this.onlinePlayerIndex % onlineSpawns.length] || this.worldMap.playerSpawn) : this.worldMap.playerSpawn;
     this.player = TankGame.Entities.createTank(playerSpawn.x, playerSpawn.y, "player");
-    this.player.name = this.onlineRoom && this.onlineRoom.names ? this.onlineRoom.names[this.onlinePlayerIndex] : "XPZ";
+    this.player.name = this.onlineRoom && this.onlineRoom.names ? this.onlineRoom.names[this.onlinePlayerIndex] : "";
     this.player.bodyAngle = -Math.PI / 2;
     this.player.turretAngle = -Math.PI / 2;
     this.player.invulnerable = 0;
@@ -1324,9 +1344,6 @@
       var bullet = TankGame.Entities.createBullet(x, y, tank.turretAngle + offset, tank.team);
       bullet.damage = (tank.bulletDamage || Config.bulletDamage) * (splitLevel ? 0.7 : 1);
       bullet.futureTech = tank.team === "player" && tank.skin === "futureTech";
-      if (this.selectedMode === "online" && tank === this.player && TankGame.Multiplayer.sendShot) {
-        TankGame.Multiplayer.sendShot(x, y, tank.turretAngle + offset, bullet.damage);
-      }
       if (tank.team === "player" && this.runShop.redBullet) { bullet.redBullet = true; bullet.damage *= 2; }
       if (playerShotVariant === "bomb") {
         bullet.bossBomb = true;
@@ -1377,6 +1394,10 @@
         bullet.explosionRadius = tank.turretWeapon === "mortar" ? Config.fixedTurret.mortarRadius : Config.fixedTurret.bombRadius;
         bullet.angle = tank.turretWeapon === "mortar" && this.player.alive ? Math.atan2(this.player.y - tank.y, this.player.x - tank.x) : bullet.angle;
         bullet.lifetime = this.getEnemyAttackRange(tank, tank.mode || this.mode) / bullet.speed;
+      }
+      this.applyPlayerBulletSpeed(bullet);
+      if (this.selectedMode === "online" && tank === this.player && TankGame.Multiplayer.sendShot) {
+        TankGame.Multiplayer.sendShot(x, y, tank.turretAngle + offset, bullet.damage, bullet.speed);
       }
       self.bullets.push(bullet);
     }
@@ -2591,6 +2612,7 @@
       fragment.armingTime = 0.1;
       fragment.fragment = true;
       fragment.futureTech = this.player.skin === "futureTech";
+      this.applyPlayerBulletSpeed(fragment);
       this.bullets.push(fragment);
     }
     TankGame.Effects.burst(x, y, "#ffd166", 10, 180);
@@ -2619,6 +2641,7 @@
       fragment.targetY = y + Math.sin(angle) * 200;
       fragment.flightDuration = 0.48;
       fragment.flightTimer = fragment.flightDuration;
+      this.applyPlayerBulletSpeed(fragment);
       this.bullets.push(fragment);
     }
     TankGame.Effects.burst(x, y, "#ffd166", 10, 180);
@@ -2639,6 +2662,7 @@
       fragment.playerBomb = true;
       fragment.futureTech = this.player.skin === "futureTech";
       fragment.explosionRadius = 56;
+      this.applyPlayerBulletSpeed(fragment);
       this.bullets.push(fragment);
     }
     TankGame.Effects.burst(x, y, "#ffd166", 10, 180);
@@ -2808,7 +2832,8 @@
   };
 
   Game.prototype.getAirSupportCooldown = function () {
-    var level = Math.min(30, Math.max(0, this.shopData.items.airSupport || 0));
+    var storedLevel = this.runShop && this.runShop.airSupport ? this.runShop.airSupport : this.shopData.items.airSupport;
+    var level = Math.min(30, Math.max(0, storedLevel || 0));
     return Math.max(15, 45 - level);
   };
 
@@ -2852,7 +2877,7 @@
   Game.prototype.updateSupportAircraft = function (deltaTime) {
     var self = this;
     var hasPermanentSupport = this.selectedMode === "endless" && this.endlessPermanent.supportCall && this.player.alive;
-    var hasPurchasedSupport = (this.shopData.items.airSupport || 0) > 0 && this.player.alive;
+    var hasPurchasedSupport = (this.runShop.airSupport || 0) > 0 && this.player.alive;
     if (hasPermanentSupport) {
       this.supportTimer = Math.max(0, this.supportTimer - deltaTime);
       if (this.supportTimer <= 0 && this.supportAircraft.length === 0) {

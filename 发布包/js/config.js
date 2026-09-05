@@ -148,7 +148,7 @@
     }),
     partsSettlement: Object.freeze({
       normal: Object.freeze({ scorePerParts: 100, partsPerStep: 10, victoryBonus: 30 }),
-      challenge: Object.freeze({ scorePerParts: 100, partsPerStep: 10, victoryMultiplier: 2 }),
+      challenge: Object.freeze({ scorePerParts: 1, partsPerStep: 1, victoryMultiplier: 10 }),
       endless: Object.freeze({ scorePerParts: 500, partsPerStep: 10, scoreMultiplierInterval: 5, scoreMultiplier: 1.2 }),
       brave: Object.freeze({ scorePerParts: 100, partsPerStep: 10, scoreMultiplier: 2 }),
       online: Object.freeze({ scorePerParts: 100, partsPerStep: 10, victoryBonus: 0 })
@@ -169,14 +169,15 @@
         Object.freeze({ id: "healing", label: "治疗", description: "单次无尽模式或勇者行动中，每 10 秒回复 100 生命。", price: 500, maxLevel: 1, allowedModes: ["endless", "brave"], effect: "每 10 秒 +100 生命" }),
         Object.freeze({ id: "frenzy", label: "狂暴", description: "单次无尽模式或勇者行动中，攻击力 +15%，移速 +5%。", price: 5000, maxLevel: 1, allowedModes: ["endless", "brave"], effect: "攻击 +15% · 移速 +5%" }),
         Object.freeze({ id: "instantKill", label: "瞬杀", description: "每次购买使击中普通坦克或炮台时的瞬杀概率提高 0.1%，最高 100%。", price: 10086, maxLevel: 1000, allowedModes: ["endless", "brave"], effect: "每级 +0.1% · 最高 100%" }),
-        Object.freeze({ id: "blueShield", label: "蓝盾", description: "无尽模式和勇者行动中，玩家单次承受伤害最高为生命上限的 20%。", price: 1000000, maxLevel: 1, allowedModes: ["endless", "brave"], effect: "单次伤害上限 · 生命上限 20%" })
+        Object.freeze({ id: "blueShield", label: "蓝盾", description: "无尽模式和勇者行动中，玩家单次承受伤害最高为生命上限的 20%。", price: 1000000, maxLevel: 1, allowedModes: ["endless", "brave"], effect: "单次伤害上限 · 生命上限 20%" }),
+        Object.freeze({ id: "rapidBullet", label: "急速炮弹", description: "消耗品。适用于所有模式；本局玩家发射的所有类型子弹飞行速度提升至原来的 200%。", price: 4000, maxLevel: 1, effect: "本局消耗 · 子弹速度 200%" })
       ]),
       items: Object.freeze([
-        Object.freeze({ id: "mudTruck", label: "泥头车", description: "无尽模式开局获得前车之鉴；冲撞伤害为当前攻击力 200%，移速和体型各提升 10%，可撞毁可破坏墙壁。", price: 5000, maxLevel: 1, allowedModes: ["endless"], effect: "前车之鉴 · 冲撞强化" }),
-        Object.freeze({ id: "bomb", label: "炸弹", description: "每次购买使子弹突变为炸弹的概率提高 10%，最高 100%。", price: 2608, maxLevel: 10, allowedModes: ["endless", "brave"], effect: "每级 +10% · 范围爆炸" }),
-        Object.freeze({ id: "mortar", label: "迫击炮", description: "每次购买使子弹突变为迫击炮弹的概率提高 1%，最高 100%。", price: 2604, maxLevel: 100, allowedModes: ["endless", "brave"], effect: "每级 +1% · 范围爆炸" }),
-        Object.freeze({ id: "redBullet", label: "红色子弹", description: "无尽模式和勇者行动中，发射的子弹全部变为红色子弹，攻击力翻倍。", price: 9999, maxLevel: 1, allowedModes: ["endless", "brave"], effect: "全部子弹 · 攻击翻倍" }),
-        Object.freeze({ id: "airSupport", label: "空中支援", description: "所有模式每隔 45 秒自动获得一次随机临时增益；每次购买使局内冷却缩短 1 秒。", price: 100000, maxLevel: 30, effect: "每 45 秒自动获得 · 每级 -1 秒" })
+        Object.freeze({ id: "mudTruck", label: "泥头车", description: "消耗品。本局开局获得前车之鉴；冲撞伤害为当前攻击力 200%，移速和体型各提升 10%，可撞毁可破坏墙壁。", price: 5000, maxLevel: 1, allowedModes: ["endless"], effect: "本局消耗 · 前车之鉴" }),
+        Object.freeze({ id: "bomb", label: "炸弹", description: "消耗品。本局每次购买使子弹突变为炸弹的概率提高 10%，最高 100%。", price: 2608, maxLevel: 10, allowedModes: ["endless", "brave"], effect: "本局消耗 · 每级 +10%" }),
+        Object.freeze({ id: "mortar", label: "迫击炮", description: "消耗品。本局每次购买使子弹突变为迫击炮弹的概率提高 1%，最高 100%。", price: 2604, maxLevel: 100, allowedModes: ["endless", "brave"], effect: "本局消耗 · 每级 +1%" }),
+        Object.freeze({ id: "redBullet", label: "红色子弹", description: "消耗品。本局发射的子弹全部变为红色子弹，攻击力翻倍。", price: 9999, maxLevel: 1, allowedModes: ["endless", "brave"], effect: "本局消耗 · 全部子弹攻击翻倍" }),
+        Object.freeze({ id: "airSupport", label: "空中支援", description: "消耗品。所有模式本局每隔 45 秒自动获得一次随机临时增益；每次购买使本局冷却缩短 1 秒。", price: 100000, maxLevel: 30, effect: "本局消耗 · 每级 -1 秒" })
       ]),
       skins: Object.freeze([
         Object.freeze({ id: "default", label: "原皮", description: "出厂涂装，已解锁。", price: 0, image: "assets/images/tanks/player-hull.png" }),
@@ -184,7 +185,8 @@
         Object.freeze({ id: "yellow", label: "黄皮", description: "参考黄色涂装。", price: 5000, image: "assets/images/tanks/yellow.jpg" }),
         Object.freeze({ id: "blue", label: "蓝皮", description: "参考蓝色涂装。", price: 5000, image: "assets/images/tanks/blue.jpg" }),
         Object.freeze({ id: "green", label: "绿皮", description: "参考绿色涂装。", price: 5000, image: "assets/images/tanks/green.jpg" }),
-        Object.freeze({ id: "futureTech", label: "未来科技", description: "蓝紫复合装甲与量子反应堆，伴随电路辉光和能量环特效。", price: 100000, image: "assets/images/tanks/future-tech-preview.png" })
+        Object.freeze({ id: "futureTech", label: "未来科技", description: "蓝紫复合装甲与量子反应堆，伴随电路辉光和能量环特效。", price: 100000, image: "assets/images/tanks/future-tech-preview.png" }),
+        Object.freeze({ id: "silverTank", label: "银色战车", description: "银白复合装甲、枪灰履带与金属十字徽记，采用独立双图层战车绘制。", price: 30000, image: "assets/images/tanks/silver-tank-preview.png" })
       ])
     }),
     endlessRewards: Object.freeze({
