@@ -13,6 +13,7 @@
   var tankSprites = {};
   var futureTechSprites = {};
   var silverTankSprites = {};
+  var lavaCoreSprites = {};
 
   Object.keys(tankSpriteDefinitions).forEach(function (key) {
     var hull = new Image();
@@ -46,6 +47,17 @@
     return silverTankSprites;
   }
 
+  function getLavaCoreSprites() {
+    if (lavaCoreSprites.hull && lavaCoreSprites.turret) { return lavaCoreSprites; }
+    ["hull", "turret"].forEach(function (layer) {
+      var image = new Image();
+      image.decoding = "async";
+      image.src = "assets/images/tanks/lava-core-" + layer + ".png";
+      lavaCoreSprites[layer] = image;
+    });
+    return lavaCoreSprites;
+  }
+
   function wrapAngle(angle) {
     while (angle > Math.PI) { angle -= Math.PI * 2; }
     while (angle < -Math.PI) { angle += Math.PI * 2; }
@@ -73,7 +85,7 @@
     context.shadowColor = "rgba(0, 0, 0, 0.6)";
     context.shadowBlur = 8 / definition.scale;
     context.shadowOffsetY = 5 / definition.scale;
-    if (tank.team === "player" && tank.skin && tank.skin !== "default" && tank.skin !== "futureTech" && tank.skin !== "silverTank") {
+    if (tank.team === "player" && tank.skin && tank.skin !== "default" && tank.skin !== "futureTech" && tank.skin !== "silverTank" && tank.skin !== "lavaCore") {
       context.filter = tank.skin === "red" ? "hue-rotate(320deg) saturate(1.8)" :
         (tank.skin === "yellow" ? "hue-rotate(28deg) saturate(1.9) brightness(1.12)" :
           (tank.skin === "blue" ? "hue-rotate(175deg) saturate(1.7) brightness(0.96)" : "hue-rotate(72deg) saturate(1.35) brightness(0.9)"));
@@ -166,11 +178,82 @@
     context.restore();
   }
 
+  function drawLavaCoreEffects(context, tank, drawY, foreground) {
+    var time = (typeof performance !== "undefined" && performance.now ? performance.now() : Date.now()) / 1000;
+    var scale = tank.visualScale || 1;
+    var pulse = 0.76 + Math.sin(time * 5.2 + tank.x * 0.012) * 0.24;
+    context.save();
+    context.translate(tank.x, drawY);
+    context.globalAlpha = tank.ghost ? 0.24 : 1;
+    context.globalCompositeOperation = "lighter";
+    if (!foreground) {
+      context.fillStyle = "rgba(255, 62, 20, " + (0.07 + pulse * 0.05) + ")";
+      context.shadowColor = "#ff3c1d";
+      context.shadowBlur = 24 * scale;
+      context.beginPath();
+      context.ellipse(0, 3 * scale, 43 * scale, 32 * scale, tank.bodyAngle, 0, Math.PI * 2);
+      context.fill();
+      context.restore();
+      return;
+    }
+    context.shadowColor = "#ff4d1f";
+    context.shadowBlur = 14 * scale;
+    context.strokeStyle = "rgba(255, 101, 32, " + (0.5 + pulse * 0.2) + ")";
+    context.lineWidth = 1.8 * scale;
+    context.beginPath();
+    context.arc(0, 0, (35 + pulse * 2) * scale, time * 1.9, time * 1.9 + Math.PI * 1.25);
+    context.stroke();
+    context.strokeStyle = "rgba(255, 194, 68, 0.62)";
+    context.setLineDash([6 * scale, 5 * scale]);
+    context.beginPath();
+    context.arc(0, 0, 42 * scale, -time * 1.3, -time * 1.3 + Math.PI * 1.2);
+    context.stroke();
+    context.setLineDash([]);
+    [0, Math.PI * 0.5, Math.PI, Math.PI * 1.5].forEach(function (offset, index) {
+      var angle = time * (index % 2 ? -0.5 : 0.62) + offset;
+      var distance = (38 + (index % 2) * 5) * scale;
+      context.fillStyle = index % 2 ? "#ffd166" : "#ff5722";
+      context.shadowColor = context.fillStyle;
+      context.shadowBlur = 10 * scale;
+      context.beginPath();
+      context.arc(Math.cos(angle) * distance, Math.sin(angle) * distance, 1.8 * scale, 0, Math.PI * 2);
+      context.fill();
+    });
+    context.restore();
+  }
+
+  function drawLavaCoreBulletTrail(context, bullet, x, y) {
+    var directionX = Math.cos(bullet.angle);
+    var directionY = Math.sin(bullet.angle);
+    context.save();
+    context.globalCompositeOperation = "lighter";
+    context.lineCap = "round";
+    [10, 22, 36, 52].forEach(function (distance, index) {
+      var alpha = 0.52 - index * 0.1;
+      var tailX = x - directionX * distance;
+      var tailY = y - directionY * distance;
+      context.strokeStyle = index % 2 ? "rgba(255, 180, 55, " + alpha + ")" : "rgba(255, 67, 23, " + alpha + ")";
+      context.lineWidth = Math.max(1, 5 - index);
+      context.shadowColor = index % 2 ? "#ffd166" : "#ff3c1d";
+      context.shadowBlur = 13;
+      context.beginPath();
+      context.moveTo(x - directionX * Math.max(1, distance - 12), y - directionY * Math.max(1, distance - 12));
+      context.lineTo(tailX, tailY);
+      context.stroke();
+      context.fillStyle = "rgba(255, 113, 39, " + (alpha * 0.6) + ")";
+      context.beginPath();
+      context.arc(tailX, tailY, Math.max(1, bullet.radius * (0.75 - index * 0.11)), 0, Math.PI * 2);
+      context.fill();
+    });
+    context.restore();
+  }
+
   function drawTankSprites(context, tank, drawY, shadow) {
     var key = getTankSpriteKey(tank);
     var definition = tankSpriteDefinitions[key];
     var sprites = tank.team === "player" && tank.skin === "futureTech" ? getFutureTechSprites() :
-      (tank.team === "player" && tank.skin === "silverTank" ? getSilverTankSprites() : tankSprites[key]);
+      (tank.team === "player" && tank.skin === "silverTank" ? getSilverTankSprites() :
+        (tank.team === "player" && tank.skin === "lavaCore" ? getLavaCoreSprites() : tankSprites[key]));
     if (!sprites || !spriteReady(sprites.hull) || !spriteReady(sprites.turret)) { return false; }
     drawSpriteLayer(context, sprites.hull, tank, tank.bodyAngle, drawY, definition, shadow);
     drawSpriteLayer(context, sprites.turret, tank, tank.turretAngle, drawY, definition, shadow);
@@ -415,6 +498,7 @@
         return;
       }
       if (tank.team === "player" && tank.skin === "futureTech") { drawFutureTechEffects(context, tank, drawY, false); }
+      if (tank.team === "player" && tank.skin === "lavaCore") { drawLavaCoreEffects(context, tank, drawY, false); }
       if (!drawTankSprites(context, tank, drawY, shadow)) {
         context.save();
         context.globalAlpha = shadow ? 0.48 : (tank.ghost ? 0.28 : 1);
@@ -499,6 +583,7 @@
         context.restore();
       }
       if (tank.team === "player" && tank.skin === "futureTech") { drawFutureTechEffects(context, tank, drawY, true); }
+      if (tank.team === "player" && tank.skin === "lavaCore") { drawLavaCoreEffects(context, tank, drawY, true); }
 
       if (tank.name && tank.alive) {
         context.save();
@@ -646,6 +731,7 @@
         var progress = 1 - Math.max(0, bullet.flightTimer) / bullet.flightDuration;
         var height = Math.sin(progress * Math.PI) * (bullet.mortarFragment ? 28 : 56);
         if (bullet.futureTech) { drawFutureTechBulletTrail(context, bullet, bullet.x, bullet.y - height); }
+        if (bullet.lavaCore) { drawLavaCoreBulletTrail(context, bullet, bullet.x, bullet.y - height); }
         context.save();
         context.shadowColor = "#ff6b51";
         context.shadowBlur = 15;
@@ -661,20 +747,21 @@
         return;
       }
       if (bullet.futureTech) { drawFutureTechBulletTrail(context, bullet, bullet.x, bullet.y); }
+      if (bullet.lavaCore) { drawLavaCoreBulletTrail(context, bullet, bullet.x, bullet.y); }
       context.save();
-      context.strokeStyle = bullet.futureTech ? "rgba(62, 220, 255, 0.92)" : (bullet.fieldArmor ? "rgba(255, 68, 54, 0.88)" :
+      context.strokeStyle = bullet.lavaCore ? "rgba(255, 108, 35, 0.92)" : (bullet.futureTech ? "rgba(62, 220, 255, 0.92)" : (bullet.fieldArmor ? "rgba(255, 68, 54, 0.88)" :
         (bullet.redBullet ? "rgba(255, 68, 54, 0.92)" :
           (bullet.team === "player" ? "rgba(183, 255, 220, 0.7)" :
             (bullet.bossBomb ? "rgba(255, 176, 0, 0.82)" :
-              (bullet.bossBurst ? "rgba(255, 215, 0, 0.78)" : "rgba(255, 143, 113, 0.72)")))));
+              (bullet.bossBurst ? "rgba(255, 215, 0, 0.78)" : "rgba(255, 143, 113, 0.72)"))))));
       context.lineWidth = 3;
       context.beginPath();
       context.moveTo(bullet.previousX, bullet.previousY);
       context.lineTo(bullet.x, bullet.y);
       context.stroke();
-      context.shadowColor = bullet.futureTech ? "#28dfff" : (bullet.fieldArmor ? "#ff3b30" : (bullet.redBullet ? "#ff3028" : (bullet.team === "player" ? "#8cf6c3" : (bullet.bossBomb || bullet.bossBurst ? "#ffd700" : "#ff715c"))));
+      context.shadowColor = bullet.lavaCore ? "#ff3b1f" : (bullet.futureTech ? "#28dfff" : (bullet.fieldArmor ? "#ff3b30" : (bullet.redBullet ? "#ff3028" : (bullet.team === "player" ? "#8cf6c3" : (bullet.bossBomb || bullet.bossBurst ? "#ffd700" : "#ff715c")))));
       context.shadowBlur = bullet.bossBomb ? 20 : 12;
-      context.fillStyle = bullet.futureTech ? "#d9fbff" : (bullet.fieldArmor ? "#ff453a" : (bullet.redBullet ? "#ff3028" : (bullet.bossBomb ? "#ff8c00" : (bullet.bossBurst ? "#fff2a8" : "#fff7cf"))));
+      context.fillStyle = bullet.lavaCore ? "#ffd166" : (bullet.futureTech ? "#d9fbff" : (bullet.fieldArmor ? "#ff453a" : (bullet.redBullet ? "#ff3028" : (bullet.bossBomb ? "#ff8c00" : (bullet.bossBurst ? "#fff2a8" : "#fff7cf")))));
       context.beginPath();
       context.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
       context.fill();

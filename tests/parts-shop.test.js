@@ -160,6 +160,15 @@ assert.strictEqual(silverTankGame.shopData.equippedSkin, "silverTank", "购买�
 silverTankGame.start();
 assert.strictEqual(silverTankGame.player.skin, "silverTank", "开局玩家应使用银色战车皮肤");
 
+var lavaCoreGame = createGame();
+lavaCoreGame.parts = 50000;
+assert.strictEqual(lavaCoreGame.getShopItem("skins", "lavaCore").price, 50000, "熔岩核心售价应为 50000 零件");
+assert.strictEqual(lavaCoreGame.purchaseShopItem("skins", "lavaCore").ok, true, "熔岩核心应可购买");
+lavaCoreGame.start();
+lavaCoreGame.fire(lavaCoreGame.player);
+assert.strictEqual(lavaCoreGame.player.skin, "lavaCore", "开局玩家应使用熔岩核心皮肤");
+assert.strictEqual(lavaCoreGame.bullets[0].lavaCore, true, "熔岩核心发射的子弹应携带专属特效标记");
+
 game.shopData.boosts.healing = 1;
 game.shopData.items.bomb = 10;
 assert.strictEqual(game.purchaseShopItem("boosts", "healing").reason, "max");

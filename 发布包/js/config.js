@@ -186,7 +186,8 @@
         Object.freeze({ id: "blue", label: "蓝皮", description: "参考蓝色涂装。", price: 5000, image: "assets/images/tanks/blue.jpg" }),
         Object.freeze({ id: "green", label: "绿皮", description: "参考绿色涂装。", price: 5000, image: "assets/images/tanks/green.jpg" }),
         Object.freeze({ id: "futureTech", label: "未来科技", description: "蓝紫复合装甲与量子反应堆，伴随电路辉光和能量环特效。", price: 100000, image: "assets/images/tanks/future-tech-preview.png" }),
-        Object.freeze({ id: "silverTank", label: "银色战车", description: "银白复合装甲、枪灰履带与金属十字徽记，采用独立双图层战车绘制。", price: 30000, image: "assets/images/tanks/silver-tank-preview.png" })
+        Object.freeze({ id: "silverTank", label: "银色战车", description: "银白复合装甲、枪灰履带与金属十字徽记，采用独立双图层战车绘制。", price: 30000, image: "assets/images/tanks/silver-tank-preview.png" }),
+        Object.freeze({ id: "lavaCore", label: "熔岩核心", description: "黑曜石装甲与炽热裂隙构成的火山战车，核心持续脉动并释放熔岩辉光。", price: 50000, image: "assets/images/tanks/lava-core-preview.png" })
       ])
     }),
     endlessRewards: Object.freeze({

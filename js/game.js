@@ -1344,6 +1344,7 @@
       var bullet = TankGame.Entities.createBullet(x, y, tank.turretAngle + offset, tank.team);
       bullet.damage = (tank.bulletDamage || Config.bulletDamage) * (splitLevel ? 0.7 : 1);
       bullet.futureTech = tank.team === "player" && tank.skin === "futureTech";
+      bullet.lavaCore = tank.team === "player" && tank.skin === "lavaCore";
       if (tank.team === "player" && this.runShop.redBullet) { bullet.redBullet = true; bullet.damage *= 2; }
       if (playerShotVariant === "bomb") {
         bullet.bossBomb = true;
@@ -1411,7 +1412,7 @@
       var teleportPath = this.movePlayerSafely(tank, tank.turretAngle, 48, startX, startY);
       this.spawnFrontStepTrails(teleportPath, tank.bodyAngle, tank.turretAngle);
     }
-    this.muzzleFlashes.push({ x: x, y: y, life: tank.skin === "futureTech" ? 0.14 : 0.09, color: tank.skin === "futureTech" ? "#38dfff" : (tank.team === "player" ? "#c8ffe5" : "#ff9a78") });
+    this.muzzleFlashes.push({ x: x, y: y, life: tank.skin === "futureTech" || tank.skin === "lavaCore" ? 0.14 : 0.09, color: tank.skin === "futureTech" ? "#38dfff" : (tank.skin === "lavaCore" ? "#ff5425" : (tank.team === "player" ? "#c8ffe5" : "#ff9a78")) });
     if (tank.team === "player") {
       this.stats.shots += 1;
       TankGame.Audio.play("shoot");
@@ -2612,6 +2613,7 @@
       fragment.armingTime = 0.1;
       fragment.fragment = true;
       fragment.futureTech = this.player.skin === "futureTech";
+      fragment.lavaCore = this.player.skin === "lavaCore";
       this.applyPlayerBulletSpeed(fragment);
       this.bullets.push(fragment);
     }
@@ -2634,6 +2636,7 @@
       fragment.playerMortar = true;
       fragment.bossBomb = true;
       fragment.futureTech = this.player.skin === "futureTech";
+      fragment.lavaCore = this.player.skin === "lavaCore";
       fragment.explosionRadius = 0;
       fragment.startX = x;
       fragment.startY = y;
@@ -2661,6 +2664,7 @@
       fragment.bossBomb = true;
       fragment.playerBomb = true;
       fragment.futureTech = this.player.skin === "futureTech";
+      fragment.lavaCore = this.player.skin === "lavaCore";
       fragment.explosionRadius = 56;
       this.applyPlayerBulletSpeed(fragment);
       this.bullets.push(fragment);
