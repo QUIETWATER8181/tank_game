@@ -3209,6 +3209,8 @@
         bottom: Math.min(Config.worldHeight, this.player.y + ghostViewHeight / 2 + 80)
       };
     }
+    var renderScale = TankGame.Quality ? TankGame.Quality.renderScale : 1;
+    context.setTransform(renderScale, 0, 0, renderScale, 0, 0);
     context.clearRect(0, 0, viewportWidth, viewportHeight);
     context.save();
     if (this.shake > 0) {
@@ -3332,8 +3334,10 @@
       this.drawRespawnMessage(context);
     }
     context.restore();
+    // 屏幕空间 HUD/气氛层也按逻辑坐标绘制，这里重新套上内部渲染缩放。
+    context.setTransform(renderScale, 0, 0, renderScale, 0, 0);
     if (pitchedView && TankGame.Battlefield) {
-      TankGame.Battlefield.drawAtmosphere(context, viewportWidth, viewportHeight);
+      TankGame.Battlefield.drawAtmosphere(context, viewportWidth, viewportHeight, renderScale);
     }
     if (this.isBossBattleActive() && [Config.states.CINEMATIC, Config.states.COUNTDOWN].indexOf(this.state) === -1) { this.drawBossWarParticles(context); }
     if (cinematicActive) { this.cinematic.drawScreenOverlay(context); }

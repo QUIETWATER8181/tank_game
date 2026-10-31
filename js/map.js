@@ -915,6 +915,8 @@
       context.restore();
     },
 
+    decorationSpriteCache: {},
+
     drawDecorations: function (context, worldMap, bounds) {
       var self = this;
       (worldMap.decorations || []).forEach(function (decoration) {
@@ -962,7 +964,33 @@
         context.scale(scale, scale);
       }
 
-      if (decoration.kind === "rock") {
+      var sprite = this.getDecorationSprite(decoration.kind);
+      if (sprite) {
+        context.drawImage(sprite.canvas, -sprite.anchorX, -sprite.anchorY);
+      } else {
+        this.paintDecorationShape(context, decoration.kind);
+      }
+      context.restore();
+    },
+
+    getDecorationSprite: function (kind) {
+      var key = kind || "barrel";
+      if (this.decorationSpriteCache[key]) { return this.decorationSpriteCache[key]; }
+      if (typeof document === "undefined" || !document.createElement) { return null; }
+      var canvas = document.createElement("canvas");
+      canvas.width = 80;
+      canvas.height = 80;
+      var spriteContext = canvas.getContext("2d");
+      if (!spriteContext) { return null; }
+      spriteContext.translate(40, 60);
+      this.paintDecorationShape(spriteContext, key);
+      var sprite = { canvas: canvas, anchorX: 40, anchorY: 60 };
+      this.decorationSpriteCache[key] = sprite;
+      return sprite;
+    },
+
+    paintDecorationShape: function (context, kind) {
+      if (kind === "rock") {
         context.fillStyle = "#202a29";
         context.beginPath();
         context.moveTo(-19, 13); context.lineTo(-16, -7); context.lineTo(-4, -16);
@@ -975,7 +1003,7 @@
         context.fillStyle = "rgba(181, 191, 169, 0.48)";
         context.fillRect(-7, -9, 8, 3);
         context.fillRect(5, -5, 5, 3);
-      } else if (decoration.kind === "bush") {
+      } else if (kind === "bush") {
         context.fillStyle = "#112b20";
         context.beginPath(); context.arc(-10, 3, 13, 0, Math.PI * 2); context.arc(7, 1, 15, 0, Math.PI * 2); context.arc(0, -9, 12, 0, Math.PI * 2); context.fill();
         context.fillStyle = "#2f6338";
@@ -984,7 +1012,7 @@
         context.fillRect(-9, -8, 5, 3); context.fillRect(1, -14, 5, 3); context.fillRect(7, -1, 5, 3);
         context.fillStyle = "rgba(9, 34, 21, 0.8)";
         context.fillRect(-14, 8, 25, 5);
-      } else if (decoration.kind === "deadGrass") {
+      } else if (kind === "deadGrass") {
         context.strokeStyle = "#9e845e";
         context.lineWidth = 3;
         context.beginPath();
@@ -993,7 +1021,7 @@
         context.moveTo(5, 15); context.lineTo(13, -13);
         context.moveTo(12, 15); context.lineTo(19, -7);
         context.stroke();
-      } else if (decoration.kind === "scorchedRoot") {
+      } else if (kind === "scorchedRoot") {
         context.strokeStyle = "#3a2922";
         context.lineWidth = 5;
         context.beginPath();
@@ -1001,7 +1029,7 @@
         context.moveTo(-5, 0); context.lineTo(10, -17);
         context.moveTo(-4, 8); context.lineTo(15, 1);
         context.stroke();
-      } else if (decoration.kind === "crate") {
+      } else if (kind === "crate") {
         context.fillStyle = "#573b2c"; context.fillRect(-16, -16, 32, 32);
         context.fillStyle = "#8f5f3d"; context.fillRect(-13, -13, 26, 26);
         context.strokeStyle = "#d39a5f"; context.lineWidth = 2; context.strokeRect(-13, -13, 26, 26);
@@ -1016,7 +1044,6 @@
         context.beginPath(); context.moveTo(-8, -9); context.lineTo(-8, 9); context.moveTo(0, -9); context.lineTo(0, 9); context.moveTo(8, -9); context.lineTo(8, 9); context.stroke();
         context.fillStyle = "#d9a06b"; context.fillRect(-12, -7, 4, 3); context.fillRect(0, -7, 4, 3); context.fillRect(8, -7, 4, 3);
       }
-      context.restore();
     },
 
     drawBossFence: function (context, obstacle, breakable) {

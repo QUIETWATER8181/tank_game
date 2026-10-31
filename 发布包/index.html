@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>钢铁征途 坦克大战</title>
-  <link rel="stylesheet" href="css/style.css?v=20261031-25d-perf2">
+  <link rel="stylesheet" href="css/style.css?v=20261031-25d-perf4">
   <link rel="preload" as="image" href="assets/images/tanks/player-hull.png" fetchpriority="high">
   <link rel="preload" as="image" href="assets/images/tanks/player-turret.png" fetchpriority="high">
   <link rel="preload" as="image" href="assets/images/tanks/enemy-hull.png" fetchpriority="high">
@@ -89,6 +89,7 @@
                 <p><strong>瞄准与开火</strong><span>鼠标或触屏控制炮塔方向；点击或按住游戏画面、鼠标左键或 <kbd>Space</kbd> 发射。</span></p>
                 <p><strong>暂停</strong><span><kbd>P</kbd> 或 <kbd>Esc</kbd> 暂停/继续；切换到其他窗口时会自动暂停。</span></p>
                 <p><strong>视角</strong><span><kbd>V</kbd> 或右上角 <strong>◈</strong> 切换 2.5D 斜俯视 / 原版 2D 平铺；2.5D 下墙体有厚度、坦克有接地阴影，瞄准会自动补偿视角。</span></p>
+                <p><strong>画质</strong><span>地址后加 <code>?stats=1</code> 看帧时间；<code>?scale=0.8</code> 降内部渲染分辨率；<code>?dynamic=1</code> 掉帧时自动降画质，帧率恢复后再慢慢升回去。</span></p>
                 <p><strong>地图与碰撞</strong><span>墙体会阻挡坦克和炮弹。砖墙可被炮弹击破，破坏后可能掉落场地能源。</span></p>
               </div>
             </section>
@@ -391,20 +392,21 @@
     <footer class="footer-note">支持跨网联机 · 双击即可运行 · 建议使用 Chrome 或 Edge</footer>
   </main>
 
-  <script defer src="js/config.js?v=20261031-25d-perf2"></script>
-  <script defer src="js/view.js?v=20261031-25d-perf2"></script>
-  <script defer src="js/audio.js?v=20261031-25d-perf2"></script>
-  <script defer src="js/input.js?v=20261031-25d-perf2"></script>
-  <script defer src="js/collision.js?v=20261031-25d-perf2"></script>
-  <script defer src="js/entities.js?v=20261031-25d-perf2"></script>
-  <script defer src="js/cinematic.js?v=20261031-25d-perf2"></script>
-  <script defer src="js/map.js?v=20261031-25d-perf2"></script>
-  <script defer src="js/battlefield.js?v=20261031-25d-perf2"></script>
-  <script defer src="js/ai.js?v=20261031-25d-perf2"></script>
-  <script defer src="js/effects.js?v=20261031-25d-perf2"></script>
-  <script defer src="js/game.js?v=20261031-25d-perf2"></script>
-  <script defer src="js/multiplayer.js?v=20261031-25d-perf2"></script>
-  <script defer src="js/field-skills.js?v=20261031-25d-perf2"></script>
-  <script defer src="js/main.js?v=20261031-25d-perf2"></script>
+  <script defer src="js/config.js?v=20261031-25d-perf4"></script>
+  <script defer src="js/view.js?v=20261031-25d-perf4"></script>
+  <script defer src="js/quality.js?v=20261031-25d-perf4"></script>
+  <script defer src="js/audio.js?v=20261031-25d-perf4"></script>
+  <script defer src="js/input.js?v=20261031-25d-perf4"></script>
+  <script defer src="js/collision.js?v=20261031-25d-perf4"></script>
+  <script defer src="js/entities.js?v=20261031-25d-perf4"></script>
+  <script defer src="js/cinematic.js?v=20261031-25d-perf4"></script>
+  <script defer src="js/map.js?v=20261031-25d-perf4"></script>
+  <script defer src="js/battlefield.js?v=20261031-25d-perf4"></script>
+  <script defer src="js/ai.js?v=20261031-25d-perf4"></script>
+  <script defer src="js/effects.js?v=20261031-25d-perf4"></script>
+  <script defer src="js/game.js?v=20261031-25d-perf4"></script>
+  <script defer src="js/multiplayer.js?v=20261031-25d-perf4"></script>
+  <script defer src="js/field-skills.js?v=20261031-25d-perf4"></script>
+  <script defer src="js/main.js?v=20261031-25d-perf4"></script>
 </body>
 </html>

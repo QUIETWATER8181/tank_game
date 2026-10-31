@@ -18,6 +18,10 @@
     tracks: [],
     groundChunks: null,
     groundChunkClock: 0,
+    wallSpriteCache: Object.create(null),
+    wallSpriteCacheCount: 0,
+    wallTiles: Object.create(null),
+    wallPhaseTiles: Object.create(null),
     now: 0
   };
 
@@ -1067,7 +1071,7 @@
     return WALL_HEIGHT[kind] || 0;
   };
 
-  B.drawObstacle = function (ctx, obstacle, worldMap) {
+  B.drawObstacle = function (ctx, obstacle, worldMap, noCache, patternOverride) {
     if (!ensure(ctx)) {
       if (TankGame.Map && TankGame.Map.drawObstacle) { TankGame.Map.drawObstacle(ctx, obstacle, worldMap); }
       return;
@@ -1079,11 +1083,11 @@
       if (TankGame.Map && TankGame.Map.drawObstacle) { TankGame.Map.drawObstacle(ctx, obstacle, worldMap); }
       return;
     }
-    var facade = screenHeight / Math.max(0.25, k);
+    var facade = Math.round(screenHeight / Math.max(0.25, k));
     var x = obstacle.x;
     var y = obstacle.y;
     var size = TILE;
-    var pattern = B.patterns.wall[obstacle.kind] || B.patterns.wall["#"];
+    var pattern = patternOverride || B.patterns.wall[obstacle.kind] || B.patterns.wall["#"];
 
     if (worldMap && worldMap.isBossMap) {
       // BOSS 场地的栅栏/砖堆沿用原画，只补一层厚度
@@ -1096,6 +1100,27 @@
       if (TankGame.Map && TankGame.Map.drawObstacle) { TankGame.Map.drawObstacle(ctx, obstacle, worldMap); }
       ctx.restore();
       return;
+    }
+
+    var southOpen = !solidAt(worldMap, obstacle.column, obstacle.row + 1);
+    var westOpen = !solidAt(worldMap, obstacle.column - 1, obstacle.row);
+    var eastOpen = !solidAt(worldMap, obstacle.column + 1, obstacle.row);
+    var fringeIndex = (obstacle.column * 7 + obstacle.row * 13) % B.sprites.fringe.length;
+
+    if (!noCache) {
+      var cacheKey = obstacle.kind + "|" + (southOpen ? 1 : 0) + (westOpen ? 1 : 0) +
+        (eastOpen ? 1 : 0) + "|" + fringeIndex + "|" + facade.toFixed(2) +
+        "|" + (((obstacle.x % 128) + 128) % 128) + "," + (((obstacle.y % 128) + 128) % 128);
+      var cached = B.wallSpriteCache[cacheKey];
+      if (cached) {
+        ctx.drawImage(cached.canvas, x + cached.offsetX, y + cached.offsetY);
+        return;
+      }
+      var built = B.buildWallSprite(obstacle, facade, southOpen, westOpen, eastOpen, cacheKey);
+      if (built) {
+        ctx.drawImage(built.canvas, x + built.offsetX, y + built.offsetY);
+        return;
+      }
     }
 
     // 顶面
@@ -1116,15 +1141,15 @@
     ctx.strokeStyle = "rgba(226, 224, 196, 0.20)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    if (!solidAt(worldMap, obstacle.column, obstacle.row + 1)) {
+    if (southOpen) {
       ctx.moveTo(x, y + size);
       ctx.lineTo(x + size, y + size);
     }
-    if (!solidAt(worldMap, obstacle.column - 1, obstacle.row)) {
+    if (westOpen) {
       ctx.moveTo(x, y);
       ctx.lineTo(x, y + size);
     }
-    if (!solidAt(worldMap, obstacle.column + 1, obstacle.row)) {
+    if (eastOpen) {
       ctx.moveTo(x + size, y);
       ctx.lineTo(x + size, y + size);
     }
@@ -1132,7 +1157,7 @@
     ctx.restore();
 
     // 朝南立面
-    if (!solidAt(worldMap, obstacle.column, obstacle.row + 1)) {
+    if (southOpen) {
       var faceY = y + size - facade;
       ctx.save();
       ctx.beginPath();
@@ -1156,18 +1181,79 @@
       ctx.fillRect(x, y + size - 4, size, 4);
       // 暴露的左右边缘压暗
       ctx.fillStyle = "rgba(12, 14, 12, 0.26)";
-      if (!solidAt(worldMap, obstacle.column - 1, obstacle.row)) { ctx.fillRect(x, faceY, 2, facade); }
-      if (!solidAt(worldMap, obstacle.column + 1, obstacle.row)) { ctx.fillRect(x + size - 2, faceY, 2, facade); }
+      if (westOpen) { ctx.fillRect(x, faceY, 2, facade); }
+      if (eastOpen) { ctx.fillRect(x + size - 2, faceY, 2, facade); }
       ctx.restore();
 
       // 墙脚草：压在墙面上，墙就不会像一块浮在草地上的贴纸
-      var fringe = B.sprites.fringe[(obstacle.column * 7 + obstacle.row * 13) % B.sprites.fringe.length];
+      var fringe = B.sprites.fringe[fringeIndex];
       if (fringe) {
         ctx.globalAlpha = 0.78;
         ctx.drawImage(fringe, x - 10, y + size - 16, size + 20, 30);
         ctx.globalAlpha = 1;
       }
     }
+  };
+
+  // 把一块墙的顶面/朝南立面/墙脚草预渲染成小图；相邻墙是否实心决定暴露边，
+  // 所以缓存键里要带 south/west/east 和当前俯仰下的立面高度。
+  B.buildWallSprite = function (obstacle, facade, southOpen, westOpen, eastOpen, cacheKey) {
+    if (typeof document === "undefined" || !document.createElement) { return null; }
+    if (B.wallSpriteCacheCount > 192) {
+      B.wallSpriteCache = Object.create(null);
+      B.wallSpriteCacheCount = 0;
+    }
+    var size = TILE;
+    var canvas = document.createElement("canvas");
+    canvas.width = size + 20;
+    canvas.height = Math.ceil(facade + size + 14);
+    var spriteContext = canvas.getContext("2d");
+    if (!spriteContext) { return null; }
+
+    var cells = [];
+    cells[obstacle.row] = [];
+    cells[obstacle.row][obstacle.column] = obstacle.kind;
+    cells[obstacle.row + 1] = [];
+    cells[obstacle.row + 1][obstacle.column] = southOpen ? " " : "#";
+    if (obstacle.column > 0) {
+      cells[obstacle.row][obstacle.column - 1] = westOpen ? " " : "#";
+    }
+    cells[obstacle.row][obstacle.column + 1] = eastOpen ? " " : "#";
+
+    var fakeMap = { cells: cells, isBossMap: false };
+    var fakeObstacle = {
+      x: 0, y: 0, kind: obstacle.kind,
+      column: obstacle.column, row: obstacle.row
+    };
+    var tileKind = obstacle.kind === "B" || obstacle.kind === "I" ? obstacle.kind : "#";
+    if (!B.wallTiles[tileKind]) { B.wallTiles[tileKind] = makeWallTile(tileKind); }
+    var localPattern = null;
+    if (B.wallTiles[tileKind]) {
+      // 把墙砖纹理按世界坐标相位平移，保证缓存墙和直接绘制时砖缝完全对齐。
+      var phaseX = ((obstacle.x % 128) + 128) % 128;
+      var phaseY = ((obstacle.y % 128) + 128) % 128;
+      var phaseKey = tileKind + "|" + phaseX + "," + phaseY;
+      var shiftedTile = B.wallPhaseTiles[phaseKey];
+      if (!shiftedTile) {
+        shiftedTile = document.createElement("canvas");
+        shiftedTile.width = 128;
+        shiftedTile.height = 128;
+        var shiftedContext = shiftedTile.getContext("2d");
+        shiftedContext.drawImage(B.wallTiles[tileKind], -phaseX, -phaseY);
+        shiftedContext.drawImage(B.wallTiles[tileKind], 128 - phaseX, -phaseY);
+        shiftedContext.drawImage(B.wallTiles[tileKind], -phaseX, 128 - phaseY);
+        shiftedContext.drawImage(B.wallTiles[tileKind], 128 - phaseX, 128 - phaseY);
+        B.wallPhaseTiles[phaseKey] = shiftedTile;
+      }
+      localPattern = spriteContext.createPattern(shiftedTile, "repeat");
+    }
+    spriteContext.translate(10, facade);
+    B.drawObstacle(spriteContext, fakeObstacle, fakeMap, true, localPattern);
+
+    var sprite = { canvas: canvas, offsetX: -10, offsetY: -facade };
+    B.wallSpriteCache[cacheKey] = sprite;
+    B.wallSpriteCacheCount += 1;
+    return sprite;
   };
 
   // ---------------------------------------------------------------- 坦克特效
@@ -1278,11 +1364,12 @@
 
   // ---------------------------------------------------------------- 屏幕空间气氛
 
-  B.drawAtmosphere = function (ctx, width, height) {
+  B.drawAtmosphere = function (ctx, width, height, renderScale) {
     if (!ensure(ctx)) { return; }
     var now = B.now || nowSeconds();
+    var scale = renderScale || 1;
     ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
     // 静态的雾/夕照/暗角由 CSS 合成层负责；这里只画会动的尘埃。
     for (var index = 0; index < 26; index += 1) {

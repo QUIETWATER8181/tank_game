@@ -7,6 +7,7 @@
   var mobileControls = document.getElementById("mobileControls");
   var input = new TankGame.InputManager(canvas);
   var game = new TankGame.Game(canvas, input);
+  if (TankGame.Quality) { TankGame.Quality.init(canvas); }
   var statsEnabled = false;
   try { statsEnabled = /[?&]stats=1/.test(window.location.search); } catch (error) { statsEnabled = false; }
   var statsEl = null;
@@ -1063,6 +1064,7 @@
   });
 
   function frame(currentTime) {
+    var frameStart = performance.now();
     var frameTime = Math.min((currentTime - previousTime) / 1000, Config.maxFrameTime);
     previousTime = currentTime;
     accumulator += frameTime;
@@ -1090,7 +1092,8 @@
           "  子弹 " + (game.bullets ? game.bullets.length : 0) +
           "  粒子 " + TankGame.Effects.particles.length + "\n" +
           "装饰 " + (game.worldMap && game.worldMap.decorations ? game.worldMap.decorations.length : 0) +
-          "  " + (TankGame.View && TankGame.View.isPitched() ? "2.5D" : "2D");
+          "  " + (TankGame.View && TankGame.View.isPitched() ? "2.5D" : "2D") +
+          "  scale " + (TankGame.Quality ? TankGame.Quality.renderScale.toFixed(2) : "1.00");
         statsFrames = 0;
         statsRenderMs = 0;
         statsLastUpdate = currentTime;
@@ -1156,6 +1159,7 @@
     } else {
       powerValue.textContent = "--";
     }
+    if (TankGame.Quality) { TankGame.Quality.sample(performance.now() - frameStart, currentTime); }
     requestAnimationFrame(frame);
   }
 
