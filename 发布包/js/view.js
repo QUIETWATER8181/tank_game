@@ -3,14 +3,14 @@
 
   window.TankGame = window.TankGame || {};
 
-  // 视角：0 = 平铺（原版，默认），>0 = 斜俯视（相机俯仰，地面按 cos(pitch) 压扁）。
+  // 视角：0 = 平铺（原版），>0 = 斜俯视（相机俯仰，地面按 cos(pitch) 压扁）。
   // 开关走 URL 参数 ?pitch=50，并记进 localStorage，刷新后保持。
   var STORAGE_KEY = "tankGameViewPitch";
   var MAX_PITCH = 65;
-  // 默认平铺（原版 2D 风格）；斜俯视是实验特性，加 ?pitch=50 才开。
-  var DEFAULT_PITCH = 0;
+  // 默认 2.5D 斜俯视；?pitch=off 或点右上角 ◈ 可切回原版平铺。
+  var DEFAULT_PITCH = 48;
   // 坦克在斜视下的屏幕抬升量（像素）；地面接触点保持在原位置，抬起来的部分就是车身高度。
-  var TANK_LIFT_PX = 14;
+  var TANK_LIFT_PX = 16;
 
   function readParam(name) {
     try {
@@ -51,6 +51,8 @@
     k: 1,
     lift: 0,
     tankLiftPx: TANK_LIFT_PX,
+    // 过场动画自带镜头，渲染期间临时压制俯仰，避免两套投影叠加
+    suppressPitch: false,
 
     setPitch: function (degrees, persist) {
       var value = Number(degrees);
@@ -64,8 +66,16 @@
     },
 
     isPitched: function () {
-      return this.k < 0.999;
+      return !this.suppressPitch && this.k < 0.999;
     },
+
+    // 在 2.5D 与原版平铺之间切换；返回切换后是否处于 2.5D。
+    toggle: function () {
+      this.setPitch(this.k < 0.999 ? 0 : DEFAULT_PITCH);
+      return this.isPitched();
+    },
+
+    defaultPitch: DEFAULT_PITCH,
 
     // 世界 y 偏移 → 屏幕 y 偏移
     toScreenY: function (worldDelta) {

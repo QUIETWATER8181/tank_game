@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>钢铁征途 坦克大战</title>
-  <link rel="stylesheet" href="css/style.css?v=20260905-lava-core">
+  <link rel="stylesheet" href="css/style.css?v=20261031-25d">
   <link rel="preload" as="image" href="assets/images/tanks/player-hull.png" fetchpriority="high">
   <link rel="preload" as="image" href="assets/images/tanks/player-turret.png" fetchpriority="high">
   <link rel="preload" as="image" href="assets/images/tanks/enemy-hull.png" fetchpriority="high">
@@ -36,6 +36,7 @@
         </div>
         <button id="muteButton" class="icon-button" type="button" title="关闭音效" aria-label="关闭音效" aria-pressed="true">♪</button>
         <button id="fullscreenButton" class="icon-button" type="button" title="切换横屏" aria-label="切换横屏">⛶</button>
+        <button id="viewButton" class="icon-button view-button" type="button" title="2.5D 视角：开（点击切回 2D）" aria-label="切换 2.5D 视角" aria-pressed="true">◈</button>
         <button id="pauseButton" class="icon-button" type="button" title="暂停" aria-label="暂停" disabled>Ⅱ</button>
         <button id="resetButton" class="icon-button" type="button" title="返回主菜单" aria-label="返回主菜单">↻</button>
         <button id="helpButton" class="icon-button help-button" type="button" title="帮助说明" aria-label="打开帮助说明" aria-expanded="false" aria-controls="helpPanel">?</button>
@@ -44,6 +45,7 @@
 
     <section id="gameStage" class="game-stage" aria-label="游戏区域">
       <canvas id="gameCanvas" width="1440" height="900" tabindex="0">你的浏览器不支持 Canvas，请使用新版 Chrome 或 Edge。</canvas>
+      <div class="battlefield-atmosphere" aria-hidden="true"></div>
 
       <div id="mobileControls" class="mobile-controls" aria-label="移动端战斗控制">
         <div class="mobile-dpad" aria-label="移动方向">
@@ -86,6 +88,7 @@
                 <p><strong>移动</strong><span><kbd>W</kbd>/<kbd>S</kbd> 前进和后退，<kbd>A</kbd>/<kbd>D</kbd> 旋转车身；手机使用左下方向键。</span></p>
                 <p><strong>瞄准与开火</strong><span>鼠标或触屏控制炮塔方向；点击或按住游戏画面、鼠标左键或 <kbd>Space</kbd> 发射。</span></p>
                 <p><strong>暂停</strong><span><kbd>P</kbd> 或 <kbd>Esc</kbd> 暂停/继续；切换到其他窗口时会自动暂停。</span></p>
+                <p><strong>视角</strong><span><kbd>V</kbd> 或右上角 <strong>◈</strong> 切换 2.5D 斜俯视 / 原版 2D 平铺；2.5D 下墙体有厚度、坦克有接地阴影，瞄准会自动补偿视角。</span></p>
                 <p><strong>地图与碰撞</strong><span>墙体会阻挡坦克和炮弹。砖墙可被炮弹击破，破坏后可能掉落场地能源。</span></p>
               </div>
             </section>
@@ -199,6 +202,7 @@
           <span><kbd>WASD</kbd> 移动</span>
           <span><kbd>鼠标</kbd> 瞄准</span>
           <span><kbd>左键</kbd> 开火</span>
+          <span><kbd>V</kbd> 2.5D / 2D</span>
           <span><kbd>Esc</kbd> 暂停</span>
         </div>
         <p id="recordSummary" class="record-summary">本机纪录：暂无</p>
@@ -387,19 +391,20 @@
     <footer class="footer-note">支持跨网联机 · 双击即可运行 · 建议使用 Chrome 或 Edge</footer>
   </main>
 
-  <script defer src="js/config.js?v=20261031-merge-scan"></script>
-  <script defer src="js/view.js?v=20261031-flat2d"></script>
-  <script defer src="js/audio.js?v=20260903-rapid-bullet"></script>
-  <script defer src="js/input.js?v=20261031-flat2d"></script>
-  <script defer src="js/collision.js?v=20260903-rapid-bullet"></script>
-  <script defer src="js/entities.js?v=20261031-flat2d"></script>
-  <script defer src="js/cinematic.js?v=20260903-rapid-bullet"></script>
-  <script defer src="js/map.js?v=20261031-flat2d"></script>
-  <script defer src="js/ai.js?v=20260903-rapid-bullet"></script>
-  <script defer src="js/effects.js?v=20261031-tank-side"></script>
-  <script defer src="js/game.js?v=20261031-flat2d"></script>
-  <script defer src="js/multiplayer.js?v=20261031-merge-scan"></script>
-  <script defer src="js/field-skills.js?v=20260903-rapid-bullet"></script>
-  <script defer src="js/main.js?v=20261031-merge-scan"></script>
+  <script defer src="js/config.js?v=20261031-25d"></script>
+  <script defer src="js/view.js?v=20261031-25d"></script>
+  <script defer src="js/audio.js?v=20261031-25d"></script>
+  <script defer src="js/input.js?v=20261031-25d"></script>
+  <script defer src="js/collision.js?v=20261031-25d"></script>
+  <script defer src="js/entities.js?v=20261031-25d"></script>
+  <script defer src="js/cinematic.js?v=20261031-25d"></script>
+  <script defer src="js/map.js?v=20261031-25d"></script>
+  <script defer src="js/battlefield.js?v=20261031-25d"></script>
+  <script defer src="js/ai.js?v=20261031-25d"></script>
+  <script defer src="js/effects.js?v=20261031-25d"></script>
+  <script defer src="js/game.js?v=20261031-25d"></script>
+  <script defer src="js/multiplayer.js?v=20261031-25d"></script>
+  <script defer src="js/field-skills.js?v=20261031-25d"></script>
+  <script defer src="js/main.js?v=20261031-25d"></script>
 </body>
 </html>

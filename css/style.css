@@ -121,6 +121,22 @@ button:focus-visible {
   font-weight: 700;
 }
 
+.view-button {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.view-button[aria-pressed="true"] {
+  color: #8cf6c3;
+  border-color: rgba(140, 246, 195, 0.62);
+  box-shadow: inset 0 0 10px rgba(140, 246, 195, 0.10);
+}
+
+.view-button[aria-pressed="false"] {
+  color: #aab8b1;
+  opacity: 0.72;
+}
+
 .music-volume-control {
   position: relative;
   flex: 0 0 auto;
@@ -211,6 +227,27 @@ button:focus-visible {
   touch-action: none;
   outline: none;
   cursor: crosshair;
+}
+
+/* 2.5D 战场气氛层：静态雾/夕照/暗角交给合成器，不占 Canvas 每帧开销 */
+.battlefield-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: none;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 18% 10%, rgba(255, 222, 158, 0.12) 0%, rgba(255, 204, 132, 0.045) 32%, rgba(255, 196, 120, 0) 58%),
+    radial-gradient(ellipse at 50% 52%, rgba(0, 0, 0, 0) 34%, rgba(0, 0, 0, 0.14) 96%),
+    linear-gradient(180deg, rgba(24, 34, 34, 0.16) 0%, rgba(24, 32, 30, 0.06) 34%, rgba(52, 40, 26, 0.02) 72%, rgba(38, 28, 18, 0.10) 100%);
+}
+
+.game-stage.is-25d .battlefield-atmosphere {
+  display: block;
+}
+
+.game-stage.is-cinematic .battlefield-atmosphere {
+  display: none;
 }
 
 .mobile-controls {
@@ -319,6 +356,7 @@ button:focus-visible {
   position: absolute;
   top: 14px;
   left: 14px;
+  z-index: 3;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;

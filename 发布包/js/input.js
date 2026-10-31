@@ -88,15 +88,17 @@
     var bounds = this.canvas.getBoundingClientRect();
     var view = window.TankGame && window.TankGame.View;
     var pitchK = view && view.isPitched() ? view.k : 1;
+    var lift = view && view.isPitched() ? view.lift : 0;
     if (!bounds.width || !bounds.height) {
       return { x: this.camera.x + this.canvas.width / 2, y: this.camera.y + this.canvas.height / 2 };
     }
     var screenX = Math.max(0, Math.min(this.canvas.width, (clientX - bounds.left) * (this.canvas.width / bounds.width)));
     var screenY = Math.max(0, Math.min(this.canvas.height, (clientY - bounds.top) * (this.canvas.height / bounds.height)));
-    // 逆投影：画面纵向被压扁了 pitchK 倍，反算世界坐标时要除回去，否则瞄准整体偏上。
+    // 逆投影：画面纵向被压扁了 pitchK 倍，反算世界坐标时要除回去；
+    // 再加上坦克的屏幕抬升，鼠标指到车体中心时瞄准点才是车体脚下的地面坐标。
     return {
       x: this.camera.x + screenX,
-      y: this.camera.y + screenY / pitchK
+      y: this.camera.y + screenY / pitchK + lift
     };
   };
 

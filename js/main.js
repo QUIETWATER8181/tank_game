@@ -69,6 +69,7 @@
   var musicVolumeValue = document.getElementById("musicVolumeValue");
   var muteButton = document.getElementById("muteButton");
   var fullscreenButton = document.getElementById("fullscreenButton");
+  var viewButton = document.getElementById("viewButton");
   var modeOptions = document.querySelectorAll(".mode-option");
   var pauseButton = document.getElementById("pauseButton");
   var pauseGiftButton = document.getElementById("pauseGiftButton");
@@ -358,6 +359,25 @@
     fullscreenButton.setAttribute("aria-label", label);
   }
 
+  function syncViewButton() {
+    if (!viewButton || !TankGame.View) { return; }
+    var pitched = TankGame.View.isPitched();
+    viewButton.textContent = pitched ? "◈" : "◇";
+    var label = pitched ? "2.5D 视角：开（点击切回 2D）" : "2.5D 视角：关（点击开启）";
+    viewButton.title = label;
+    viewButton.setAttribute("aria-label", label);
+    viewButton.setAttribute("aria-pressed", pitched ? "true" : "false");
+    var stage = document.getElementById("gameStage");
+    if (stage) { stage.classList.toggle("is-25d", pitched); }
+  }
+
+  function toggleView() {
+    if (!TankGame.View) { return; }
+    TankGame.View.toggle();
+    if (game.updateCamera) { game.updateCamera(0, true); }
+    syncViewButton();
+  }
+
   function toggleMobileLandscape() {
     var target = document.getElementById("gameStage");
     var shell = document.querySelector(".game-shell");
@@ -602,6 +622,13 @@
       document.exitFullscreen();
     }
   });
+
+  if (viewButton) {
+    viewButton.addEventListener("click", function () {
+      toggleView();
+      canvas.focus();
+    });
+  }
 
   document.addEventListener("fullscreenchange", function () {
     updateFullscreenButtonLabel();
@@ -987,6 +1014,11 @@
       togglePause();
     }
 
+    if (event.code === "KeyV" && !/^(INPUT|TEXTAREA|SELECT)$/.test(event.target && event.target.tagName)) {
+      event.preventDefault();
+      toggleView();
+    }
+
     if (event.code === "KeyR" && game.state !== Config.states.MENU) {
       game.reset();
       syncInterface();
@@ -1085,6 +1117,7 @@
     requestAnimationFrame(frame);
   }
 
+  syncViewButton();
   syncInterface();
   requestAnimationFrame(frame);
 }());

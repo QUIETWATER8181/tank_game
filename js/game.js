@@ -778,6 +778,7 @@
     this.airSupportTimer = this.getAirSupportCooldown();
     this.tracks = [];
     this.trackTimer = 0;
+    if (TankGame.Battlefield) { TankGame.Battlefield.reset(); }
     this.wrecks = [];
     this.shake = 0;
     this.comboCount = 0;
@@ -1426,7 +1427,8 @@
       this.spawnFrontStepTrails(teleportPath, tank.bodyAngle, tank.turretAngle);
     }
     this.muzzleFlashes.push({ x: x, y: y, life: tank.skin === "futureTech" || tank.skin === "lavaCore" ? 0.14 : 0.09, color: tank.skin === "futureTech" ? "#38dfff" : (tank.skin === "lavaCore" ? "#ff5425" : (tank.team === "player" ? "#c8ffe5" : "#ff9a78")) });
-    TankGame.Effects.muzzle(x, y, tank.turretAngle,
+    var muzzleVisualY = y - (TankGame.View && TankGame.View.isPitched() ? TankGame.View.lift : 0);
+    TankGame.Effects.muzzle(x, muzzleVisualY, tank.turretAngle,
       tank.skin === "futureTech" ? "#38dfff" : (tank.skin === "lavaCore" ? "#ff5425" : (tank.team === "player" ? "#c8ffe5" : "#ff9a78")),
       tank.team === "player" ? 1 : 0.85);
     if (tank.team === "player") {
@@ -3188,6 +3190,10 @@
     }
     var cinematicView = cinematicActive ? this.cinematic.getCameraView() : null;
     var bounds = cinematicActive ? this.cinematic.getBounds(120) : this.getCameraBounds(80);
+    // 过场自带 zoom/focus，混用俯仰会错位；过场期间强制按平铺绘制。
+    if (cinematicActive && TankGame.View) { TankGame.View.suppressPitch = true; }
+    if (!cinematicActive && TankGame.View) { TankGame.View.suppressPitch = false; }
+    var pitchedView = Boolean(TankGame.View && TankGame.View.isPitched());
     if (!cinematicActive && this.selectedMode === "online" && this.player.ghost) {
       var ghostViewWidth = Config.viewportWidth / 0.625;
       var ghostViewHeight = Config.viewportHeight / 0.625;
@@ -3219,12 +3225,19 @@
         context.translate(-this.camera.x, -this.camera.y);
       }
     }
-    this.drawGround(context, bounds);
-    this.drawCampusGrid(context, bounds);
+    var visibleObstacles = null;
+    if (pitchedView && TankGame.Battlefield) {
+      TankGame.Battlefield.drawGround(context, this.worldMap, bounds);
+      visibleObstacles = TankGame.Map.queryObstacles(this.worldMap, bounds.left, bounds.top, bounds.right, bounds.bottom);
+      TankGame.Battlefield.drawGroundShadows(context, this.worldMap, visibleObstacles);
+    } else {
+      this.drawGround(context, bounds);
+      this.drawCampusGrid(context, bounds);
+    }
     if (this.drawFieldSite) { this.drawFieldSite(context); }
-    this.drawTracks(context);
+    if (!pitchedView) { this.drawTracks(context); }
     this.drawWrecks(context);
-    TankGame.Map.draw(context, this.worldMap, bounds, TankGame.View ? TankGame.View.isPitched() : false);
+    TankGame.Map.draw(context, this.worldMap, bounds, pitchedView);
     this.drawBossBattleEffects(context);
     this.drawBossFirePits(context);
     if (cinematicActive) { this.cinematic.drawRotorWash(context); }
@@ -3236,28 +3249,35 @@
     if (this.drawFieldPoisonTrails) { this.drawFieldPoisonTrails(context); }
     this.drawSpecialEnemyIndicators(context);
     this.drawEliteChargePaths(context);
-    if (TankGame.View && TankGame.View.isPitched()) {
-      // 斜俯视：墙和坦克按「最靠近镜头的那条边」混排，坦克站在墙后面就会被墙挡住。
+    if (pitchedView) {
+      // 2.5D：墙和坦克按「最靠近镜头的那条边」混排，坦克站在墙后面就会被墙挡住。
       var depthItems = [];
       var tileSize = TankGame.Map.tileSize || 60;
-      TankGame.Map.queryObstacles(this.worldMap, bounds.left, bounds.top, bounds.right, bounds.bottom).forEach(function (obstacle) {
+      (visibleObstacles || TankGame.Map.queryObstacles(this.worldMap, bounds.left, bounds.top, bounds.right, bounds.bottom)).forEach(function (obstacle) {
         if (obstacle.kind === "W") { return; }
         depthItems.push({
           depth: obstacle.y + tileSize,
-          draw: function () { TankGame.Map.drawObstacle(context, obstacle, this.worldMap); }.bind(this)
+          draw: function () {
+            if (TankGame.Battlefield) { TankGame.Battlefield.drawObstacle(context, obstacle, this.worldMap); }
+            else { TankGame.Map.drawObstacle(context, obstacle, this.worldMap); }
+          }.bind(this)
         });
       }, this);
+      var drawDepthTank = function (tank) {
+        if (TankGame.Battlefield) { TankGame.Battlefield.drawTankEffects(context, tank); }
+        TankGame.Entities.drawTank(context, tank);
+      };
       this.enemies.forEach(function (enemy) {
         if (cinematicActive && enemy === this.cinematic.boss) { return; }
-        depthItems.push({ depth: enemy.y, draw: function () { TankGame.Entities.drawTank(context, enemy); } });
+        depthItems.push({ depth: enemy.y, draw: function () { drawDepthTank(enemy); } });
       }, this);
       (this.remotePlayers || []).forEach(function (remote) {
         if (remote && remote.alive !== false) {
-          depthItems.push({ depth: remote.y, draw: function () { TankGame.Entities.drawTank(context, remote); } });
+          depthItems.push({ depth: remote.y, draw: function () { drawDepthTank(remote); } });
         }
       });
       if (this.player.alive && (this.player.ghost || this.player.paradiseMade || this.player.invulnerable <= 0 || Math.floor(this.elapsed * 10) % 2 === 0)) {
-        depthItems.push({ depth: this.player.y, draw: function () { TankGame.Entities.drawTank(context, this.player); }.bind(this) });
+        depthItems.push({ depth: this.player.y, draw: function () { drawDepthTank(this.player); }.bind(this) });
       }
       depthItems.sort(function (a, b) { return a.depth - b.depth; });
       depthItems.forEach(function (item) { item.draw(); });
@@ -3277,9 +3297,6 @@
     this.drawMortarWarnings(context);
     this.drawRearGuards(context);
     this.drawBraveReviveShield(context);
-    if (this.player.alive && (this.player.ghost || this.player.paradiseMade || this.player.invulnerable <= 0 || Math.floor(this.elapsed * 10) % 2 === 0)) {
-      TankGame.Entities.drawTank(context, this.player);
-    }
     if (cinematicActive) {
       this.cinematic.drawBoss(context);
       this.cinematic.drawAircraft(context);
@@ -3303,6 +3320,9 @@
       this.drawRespawnMessage(context);
     }
     context.restore();
+    if (pitchedView && TankGame.Battlefield) {
+      TankGame.Battlefield.drawAtmosphere(context, viewportWidth, viewportHeight);
+    }
     if (this.isBossBattleActive() && [Config.states.CINEMATIC, Config.states.COUNTDOWN].indexOf(this.state) === -1) { this.drawBossWarParticles(context); }
     if (cinematicActive) { this.cinematic.drawScreenOverlay(context); }
     if ([Config.states.COUNTDOWN, Config.states.PLAYING, Config.states.PAUSED].indexOf(this.state) !== -1) {
@@ -3310,6 +3330,7 @@
       this.drawPerspectiveIndicators(context);
       if (this.selectedMode !== "online") { this.drawLowHealthWarning(context); }
     }
+    if (cinematicActive && TankGame.View) { TankGame.View.suppressPitch = false; }
   };
 
   Game.prototype.drawBossBattleEffects = function (context) {
@@ -3726,15 +3747,18 @@
     var centerX = width / 2;
     var centerY = height / 2;
     var margin = 28;
+    var pitched = TankGame.View && TankGame.View.isPitched();
+    var pitchK = pitched ? TankGame.View.k : 1;
+    var liftPx = pitched ? TankGame.View.tankLiftPx : 0;
     if (!player || (!player.levelPerspective && player.perspectiveTimer <= 0)) { return []; }
     var targets = this.selectedMode === "online" ? (this.remotePlayers || []) : this.enemies;
     return targets.filter(function (enemy) {
       var screenX = enemy.x - this.camera.x;
-      var screenY = enemy.y - this.camera.y;
+      var screenY = (enemy.y - this.camera.y) * pitchK - liftPx;
       return enemy.alive && (screenX < 0 || screenX > width || screenY < 0 || screenY > height);
     }, this).map(function (enemy) {
       var screenX = enemy.x - this.camera.x;
-      var screenY = enemy.y - this.camera.y;
+      var screenY = (enemy.y - this.camera.y) * pitchK - liftPx;
       var dx = screenX - centerX;
       var dy = screenY - centerY;
       var scaleX = dx === 0 ? Infinity : (centerX - margin) / Math.abs(dx);
@@ -4154,6 +4178,7 @@
   };
 
   Game.prototype.drawMuzzleFlashes = function (context) {
+    var lift = TankGame.View && TankGame.View.isPitched() ? TankGame.View.lift : 0;
     this.muzzleFlashes.forEach(function (flash) {
       context.save();
       context.globalAlpha = Math.min(1, flash.life / 0.06);
@@ -4161,7 +4186,7 @@
       context.shadowBlur = 24;
       context.fillStyle = flash.color;
       context.beginPath();
-      context.arc(flash.x, flash.y, 12, 0, Math.PI * 2);
+      context.arc(flash.x, flash.y - lift, 12, 0, Math.PI * 2);
       context.fill();
       context.restore();
     });

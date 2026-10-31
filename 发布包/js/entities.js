@@ -311,8 +311,8 @@
       (tank.team === "player" && tank.skin === "silverTank" ? getSilverTankSprites() :
         (tank.team === "player" && tank.skin === "lavaCore" ? getLavaCoreSprites() : tankSprites[key]));
     if (!sprites || !spriteReady(sprites.hull) || !spriteReady(sprites.turret)) { return false; }
-    drawSpriteLayer(context, sprites.hull, tank, tank.bodyAngle, drawY, definition, shadow, 9);
-    drawSpriteLayer(context, sprites.turret, tank, tank.turretAngle, drawY, definition, shadow, 6);
+    drawSpriteLayer(context, sprites.hull, tank, tank.bodyAngle, drawY, definition, shadow, 14);
+    drawSpriteLayer(context, sprites.turret, tank, tank.turretAngle, drawY, definition, shadow, 10);
     return true;
   }
 
@@ -792,27 +792,31 @@
     },
 
     drawBullet: function (context, bullet) {
+      // 2.5D：炮弹画在炮口高度，和鼠标/炮塔对齐；碰撞仍用地面坐标。
+      var pitchedLift = TankGame.View && TankGame.View.isPitched() ? TankGame.View.lift : 0;
+      var drawY = bullet.y - pitchedLift;
+      var previousDrawY = bullet.previousY - pitchedLift;
       if (bullet.fixedTurretMortar || bullet.mortarProjectile) {
         var progress = 1 - Math.max(0, bullet.flightTimer) / bullet.flightDuration;
         var height = Math.sin(progress * Math.PI) * (bullet.mortarFragment ? 28 : 56);
-        if (bullet.futureTech) { drawFutureTechBulletTrail(context, bullet, bullet.x, bullet.y - height); }
-        if (bullet.lavaCore) { drawLavaCoreBulletTrail(context, bullet, bullet.x, bullet.y - height); }
+        if (bullet.futureTech) { drawFutureTechBulletTrail(context, bullet, bullet.x, drawY - height); }
+        if (bullet.lavaCore) { drawLavaCoreBulletTrail(context, bullet, bullet.x, drawY - height); }
         context.save();
         context.shadowColor = "#ff6b51";
         context.shadowBlur = 15;
         context.fillStyle = "#d24f3b";
         context.beginPath();
-        context.arc(bullet.x, bullet.y - height, bullet.radius * 4, 0, Math.PI * 2);
+        context.arc(bullet.x, drawY - height, bullet.radius * 4, 0, Math.PI * 2);
         context.fill();
         context.fillStyle = "#ffd18a";
         context.beginPath();
-        context.arc(bullet.x - 4, bullet.y - height - 4, Math.max(4, bullet.radius * 0.35), 0, Math.PI * 2);
+        context.arc(bullet.x - 4, drawY - height - 4, Math.max(4, bullet.radius * 0.35), 0, Math.PI * 2);
         context.fill();
         context.restore();
         return;
       }
-      if (bullet.futureTech) { drawFutureTechBulletTrail(context, bullet, bullet.x, bullet.y); }
-      if (bullet.lavaCore) { drawLavaCoreBulletTrail(context, bullet, bullet.x, bullet.y); }
+      if (bullet.futureTech) { drawFutureTechBulletTrail(context, bullet, bullet.x, drawY); }
+      if (bullet.lavaCore) { drawLavaCoreBulletTrail(context, bullet, bullet.x, drawY); }
       context.save();
       context.strokeStyle = bullet.lavaCore ? "rgba(255, 108, 35, 0.92)" : (bullet.futureTech ? "rgba(62, 220, 255, 0.92)" : (bullet.fieldArmor ? "rgba(255, 68, 54, 0.88)" :
         (bullet.redBullet ? "rgba(255, 68, 54, 0.92)" :
@@ -821,14 +825,14 @@
               (bullet.bossBurst ? "rgba(255, 215, 0, 0.78)" : "rgba(255, 143, 113, 0.72)"))))));
       context.lineWidth = 3;
       context.beginPath();
-      context.moveTo(bullet.previousX, bullet.previousY);
-      context.lineTo(bullet.x, bullet.y);
+      context.moveTo(bullet.previousX, previousDrawY);
+      context.lineTo(bullet.x, drawY);
       context.stroke();
       context.shadowColor = bullet.lavaCore ? "#ff3b1f" : (bullet.futureTech ? "#28dfff" : (bullet.fieldArmor ? "#ff3b30" : (bullet.redBullet ? "#ff3028" : (bullet.team === "player" ? "#8cf6c3" : (bullet.bossBomb || bullet.bossBurst ? "#ffd700" : "#ff715c")))));
       context.shadowBlur = bullet.bossBomb ? 20 : 12;
       context.fillStyle = bullet.lavaCore ? "#ffd166" : (bullet.futureTech ? "#d9fbff" : (bullet.fieldArmor ? "#ff453a" : (bullet.redBullet ? "#ff3028" : (bullet.bossBomb ? "#ff8c00" : (bullet.bossBurst ? "#fff2a8" : "#fff7cf")))));
       context.beginPath();
-      context.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+      context.arc(bullet.x, drawY, bullet.radius, 0, Math.PI * 2);
       context.fill();
       context.restore();
     }

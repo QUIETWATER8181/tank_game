@@ -528,18 +528,28 @@
         context.rect(cell.x - 0.5, cell.y - 0.5, size + 1, size + 1);
       });
       context.clip();
+      var murky = Boolean(TankGame.View && TankGame.View.isPitched());
       var gradient = context.createLinearGradient(0, minY, 0, maxY);
-      gradient.addColorStop(0, "#2d89a5");
-      gradient.addColorStop(0.5, "#176e90");
-      gradient.addColorStop(1, "#0d5274");
-      context.fillStyle = "#0b4668";
+      if (murky) {
+        // 2.5D 战场：水塘是浑浊的墨绿，不是泳池蓝
+        gradient.addColorStop(0, "#3a5148");
+        gradient.addColorStop(0.5, "#263d38");
+        gradient.addColorStop(1, "#192c2b");
+      } else {
+        gradient.addColorStop(0, "#2d89a5");
+        gradient.addColorStop(0.5, "#176e90");
+        gradient.addColorStop(1, "#0d5274");
+      }
+      context.fillStyle = murky ? "#142725" : "#0b4668";
       context.fillRect(minX - 2, minY - 2, maxX - minX + 4, maxY - minY + 4);
       context.fillStyle = gradient;
       context.fillRect(minX - 2, minY - 2, maxX - minX + 4, maxY - minY + 4);
 
       context.lineCap = "round";
       for (var waveY = Math.floor(minY / 28) * 28 + 12; waveY <= maxY + 8; waveY += 28) {
-        context.strokeStyle = waveY % 56 === 12 ? "rgba(170, 235, 229, 0.28)" : "rgba(94, 190, 205, 0.22)";
+        context.strokeStyle = murky
+          ? (waveY % 56 === 12 ? "rgba(154, 186, 166, 0.20)" : "rgba(110, 146, 132, 0.16)")
+          : (waveY % 56 === 12 ? "rgba(170, 235, 229, 0.28)" : "rgba(94, 190, 205, 0.22)");
         context.lineWidth = waveY % 56 === 12 ? 2.2 : 1.5;
         context.beginPath();
         for (var waveX = minX - 12; waveX <= maxX + 12; waveX += 8) {
@@ -548,7 +558,7 @@
         }
         context.stroke();
       }
-      context.fillStyle = "rgba(211, 244, 225, 0.18)";
+      context.fillStyle = murky ? "rgba(154, 178, 156, 0.12)" : "rgba(211, 244, 225, 0.18)";
       waterCells.forEach(function (cell) {
         if (hash2(cell.column, cell.row, worldMap.seed + 313) > 0.58) {
           context.fillRect(cell.x + 14, cell.y + 11, 14, 2);
@@ -586,7 +596,7 @@
         }
         context.closePath();
         context.fill();
-        context.strokeStyle = "rgba(177, 231, 211, 0.58)";
+        context.strokeStyle = murky ? "rgba(132, 148, 116, 0.45)" : "rgba(177, 231, 211, 0.58)";
         context.lineWidth = 2.5;
         context.beginPath();
         points.forEach(function (point, pointIndex) {
@@ -940,16 +950,7 @@
         this.drawBossFence(context, obstacle, obstacle.kind === "B");
         return;
       }
-      // 斜俯视：给墙、砖墙补一块朝南的立面，再把顶面往上抬，看起来才是一堵有高度的墙。
-      var facade = 0;
-      if (TankGame.View && TankGame.View.isPitched() && ["#", "B", "I"].indexOf(obstacle.kind) !== -1) {
-        facade = Math.round(26 / TankGame.View.k);
-        context.fillStyle = obstacle.kind === "B" ? "#3a1d18" : "#1b2422";
-        context.fillRect(x + 2, y + size - facade, size - 4, facade);
-        context.fillStyle = obstacle.kind === "B" ? "rgba(140, 74, 56, 0.55)" : "rgba(94, 108, 112, 0.45)";
-        context.fillRect(x + 2, y + size - facade, size - 4, 3);
-        context.translate(0, -facade);
-      }
+      // 斜俯视的墙体厚度由 js/battlefield.js 统一绘制；这里只负责平铺顶面。
       if (obstacle.kind === "#") {
         context.shadowColor = "rgba(0, 0, 0, 0.6)"; context.shadowBlur = 0; context.shadowOffsetX = 5; context.shadowOffsetY = 6;
         context.fillStyle = "#253137"; context.fillRect(x + 2, y + 4, size - 4, size - 4);
