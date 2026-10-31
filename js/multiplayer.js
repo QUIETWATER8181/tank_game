@@ -196,6 +196,7 @@
   function applyLobby(message) {
     if (!room || !message) { return; }
     room.names = message.names || room.names;
+    room.connected = true;
     room.seed = message.seed || room.seed;
     room.phase = message.phase || "lobby";
     room.readyNames = message.readyNames || [];
@@ -504,9 +505,11 @@
       conn.on("open", function () {
         if (!room) { try { conn.close(); } catch (error) {} return; }
         acceptConnection(conn);
+        room.connected = true;
         room.lastHostSeen = Date.now();
         startHeartbeat();
         sendTo(conn, { type: "join", code: room.code, name: room.localName, protocol: PROTOCOL });
+        emit();
       });
     });
     candidate.on("error", function (error) {
