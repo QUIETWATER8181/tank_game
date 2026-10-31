@@ -1202,6 +1202,7 @@
     if (B.wallSpriteCacheCount > 192) {
       B.wallSpriteCache = Object.create(null);
       B.wallSpriteCacheCount = 0;
+      B.wallPhaseTiles = Object.create(null);
     }
     var size = TILE;
     var canvas = document.createElement("canvas");
