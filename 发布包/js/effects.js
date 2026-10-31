@@ -347,6 +347,43 @@
       clampParticleCount(this.particles);
     },
 
+    // 墙体破碎：按材质迸发带旋转的碎块 + 尘土 + 短冲击环
+    wallBreak: function (x, y, kind, scale) {
+      var sizeScale = scale || 1;
+      var palettes = {
+        "B": ["#8c4a36", "#6e3527", "#b06a4a", "#3a1d18"],
+        "#": ["#6c6e64", "#4e5048", "#8a8c80", "#2e302a"],
+        "I": ["#5a6466", "#3a4446", "#8a9496", "#2a3234"],
+        "S": ["#8a7a55", "#6a5c3e", "#a89870", "#4a3f2a"]
+      };
+      var palette = palettes[kind] || palettes["#"];
+      var total = Math.round(22 * sizeScale) + 6;
+      for (var index = 0; index < total; index += 1) {
+        var angle = Math.random() * Math.PI * 2;
+        var power = randomRange(90, 300) * sizeScale;
+        this.particles.push({
+          kind: "debris",
+          x: x + randomRange(-10, 10),
+          y: y + randomRange(-8, 8),
+          vx: Math.cos(angle) * power,
+          vy: Math.sin(angle) * power - randomRange(30, 120),
+          life: randomRange(0.55, 1.1),
+          maxLife: 1.1,
+          size: randomRange(2.5, 6.5) * sizeScale,
+          sizeEnd: randomRange(1.5, 3.5) * sizeScale,
+          color: palette[index % palette.length],
+          drag: 0.94,
+          gravity: 640,
+          angle: Math.random() * Math.PI,
+          spin: randomRange(-16, 16)
+        });
+      }
+      this.emitDust(x, y, kind === "B" ? "#6a5a4a" : "#5f6058", Math.round(10 * sizeScale), 120, 1.15);
+      this.ring(x, y, kind === "I" ? "#bfe8ee" : "#d8c0a0", 11, 0.26);
+      this.burst(x, y, kind === "I" ? "#9fe8ff" : (kind === "B" ? "#ffad72" : "#d9eee4"), 6, 100);
+      clampParticleCount(this.particles);
+    },
+
     update: function (deltaTime) {
       var particles = this.particles;
       for (var index = particles.length - 1; index >= 0; index -= 1) {
@@ -375,33 +412,52 @@
       var index;
       var particle;
 
+      // 2.5D 下世界被纵向压扁，粒子如果继续画在世界坐标里就会变成扁椭圆。
+      // 这里把粒子整体切到屏幕空间：位置仍然用世界投影，形状/尺寸不再被压。
+      var matrix = context.getTransform ? context.getTransform() : null;
+      var screenSpace = Boolean(matrix && isFinite(matrix.a) && isFinite(matrix.d));
+      var screenScale = screenSpace ? (Math.abs(matrix.a) || 1) : 1;
+      if (screenSpace) {
+        context.save();
+        context.setTransform(1, 0, 0, 1, 0, 0);
+      }
+      function screenX(value, other) {
+        return screenSpace ? matrix.a * value + matrix.c * other + matrix.e : value;
+      }
+      function screenY(value, other) {
+        return screenSpace ? matrix.b * value + matrix.d * other + matrix.f : value;
+      }
+
       // 第一遍：加色混合的火光、火星、冲击波
       context.save();
       context.globalCompositeOperation = "lighter";
       for (index = 0; index < particles.length; index += 1) {
         particle = particles[index];
         var progress = particle.life / particle.maxLife;
+        var px = screenX(particle.x, particle.y);
+        var py = screenY(particle.x, particle.y);
+        var size = particle.size * screenScale;
         if (particle.kind === "spark") {
           context.globalAlpha = Math.min(1, progress * 2.2);
           context.strokeStyle = particle.color;
-          context.lineWidth = Math.max(1.5, particle.size * 0.85);
+          context.lineWidth = Math.max(1.5, size * 0.85);
           context.beginPath();
-          context.moveTo(particle.x, particle.y);
-          context.lineTo(particle.x - particle.vx * 0.03, particle.y - particle.vy * 0.03);
+          context.moveTo(px, py);
+          context.lineTo(px - particle.vx * 0.03 * (screenSpace ? matrix.a : 1),
+            py - particle.vy * 0.03 * (screenSpace ? matrix.d : 1));
           context.stroke();
         } else if (particle.kind === "ring") {
           context.globalAlpha = progress * 0.45;
           context.strokeStyle = particle.color;
           context.lineWidth = 1.5 + 7 * (1 - progress);
           context.beginPath();
-          context.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+          context.arc(px, py, size, 0, Math.PI * 2);
           context.stroke();
         } else if (particle.kind === "fire") {
           var core = getGlow(particle.color, false);
           if (!core) { continue; }
           context.globalAlpha = Math.min(1, progress * 1.7);
-          context.drawImage(core, particle.x - particle.size, particle.y - particle.size,
-            particle.size * 2, particle.size * 2);
+          context.drawImage(core, px - size, py - size, size * 2, size * 2);
         }
       }
       context.restore();
@@ -411,23 +467,26 @@
       for (index = 0; index < particles.length; index += 1) {
         particle = particles[index];
         var smokeProgress = particle.life / particle.maxLife;
+        var sx = screenX(particle.x, particle.y);
+        var sy = screenY(particle.x, particle.y);
+        var ssize = particle.size * screenScale;
         if (particle.kind === "smoke") {
           var puff = getGlow(particle.color, true);
           if (!puff) { continue; }
           context.globalAlpha = Math.min(0.85, smokeProgress * 0.75);
-          context.drawImage(puff, particle.x - particle.size, particle.y - particle.size,
-            particle.size * 2, particle.size * 2);
+          context.drawImage(puff, sx - ssize, sy - ssize, ssize * 2, ssize * 2);
         } else if (particle.kind === "debris") {
           context.globalAlpha = Math.min(1, smokeProgress * 2);
           context.fillStyle = particle.color;
           context.save();
-          context.translate(particle.x, particle.y);
+          context.translate(sx, sy);
           context.rotate(particle.angle || 0);
-          context.fillRect(-particle.size, -particle.size * 0.6, particle.size * 2, particle.size * 1.2);
+          context.fillRect(-ssize, -ssize * 0.6, ssize * 2, ssize * 1.2);
           context.restore();
         }
       }
       context.restore();
+      if (screenSpace) { context.restore(); }
     }
   };
 }());

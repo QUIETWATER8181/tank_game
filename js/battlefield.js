@@ -16,6 +16,8 @@
     sprites: {},
     roadCache: null,
     tracks: [],
+    groundChunks: null,
+    groundChunkClock: 0,
     now: 0
   };
 
@@ -129,8 +131,8 @@
       for (var cx = 0; cx < cells; cx += 1) {
         var broad = periodicNoise(cx / 16, cy / 16, cells / 16, 11);
         var fine = periodicNoise(cx / 4, cy / 4, cells / 4, 12);
-        var dryness = periodicNoise(cx / 24, cy / 24, cells / 24, 13);
-        var muddiness = periodicNoise(cx / 12, cy / 12, cells / 12, 14);
+        var dryness = periodicNoise(cx / 16, cy / 16, cells / 16, 13);
+        var muddiness = periodicNoise(cx / 8, cy / 8, cells / 8, 14);
         var value = broad * 0.54 + fine * 0.34 + periodicNoise(cx / 2, cy / 2, cells / 2, 15) * 0.12;
         var base = value < 0.5 ? mixColor(dark, mid, value * 2) : mixColor(mid, light, (value - 0.5) * 2);
         base = mixColor(base, dry, smoothstep(0.46, 0.78, dryness) * 0.72);
@@ -789,21 +791,199 @@
     }
   }
 
+  // 512 贴图接缝的视觉遮罩：柔和的枯草/泥土过渡带 + 草簇/碎石散点。
+  // 噪声周期已经修正，这里再叠一层“过渡带”，让即使有残留色差也读成地形变化。
+  function drawGrassTuft(ctx, x, y, scale, seed) {
+    var count = 3 + Math.floor(hash(seed, 1, 601) * 3);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.lineCap = "round";
+    for (var index = 0; index < count; index += 1) {
+      var lean = (hash(seed, index, 602) - 0.5) * 12 * scale;
+      var height = (7 + hash(seed, index, 603) * 11) * scale;
+      var toneRoll = hash(seed, index, 604);
+      ctx.strokeStyle = toneRoll > 0.66 ? "rgba(138, 124, 76, 0.58)" :
+        (toneRoll > 0.33 ? "rgba(88, 96, 54, 0.56)" : "rgba(54, 66, 40, 0.54)");
+      ctx.lineWidth = 0.8 + hash(seed, index, 605) * 0.9;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(lean * 0.2, -height * 0.55, lean, -height);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(10, 16, 8, 0.20)";
+    ctx.beginPath();
+    ctx.ellipse(0, 1, 4.5 * scale, 1.5 * scale, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawPebbleCluster(ctx, x, y, scale, seed) {
+    var count = 2 + Math.floor(hash(seed, 1, 611) * 3);
+    for (var index = 0; index < count; index += 1) {
+      var offsetX = (hash(seed, index, 612) - 0.5) * 12 * scale;
+      var offsetY = (hash(seed, index, 613) - 0.5) * 7 * scale;
+      var radius = (1.1 + hash(seed, index, 614) * 2.2) * scale;
+      ctx.fillStyle = "rgba(20, 22, 16, 0.34)";
+      ctx.beginPath();
+      ctx.ellipse(x + offsetX + 0.8, y + offsetY + 0.9, radius, radius * 0.62, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(126, 120, 96, 0.52)";
+      ctx.beginPath();
+      ctx.ellipse(x + offsetX, y + offsetY, radius, radius * 0.58, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawSeamCover(ctx, left, top, right, bottom) {    var cell = 512;
+    var gx;
+    var gy;
+    var index;
+    var spanY = Math.max(1, bottom - top);
+    var spanX = Math.max(1, right - left);
+
+    for (gx = Math.floor(left / cell) - 1; gx <= Math.ceil(right / cell) + 1; gx += 1) {
+      var lineX = gx * cell;
+      for (index = 0; index < 4; index += 1) {
+        var beltY = top + hash(gx, index, 621) * spanY;
+        var beltX = lineX + (hash(gx, index, 622) - 0.5) * 90;
+        var beltRadius = 45 + hash(gx, index, 623) * 70;
+        ctx.globalAlpha = 0.10 + hash(gx, index, 624) * 0.10;
+        ctx.drawImage(index % 2 ? B.sprites.blobs.light : B.sprites.blobs.mud,
+          beltX - beltRadius, beltY - beltRadius, beltRadius * 2, beltRadius * 2);
+      }
+      ctx.globalAlpha = 1;
+      for (index = 0; index < 10; index += 1) {
+        var tuftY = top + hash(gx, index, 631) * spanY;
+        var tuftX = lineX + (hash(gx, index, 632) - 0.5) * 80;
+        drawGrassTuft(ctx, tuftX, tuftY, 0.8 + hash(gx, index, 633) * 0.8, gx * 97 + index);
+      }
+      for (index = 0; index < 4; index += 1) {
+        var pebbleY = top + hash(gx, index, 641) * spanY;
+        var pebbleX = lineX + (hash(gx, index, 642) - 0.5) * 70;
+        drawPebbleCluster(ctx, pebbleX, pebbleY, 0.8 + hash(gx, index, 643) * 0.6, gx * 53 + index);
+      }
+    }
+
+    for (gy = Math.floor(top / cell) - 1; gy <= Math.ceil(bottom / cell) + 1; gy += 1) {
+      var lineY = gy * cell;
+      for (index = 0; index < 4; index += 1) {
+        var beltX2 = left + hash(gy, index, 651) * spanX;
+        var beltY2 = lineY + (hash(gy, index, 652) - 0.5) * 90;
+        var beltRadius2 = 45 + hash(gy, index, 653) * 70;
+        ctx.globalAlpha = 0.10 + hash(gy, index, 654) * 0.10;
+        ctx.drawImage(index % 2 ? B.sprites.blobs.light : B.sprites.blobs.mud,
+          beltX2 - beltRadius2, beltY2 - beltRadius2, beltRadius2 * 2, beltRadius2 * 2);
+      }
+      ctx.globalAlpha = 1;
+      for (index = 0; index < 10; index += 1) {
+        var tuftX2 = left + hash(gy, index, 661) * spanX;
+        var tuftY2 = lineY + (hash(gy, index, 662) - 0.5) * 80;
+        drawGrassTuft(ctx, tuftX2, tuftY2, 0.8 + hash(gy, index, 663) * 0.8, gy * 89 + index);
+      }
+      for (index = 0; index < 4; index += 1) {
+        var pebbleX2 = left + hash(gy, index, 671) * spanX;
+        var pebbleY2 = lineY + (hash(gy, index, 672) - 0.5) * 70;
+        drawPebbleCluster(ctx, pebbleX2, pebbleY2, 0.8 + hash(gy, index, 673) * 0.6, gy * 47 + index);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // 静态地面缓存：草地/道路/弹坑/碎石/遮缝只生成一次，之后每帧只 blit 可见块。
+  // 512 世界像素一块，和地面贴图同尺寸，方便对齐。
+  var GROUND_CHUNK = 512;
+  var GROUND_CHUNK_LIMIT = 32;
+  var GROUND_CACHE_ENABLED = true;
+  try {
+    GROUND_CACHE_ENABLED = !/[?&]bfcache=0/.test(window.location.search);
+  } catch (error) {
+    GROUND_CACHE_ENABLED = true;
+  }
+
+  function groundChunkKey(worldMap, cx, cy) {
+    return [
+      worldMap && worldMap.seed || 0,
+      worldMap && worldMap.baseSeed || 0,
+      worldMap && worldMap.generationAttempt || 0,
+      worldMap && worldMap.isBossMap ? 1 : 0,
+      cx,
+      cy
+    ].join(":");
+  }
+
+  function buildGroundChunk(worldMap, cx, cy) {
+    var canvas = makeCanvas(GROUND_CHUNK, GROUND_CHUNK);
+    var g = canvas.getContext("2d");
+    if (!g) { return canvas; }
+    var margin = 90;
+    var left = cx * GROUND_CHUNK;
+    var top = cy * GROUND_CHUNK;
+    var wide = GROUND_CHUNK + margin * 2;
+    var tall = GROUND_CHUNK + margin * 2;
+    var expanded = {
+      left: left - margin,
+      top: top - margin,
+      right: left + GROUND_CHUNK + margin,
+      bottom: top + GROUND_CHUNK + margin
+    };
+
+    g.save();
+    g.translate(-left, -top);
+    g.fillStyle = "#2b2f20";
+    g.fillRect(expanded.left, expanded.top, wide, tall);
+    if (B.patterns.ground) {
+      g.fillStyle = B.patterns.ground;
+      g.fillRect(expanded.left, expanded.top, wide, tall);
+    }
+    if (worldMap && worldMap.isBossMap) {
+      g.fillStyle = "rgba(36, 28, 22, 0.52)";
+      g.fillRect(expanded.left, expanded.top, wide, tall);
+      g.fillStyle = "rgba(88, 66, 44, 0.10)";
+      g.fillRect(expanded.left, expanded.top, wide, tall);
+    }
+    drawMacroPatches(g, expanded.left, expanded.top, expanded.right, expanded.bottom);
+    drawRoads(g, worldMap);
+    drawCraters(g, expanded);
+    drawDebris(g, expanded);
+    drawSeamCover(g, expanded.left, expanded.top, expanded.right, expanded.bottom);
+    g.restore();
+    return canvas;
+  }
+
+  function getGroundChunk(worldMap, cx, cy) {
+    var key = groundChunkKey(worldMap, cx, cy);
+    var cache = B.groundChunks || (B.groundChunks = Object.create(null));
+    var entry = cache[key];
+    if (entry) {
+      entry.used = ++B.groundChunkClock;
+      return entry.canvas;
+    }
+    var canvas = buildGroundChunk(worldMap, cx, cy);
+    cache[key] = { canvas: canvas, used: ++B.groundChunkClock };
+    var keys = Object.keys(cache);
+    if (keys.length > GROUND_CHUNK_LIMIT) {
+      keys.sort(function (a, b) { return cache[a].used - cache[b].used; });
+      for (var index = 0; index < keys.length - GROUND_CHUNK_LIMIT; index += 1) {
+        delete cache[keys[index]];
+      }
+    }
+    return canvas;
+  }
+
   B.reset = function () {
     B.tracks = [];
     B.roadCache = null;
+    B.groundChunks = Object.create(null);
+    B.groundChunkClock = 0;
   };
 
-  B.drawGround = function (ctx, worldMap, bounds) {
-    if (!ensure(ctx)) { return; }
+  B.drawGroundDirect = function (ctx, worldMap, bounds) {
     var left = bounds ? bounds.left : 0;
     var top = bounds ? bounds.top : 0;
     var right = bounds ? bounds.right : Config.worldWidth;
     var bottom = bounds ? bounds.bottom : Config.worldHeight;
     var width = Math.max(1, right - left);
     var height = Math.max(1, bottom - top);
-    B.now = nowSeconds();
-
     ctx.save();
     ctx.fillStyle = "#2b2f20";
     ctx.fillRect(left, top, width, height);
@@ -812,7 +992,6 @@
       ctx.fillRect(left, top, width, height);
     }
     if (worldMap && worldMap.isBossMap) {
-      // 焦土战场：在常规地表上压一层灰烬色，再画更多弹坑
       ctx.fillStyle = "rgba(36, 28, 22, 0.52)";
       ctx.fillRect(left, top, width, height);
       ctx.fillStyle = "rgba(88, 66, 44, 0.10)";
@@ -822,6 +1001,33 @@
     drawRoads(ctx, worldMap);
     drawCraters(ctx, bounds);
     drawDebris(ctx, bounds);
+    drawSeamCover(ctx, left, top, right, bottom);
+    B.drawTracks(ctx);
+    ctx.restore();
+  };
+
+  B.drawGround = function (ctx, worldMap, bounds) {
+    if (!ensure(ctx)) { return; }
+    B.now = nowSeconds();
+    if (!GROUND_CACHE_ENABLED) {
+      B.drawGroundDirect(ctx, worldMap, bounds);
+      return;
+    }
+    var left = bounds ? bounds.left : 0;
+    var top = bounds ? bounds.top : 0;
+    var right = bounds ? bounds.right : Config.worldWidth;
+    var bottom = bounds ? bounds.bottom : Config.worldHeight;
+
+    ctx.save();
+    var startX = Math.max(0, Math.floor(left / GROUND_CHUNK));
+    var endX = Math.min(Math.ceil(Config.worldWidth / GROUND_CHUNK) - 1, Math.floor((right - 1) / GROUND_CHUNK));
+    var startY = Math.max(0, Math.floor(top / GROUND_CHUNK));
+    var endY = Math.min(Math.ceil(Config.worldHeight / GROUND_CHUNK) - 1, Math.floor((bottom - 1) / GROUND_CHUNK));
+    for (var cy = startY; cy <= endY; cy += 1) {
+      for (var cx = startX; cx <= endX; cx += 1) {
+        ctx.drawImage(getGroundChunk(worldMap, cx, cy), cx * GROUND_CHUNK, cy * GROUND_CHUNK);
+      }
+    }
     B.drawTracks(ctx);
     ctx.restore();
   };

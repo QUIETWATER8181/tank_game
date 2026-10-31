@@ -1048,6 +1048,7 @@
         this.selectedMode === "online" ? (this.enemies || []).concat(this.remotePlayers || []) : this.enemies, function (obstacle) {
         if (!self.player.paradiseMade || !obstacle || obstacle.kind === undefined) { return; }
         if (self.onFieldWallBroken) { self.onFieldWallBroken(obstacle); }
+        TankGame.Effects.wallBreak(obstacle.x + obstacle.width / 2, obstacle.y + obstacle.height / 2, obstacle.kind, 1);
         TankGame.Map.removeObstacle(self.worldMap, obstacle);
       });
       this.updateVoidWalker(deltaTime);
@@ -2203,6 +2204,7 @@
     });
     walls.forEach(function (wall) {
       if (self.onFieldWallBroken) { self.onFieldWallBroken(wall); }
+      TankGame.Effects.wallBreak(wall.x + wall.width / 2, wall.y + wall.height / 2, wall.kind, 1);
       TankGame.Map.removeObstacle(self.worldMap, wall);
       if (awardScore) { self.score += 10; }
     });
@@ -2219,6 +2221,7 @@
     });
     walls.forEach(function (wall) {
       if (self.onFieldWallBroken) { self.onFieldWallBroken(wall); }
+      TankGame.Effects.wallBreak(wall.x + wall.width / 2, wall.y + wall.height / 2, wall.kind, 1);
       TankGame.Map.removeObstacle(self.worldMap, wall);
       if (awardScore) { self.score += 10; }
     });
@@ -2368,6 +2371,7 @@
         if (bullet.redBullet) { this.destroyBreakableWallsInRadius(bullet.x, bullet.y, bullet.radius + 1, true); }
       } else if (wall.kind === "B") {
         if (bullet.team === "player" && this.onFieldWallBroken) { this.onFieldWallBroken(wall); }
+        TankGame.Effects.wallBreak(wall.x + wall.width / 2, wall.y + wall.height / 2, wall.kind, 1);
         TankGame.Map.removeObstacle(this.worldMap, wall);
         if (bullet.team === "player") { this.score += 10; }
       }
@@ -3147,6 +3151,7 @@
           obstacle.column === 0 || obstacle.column === TankGame.Map.columns - 1) { return; }
       if (!TankGame.Collision.circleIntersectsRectangle(impact, obstacle)) { return; }
       if (["#", "B", "I"].indexOf(obstacle.kind) !== -1) {
+        TankGame.Effects.wallBreak(obstacle.x + obstacle.width / 2, obstacle.y + obstacle.height / 2, obstacle.kind, 1.1);
         TankGame.Map.removeObstacle(self.worldMap, obstacle);
       }
     });

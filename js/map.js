@@ -58,6 +58,75 @@
     return cell.column + "," + cell.row;
   }
 
+  // 把互不相连的水塘拆成独立 body。之前把所有 W 当成一个水体，
+  // 会用一个覆盖全图的矩形 + 全图波浪去裁剪 100 多个小水塘，2.5D 下每帧 10ms 以上。
+  function waterBodiesFor(worldMap, waterCells) {
+    if (worldMap._waterBodies && worldMap._waterBodyCount === waterCells.length) {
+      return worldMap._waterBodies;
+    }
+    var byKey = Object.create(null);
+    waterCells.forEach(function (cell) {
+      byKey[cell.column + "," + cell.row] = cell;
+    });
+    var seen = Object.create(null);
+    var bodies = [];
+    waterCells.forEach(function (start) {
+      var startKey = start.column + "," + start.row;
+      if (seen[startKey]) { return; }
+      seen[startKey] = true;
+      var stack = [start];
+      var cells = [];
+      var minX = start.x;
+      var minY = start.y;
+      var maxX = start.x + start.width;
+      var maxY = start.y + start.height;
+      while (stack.length) {
+        var cell = stack.pop();
+        cells.push(cell);
+        minX = Math.min(minX, cell.x);
+        minY = Math.min(minY, cell.y);
+        maxX = Math.max(maxX, cell.x + cell.width);
+        maxY = Math.max(maxY, cell.y + cell.height);
+        [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (step) {
+          var key = (cell.column + step[0]) + "," + (cell.row + step[1]);
+          var next = byKey[key];
+          if (!next || seen[key]) { return; }
+          seen[key] = true;
+          stack.push(next);
+        });
+      }
+      bodies.push({
+        cells: cells,
+        minX: minX,
+        minY: minY,
+        maxX: maxX,
+        maxY: maxY,
+        canvas: null,
+        pad: 28
+      });
+    });
+    worldMap._waterBodies = bodies;
+    worldMap._waterBodyCount = waterCells.length;
+    return bodies;
+  }
+
+  function renderWaterBody(mapObject, worldMap, body, murky) {
+    var pad = body.pad;
+    var canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.ceil(body.maxX - body.minX + pad * 2));
+    canvas.height = Math.max(1, Math.ceil(body.maxY - body.minY + pad * 2));
+    var g = canvas.getContext("2d");
+    if (!g) { return canvas; }
+    g.translate(-body.minX + pad, -body.minY + pad);
+    var k = TankGame.View && TankGame.View.isPitched() ? TankGame.View.k : 1;
+    var stretchY = murky ? 1 / Math.max(0.25, k) : 1;
+    mapObject.paintWaterBody(g, worldMap, body.cells, body.minX, body.minY, body.maxX, body.maxY, murky, stretchY);
+    body.canvas = canvas;
+    body.canvasMurky = murky;
+    body.canvasK = k;
+    return canvas;
+  }
+
   var Map = {
     tileSize: Config.tileSize,
     columns: Config.worldWidth / Config.tileSize,
@@ -498,27 +567,44 @@
     },
 
     drawWater: function (context, worldMap, bounds) {
-      var size = this.tileSize;
-      var cells = worldMap.cells;
       var waterCells = (worldMap.obstacles || []).filter(function (obstacle) {
         return obstacle.kind === "W";
       });
       if (!waterCells.length) { return; }
       if (worldMap.isBossMap) { this.drawDriedRiverbed(context, worldMap, waterCells, bounds); return; }
 
+      var murky = Boolean(TankGame.View && TankGame.View.isPitched());
+      var viewK = TankGame.View && TankGame.View.isPitched() ? TankGame.View.k : 1;
+      var bodies = waterBodiesFor(worldMap, waterCells);
+      var view = bounds || { left: 0, top: 0, right: Config.worldWidth, bottom: Config.worldHeight };
+      for (var index = 0; index < bodies.length; index += 1) {
+        var body = bodies[index];
+        var pad = body.pad;
+        var left = body.minX - pad;
+        var top = body.minY - pad;
+        if (body.maxX + pad < view.left || body.minX - pad > view.right ||
+            body.maxY + pad < view.top || body.minY - pad > view.bottom) {
+          continue;
+        }
+        var canvas = body.canvas && body.canvasMurky === murky && body.canvasK === viewK
+          ? body.canvas
+          : renderWaterBody(this, worldMap, body, murky);
+        var sx = Math.max(0, Math.floor(view.left - left));
+        var sy = Math.max(0, Math.floor(view.top - top));
+        var sw = Math.min(canvas.width - sx, Math.ceil(view.right - left) - sx);
+        var sh = Math.min(canvas.height - sy, Math.ceil(view.bottom - top) - sy);
+        if (sw <= 0 || sh <= 0) { continue; }
+        context.drawImage(canvas, sx, sy, sw, sh, left + sx, top + sy, sw, sh);
+      }
+    },
+
+    paintWaterBody: function (context, worldMap, waterCells, minX, minY, maxX, maxY, murky, stretchY) {
+      var size = this.tileSize;
+      var cells = worldMap.cells;
+      var detail = stretchY || 1;
       var waterAt = function (column, row) {
         return cells[row] && cells[row][column] === "W";
       };
-      var minX = waterCells[0].x;
-      var minY = waterCells[0].y;
-      var maxX = waterCells[0].x + size;
-      var maxY = waterCells[0].y + size;
-      waterCells.forEach(function (cell) {
-        minX = Math.min(minX, cell.x);
-        minY = Math.min(minY, cell.y);
-        maxX = Math.max(maxX, cell.x + size);
-        maxY = Math.max(maxY, cell.y + size);
-      });
 
       // Paint the whole water body as one clipped surface. Internal cell edges
       // never receive a bank or a separate wave line, so adjacent cells merge.
@@ -528,7 +614,6 @@
         context.rect(cell.x - 0.5, cell.y - 0.5, size + 1, size + 1);
       });
       context.clip();
-      var murky = Boolean(TankGame.View && TankGame.View.isPitched());
       var gradient = context.createLinearGradient(0, minY, 0, maxY);
       if (murky) {
         // 2.5D 战场：水塘是浑浊的墨绿，不是泳池蓝
@@ -546,29 +631,33 @@
       context.fillRect(minX - 2, minY - 2, maxX - minX + 4, maxY - minY + 4);
 
       context.lineCap = "round";
-      for (var waveY = Math.floor(minY / 28) * 28 + 12; waveY <= maxY + 8; waveY += 28) {
+      var waveStep = 28 * detail;
+      var waveIndex = 0;
+      for (var waveY = Math.floor(minY / waveStep) * waveStep + 12 * detail; waveY <= maxY + 8 * detail; waveY += waveStep) {
+        var strongWave = waveIndex % 2 === 0;
         context.strokeStyle = murky
-          ? (waveY % 56 === 12 ? "rgba(154, 186, 166, 0.20)" : "rgba(110, 146, 132, 0.16)")
-          : (waveY % 56 === 12 ? "rgba(170, 235, 229, 0.28)" : "rgba(94, 190, 205, 0.22)");
-        context.lineWidth = waveY % 56 === 12 ? 2.2 : 1.5;
+          ? (strongWave ? "rgba(154, 186, 166, 0.20)" : "rgba(110, 146, 132, 0.16)")
+          : (strongWave ? "rgba(170, 235, 229, 0.28)" : "rgba(94, 190, 205, 0.22)");
+        context.lineWidth = (strongWave ? 2.2 : 1.5) * detail;
         context.beginPath();
         for (var waveX = minX - 12; waveX <= maxX + 12; waveX += 8) {
-          var rippleY = waveY + Math.sin((waveX + worldMap.seed * 0.13 + waveY * 0.4) * 0.075) * 3.2;
+          var rippleY = waveY + Math.sin((waveX + worldMap.seed * 0.13 + waveY * 0.4) * 0.075) * 3.2 * detail;
           if (waveX === minX - 12) { context.moveTo(waveX, rippleY); } else { context.lineTo(waveX, rippleY); }
         }
         context.stroke();
+        waveIndex += 1;
       }
       context.fillStyle = murky ? "rgba(154, 178, 156, 0.12)" : "rgba(211, 244, 225, 0.18)";
       waterCells.forEach(function (cell) {
         if (hash2(cell.column, cell.row, worldMap.seed + 313) > 0.58) {
-          context.fillRect(cell.x + 14, cell.y + 11, 14, 2);
-          context.fillRect(cell.x + 33, cell.y + 11, 7, 2);
+          context.fillRect(cell.x + 14, cell.y + 11 * detail, 14, 2 * detail);
+          context.fillRect(cell.x + 33, cell.y + 11 * detail, 7, 2 * detail);
         }
       });
       context.restore();
 
       var bankDepth = function (column, row, salt) {
-        return 8 + Math.round(hash2(column, row, worldMap.seed + salt) * 5);
+        return (8 + Math.round(hash2(column, row, worldMap.seed + salt) * 5)) * detail;
       };
       var drawHorizontalBank = function (cell, top) {
         var edgeY = cell.y + (top ? 0 : size);
@@ -582,22 +671,22 @@
         }
         context.fillStyle = "#34382f";
         context.beginPath();
-        context.moveTo(cell.x, edgeY - direction * 3);
-        context.lineTo(cell.x + size, edgeY - direction * 3);
+        context.moveTo(cell.x, edgeY - direction * 3 * detail);
+        context.lineTo(cell.x + size, edgeY - direction * 3 * detail);
         for (var index = points.length - 1; index >= 0; index -= 1) { context.lineTo(points[index].x, points[index].y); }
         context.closePath();
         context.fill();
         context.fillStyle = "#756449";
         context.beginPath();
-        context.moveTo(cell.x, edgeY - direction);
-        context.lineTo(cell.x + size, edgeY - direction);
+        context.moveTo(cell.x, edgeY - direction * detail);
+        context.lineTo(cell.x + size, edgeY - direction * detail);
         for (var inner = points.length - 1; inner >= 0; inner -= 1) {
-          context.lineTo(points[inner].x, points[inner].y - direction * 4);
+          context.lineTo(points[inner].x, points[inner].y - direction * 4 * detail);
         }
         context.closePath();
         context.fill();
         context.strokeStyle = murky ? "rgba(132, 148, 116, 0.45)" : "rgba(177, 231, 211, 0.58)";
-        context.lineWidth = 2.5;
+        context.lineWidth = 2.5 * detail;
         context.beginPath();
         points.forEach(function (point, pointIndex) {
           if (pointIndex === 0) { context.moveTo(point.x, point.y); } else { context.lineTo(point.x, point.y); }
@@ -616,22 +705,22 @@
         }
         context.fillStyle = "#34382f";
         context.beginPath();
-        context.moveTo(edgeX - direction * 3, cell.y);
-        context.lineTo(edgeX - direction * 3, cell.y + size);
+        context.moveTo(edgeX - direction * 3 * detail, cell.y);
+        context.lineTo(edgeX - direction * 3 * detail, cell.y + size);
         for (var index = points.length - 1; index >= 0; index -= 1) { context.lineTo(points[index].x, points[index].y); }
         context.closePath();
         context.fill();
         context.fillStyle = "#756449";
         context.beginPath();
-        context.moveTo(edgeX - direction, cell.y);
-        context.lineTo(edgeX - direction, cell.y + size);
+        context.moveTo(edgeX - direction * detail, cell.y);
+        context.lineTo(edgeX - direction * detail, cell.y + size);
         for (var inner = points.length - 1; inner >= 0; inner -= 1) {
-          context.lineTo(points[inner].x - direction * 4, points[inner].y);
+          context.lineTo(points[inner].x - direction * 4 * detail, points[inner].y);
         }
         context.closePath();
         context.fill();
         context.strokeStyle = "rgba(177, 231, 211, 0.52)";
-        context.lineWidth = 2.5;
+        context.lineWidth = 2.5 * detail;
         context.beginPath();
         points.forEach(function (point, pointIndex) {
           if (pointIndex === 0) { context.moveTo(point.x, point.y); } else { context.lineTo(point.x, point.y); }
