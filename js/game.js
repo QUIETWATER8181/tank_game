@@ -391,7 +391,9 @@
 
   Game.prototype.isEnemyInCameraView = function (enemy) {
     var width = Config.viewportWidth || this.canvas.width;
-    var height = Config.viewportHeight || this.canvas.height;
+    var viewportHeight = Config.viewportHeight || this.canvas.height;
+    // 斜视下可见的世界高度被拉长了，判定必须用同一个高度，否则画面下半屏的敌人会「看不见玩家」而不开火。
+    var height = TankGame.View ? TankGame.View.visibleWorldHeight(viewportHeight) : viewportHeight;
     return enemy.x >= this.camera.x && enemy.x <= this.camera.x + width &&
       enemy.y >= this.camera.y && enemy.y <= this.camera.y + height;
   };
@@ -3222,7 +3224,7 @@
     if (this.drawFieldSite) { this.drawFieldSite(context); }
     this.drawTracks(context);
     this.drawWrecks(context);
-    TankGame.Map.draw(context, this.worldMap, bounds, true);
+    TankGame.Map.draw(context, this.worldMap, bounds, TankGame.View ? TankGame.View.isPitched() : false);
     this.drawBossBattleEffects(context);
     this.drawBossFirePits(context);
     if (cinematicActive) { this.cinematic.drawRotorWash(context); }
@@ -3234,30 +3236,43 @@
     if (this.drawFieldPoisonTrails) { this.drawFieldPoisonTrails(context); }
     this.drawSpecialEnemyIndicators(context);
     this.drawEliteChargePaths(context);
-    // 深度排序：墙和坦克按「最靠近镜头的那条边」混排，坦克站在墙后面就会被墙挡住。
-    var depthItems = [];
-    var tileSize = TankGame.Map.tileSize || 60;
-    TankGame.Map.queryObstacles(this.worldMap, bounds.left, bounds.top, bounds.right, bounds.bottom).forEach(function (obstacle) {
-      if (obstacle.kind === "W") { return; }
-      depthItems.push({
-        depth: obstacle.y + tileSize,
-        draw: function () { TankGame.Map.drawObstacle(context, obstacle, this.worldMap); }.bind(this)
+    if (TankGame.View && TankGame.View.isPitched()) {
+      // 斜俯视：墙和坦克按「最靠近镜头的那条边」混排，坦克站在墙后面就会被墙挡住。
+      var depthItems = [];
+      var tileSize = TankGame.Map.tileSize || 60;
+      TankGame.Map.queryObstacles(this.worldMap, bounds.left, bounds.top, bounds.right, bounds.bottom).forEach(function (obstacle) {
+        if (obstacle.kind === "W") { return; }
+        depthItems.push({
+          depth: obstacle.y + tileSize,
+          draw: function () { TankGame.Map.drawObstacle(context, obstacle, this.worldMap); }.bind(this)
+        });
+      }, this);
+      this.enemies.forEach(function (enemy) {
+        if (cinematicActive && enemy === this.cinematic.boss) { return; }
+        depthItems.push({ depth: enemy.y, draw: function () { TankGame.Entities.drawTank(context, enemy); } });
+      }, this);
+      (this.remotePlayers || []).forEach(function (remote) {
+        if (remote && remote.alive !== false) {
+          depthItems.push({ depth: remote.y, draw: function () { TankGame.Entities.drawTank(context, remote); } });
+        }
       });
-    }, this);
-    this.enemies.forEach(function (enemy) {
-      if (cinematicActive && enemy === this.cinematic.boss) { return; }
-      depthItems.push({ depth: enemy.y, draw: function () { TankGame.Entities.drawTank(context, enemy); } });
-    }, this);
-    (this.remotePlayers || []).forEach(function (remote) {
-      if (remote && remote.alive !== false) {
-        depthItems.push({ depth: remote.y, draw: function () { TankGame.Entities.drawTank(context, remote); } });
+      if (this.player.alive && (this.player.ghost || this.player.paradiseMade || this.player.invulnerable <= 0 || Math.floor(this.elapsed * 10) % 2 === 0)) {
+        depthItems.push({ depth: this.player.y, draw: function () { TankGame.Entities.drawTank(context, this.player); }.bind(this) });
       }
-    });
-    if (this.player.alive && (this.player.ghost || this.player.paradiseMade || this.player.invulnerable <= 0 || Math.floor(this.elapsed * 10) % 2 === 0)) {
-      depthItems.push({ depth: this.player.y, draw: function () { TankGame.Entities.drawTank(context, this.player); }.bind(this) });
+      depthItems.sort(function (a, b) { return a.depth - b.depth; });
+      depthItems.forEach(function (item) { item.draw(); });
+    } else {
+      // 平铺（原版风格）：保持老顺序，坦克永远压在墙上面
+      this.enemies.forEach(function (enemy) {
+        if (!cinematicActive || enemy !== this.cinematic.boss) { TankGame.Entities.drawTank(context, enemy); }
+      }, this);
+      (this.remotePlayers || []).forEach(function (remote) {
+        if (remote && remote.alive !== false) { TankGame.Entities.drawTank(context, remote); }
+      });
+      if (this.player.alive && (this.player.ghost || this.player.paradiseMade || this.player.invulnerable <= 0 || Math.floor(this.elapsed * 10) % 2 === 0)) {
+        TankGame.Entities.drawTank(context, this.player);
+      }
     }
-    depthItems.sort(function (a, b) { return a.depth - b.depth; });
-    depthItems.forEach(function (item) { item.draw(); });
     this.drawMarkedTarget(context);
     this.drawMortarWarnings(context);
     this.drawRearGuards(context);
@@ -4154,7 +4169,9 @@
 
   Game.prototype.drawRespawnMessage = function (context) {
     var centerX = this.camera.x + (Config.viewportWidth || this.canvas.width) / 2;
-    var centerY = this.camera.y + (Config.viewportHeight || this.canvas.height) / 2;
+    var viewportHeight = Config.viewportHeight || this.canvas.height;
+    var visibleHeight = TankGame.View ? TankGame.View.visibleWorldHeight(viewportHeight) : viewportHeight;
+    var centerY = this.camera.y + visibleHeight / 2;
     context.save();
     context.fillStyle = "rgba(3, 8, 6, 0.82)";
     context.fillRect(centerX - 190, centerY - 48, 380, 96);

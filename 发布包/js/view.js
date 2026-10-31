@@ -7,8 +7,8 @@
   // 开关走 URL 参数 ?pitch=50，并记进 localStorage，刷新后保持。
   var STORAGE_KEY = "tankGameViewPitch";
   var MAX_PITCH = 65;
-  // 默认就是斜俯视；想要原来的平铺就加 ?pitch=0
-  var DEFAULT_PITCH = 50;
+  // 默认平铺（原版 2D 风格）；斜俯视是实验特性，加 ?pitch=50 才开。
+  var DEFAULT_PITCH = 0;
   // 坦克在斜视下的屏幕抬升量（像素）；地面接触点保持在原位置，抬起来的部分就是车身高度。
   var TANK_LIFT_PX = 14;
 
