@@ -7,6 +7,27 @@
   var mobileControls = document.getElementById("mobileControls");
   var input = new TankGame.InputManager(canvas);
   var game = new TankGame.Game(canvas, input);
+  var statsEnabled = false;
+  try { statsEnabled = /[?&]stats=1/.test(window.location.search); } catch (error) { statsEnabled = false; }
+  var statsEl = null;
+  var statsRenderMs = 0;
+  var statsFrames = 0;
+  var statsLastUpdate = 0;
+  if (statsEnabled && document.body) {
+    statsEl = document.createElement("div");
+    statsEl.id = "perfStats";
+    statsEl.style.cssText = "position:fixed;left:12px;top:12px;z-index:9999;pointer-events:none;" +
+      "font:12px/1.45 Consolas,monospace;color:#d8f3e6;background:rgba(6,12,10,.66);" +
+      "border:1px solid rgba(180,240,210,.22);border-radius:4px;padding:6px 8px;white-space:pre;";
+    document.body.appendChild(statsEl);
+    var originalRender = game.render;
+    game.render = function (delta) {
+      var started = performance.now();
+      originalRender.call(game, delta);
+      statsRenderMs += performance.now() - started;
+      statsFrames += 1;
+    };
+  }
   if (TankGame.Audio.prewarmCriticalAssets) {
     (window.requestIdleCallback || function (callback) { window.setTimeout(callback, 180); })(function () {
       TankGame.Audio.prewarmCriticalAssets();
@@ -1046,14 +1067,35 @@
     previousTime = currentTime;
     accumulator += frameTime;
 
-    while (accumulator >= Config.fixedStep) {
+    // 掉帧时最多补 3 个固定步，避免一次卡顿后越补越卡。
+    var steps = 0;
+    while (accumulator >= Config.fixedStep && steps < 3) {
       var stateBeforeUpdate = game.state;
       game.update(Config.fixedStep);
       if (game.state !== stateBeforeUpdate) { syncInterface(); }
       accumulator -= Config.fixedStep;
+      steps += 1;
     }
+    if (accumulator > Config.fixedStep * 3) { accumulator = 0; }
 
     game.render(accumulator / Config.fixedStep);
+    if (statsEl) {
+      if (!statsLastUpdate) { statsLastUpdate = currentTime; }
+      var statsElapsed = currentTime - statsLastUpdate;
+      if (statsElapsed >= 500) {
+        var statsFps = statsFrames * 1000 / statsElapsed;
+        var statsAvg = statsRenderMs / Math.max(1, statsFrames);
+        statsEl.textContent = "FPS " + Math.round(statsFps) + "  render " + statsAvg.toFixed(2) + "ms\n" +
+          "敌人 " + (game.enemies ? game.enemies.length : 0) +
+          "  子弹 " + (game.bullets ? game.bullets.length : 0) +
+          "  粒子 " + TankGame.Effects.particles.length + "\n" +
+          "装饰 " + (game.worldMap && game.worldMap.decorations ? game.worldMap.decorations.length : 0) +
+          "  " + (TankGame.View && TankGame.View.isPitched() ? "2.5D" : "2D");
+        statsFrames = 0;
+        statsRenderMs = 0;
+        statsLastUpdate = currentTime;
+      }
+    }
     if (game.selectedMode === "online" && game.player) {
       game.player.onlineKills = game.onlineKills;
       TankGame.Multiplayer.publish(game.player);

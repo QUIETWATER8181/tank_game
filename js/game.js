@@ -3268,6 +3268,13 @@
           }.bind(this)
         });
       }, this);
+      var visibleDecorations = TankGame.Map.queryDecorations(this.worldMap, bounds);
+      visibleDecorations.forEach(function (decoration) {
+        depthItems.push({
+          depth: TankGame.Map.decorationDepth(decoration),
+          draw: function () { TankGame.Map.drawDecoration(context, decoration, this.worldMap, true); }.bind(this)
+        });
+      }, this);
       var drawDepthTank = function (tank) {
         if (TankGame.Battlefield) { TankGame.Battlefield.drawTankEffects(context, tank); }
         TankGame.Entities.drawTank(context, tank);

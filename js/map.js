@@ -23,6 +23,16 @@
     return (value >>> 0) / 4294967296;
   }
 
+  // 装饰物局部坐标里的“脚底”位置，用来把立牌底部锚在地面上。
+  var DECOR_BASE = {
+    rock: 17,
+    bush: 16,
+    deadGrass: 16,
+    scorchedRoot: 18,
+    crate: 16,
+    barrel: 12
+  };
+
   function rect(context, x, y, width, height, color) {
     context.fillStyle = color;
     context.fillRect(Math.round(x), Math.round(y), Math.max(1, Math.round(width)), Math.max(1, Math.round(height)));
@@ -479,7 +489,7 @@
       var self = this;
       this.drawWater(context, worldMap, bounds);
       this.drawDriedGround(context, worldMap, bounds);
-      this.drawDecorations(context, worldMap, bounds);
+      if (!skipObstacles) { this.drawDecorations(context, worldMap, bounds); }
       this.drawStonePlatform(context, worldMap);
       if (!skipObstacles) {
         var obstacles = bounds ? this.queryObstacles(worldMap, bounds.left, bounds.top, bounds.right, bounds.bottom) : worldMap.obstacles;
@@ -906,73 +916,107 @@
     },
 
     drawDecorations: function (context, worldMap, bounds) {
+      var self = this;
       (worldMap.decorations || []).forEach(function (decoration) {
-        if (bounds && (decoration.x < bounds.left || decoration.x > bounds.right ||
-            decoration.y < bounds.top || decoration.y > bounds.bottom)) { return; }
-        var scale = decoration.scale || 1;
-        context.save();
+        if (bounds && (decoration.x < bounds.left - 48 || decoration.x > bounds.right + 48 ||
+            decoration.y < bounds.top - 48 || decoration.y > bounds.bottom + 48)) { return; }
+        self.drawDecoration(context, decoration, worldMap, false);
+      });
+    },
+
+    queryDecorations: function (worldMap, bounds) {
+      var margin = 48;
+      return (worldMap.decorations || []).filter(function (decoration) {
+        return !bounds || (decoration.x >= bounds.left - margin && decoration.x <= bounds.right + margin &&
+          decoration.y >= bounds.top - margin && decoration.y <= bounds.bottom + margin);
+      });
+    },
+
+    decorationDepth: function (decoration) {
+      return decoration.y + (DECOR_BASE[decoration.kind] || 14) * (decoration.scale || 1);
+    },
+
+    drawDecoration: function (context, decoration, worldMap, billboard) {
+      var scale = decoration.scale || 1;
+      var base = DECOR_BASE[decoration.kind] || 14;
+      var k = billboard && TankGame.View && TankGame.View.isPitched() ? TankGame.View.k : 1;
+      var anchorY = decoration.y + base * scale;
+
+      // 接地阴影单独画在地面层，替代原来每个装饰物 5–7px 的 shadowBlur。
+      context.save();
+      context.globalAlpha = 0.30;
+      context.fillStyle = "#0b100c";
+      context.beginPath();
+      context.ellipse(decoration.x, anchorY, 15 * scale, 5.5 * scale, 0, 0, Math.PI * 2);
+      context.fill();
+      context.restore();
+
+      context.save();
+      if (billboard && k < 0.999) {
+        // 立牌：底部锚在地面，纵向反向拉伸抵消世界的 scale(1,k)。
+        context.translate(decoration.x, anchorY);
+        context.scale(scale, scale / k);
+        context.translate(0, -base);
+      } else {
         context.translate(decoration.x, decoration.y);
         context.scale(scale, scale);
-        context.shadowColor = "rgba(0, 0, 0, 0.5)";
-        context.shadowBlur = 7;
-        context.shadowOffsetY = 6;
-        if (decoration.kind === "rock") {
-          context.fillStyle = "#202a29";
-          context.beginPath();
-          context.moveTo(-19, 13); context.lineTo(-16, -7); context.lineTo(-4, -16);
-          context.lineTo(8, -14); context.lineTo(19, -3); context.lineTo(14, 14);
-          context.lineTo(-4, 17); context.closePath(); context.fill();
-          context.fillStyle = "#52605a";
-          context.beginPath();
-          context.moveTo(-13, -5); context.lineTo(-4, -12); context.lineTo(7, -10);
-          context.lineTo(12, -2); context.lineTo(4, 3); context.lineTo(-7, 2); context.closePath(); context.fill();
-          context.fillStyle = "rgba(181, 191, 169, 0.48)";
-          context.fillRect(-7, -9, 8, 3);
-          context.fillRect(5, -5, 5, 3);
-        } else if (decoration.kind === "bush") {
-          context.fillStyle = "#112b20";
-          context.beginPath(); context.arc(-10, 3, 13, 0, Math.PI * 2); context.arc(7, 1, 15, 0, Math.PI * 2); context.arc(0, -9, 12, 0, Math.PI * 2); context.fill();
-          context.fillStyle = "#2f6338";
-          context.beginPath(); context.arc(-9, 0, 8, 0, Math.PI * 2); context.arc(3, -8, 8, 0, Math.PI * 2); context.arc(10, 4, 8, 0, Math.PI * 2); context.fill();
-          context.fillStyle = "#68a047";
-          context.fillRect(-9, -8, 5, 3); context.fillRect(1, -14, 5, 3); context.fillRect(7, -1, 5, 3);
-          context.fillStyle = "rgba(9, 34, 21, 0.8)";
-          context.fillRect(-14, 8, 25, 5);
-        } else if (decoration.kind === "deadGrass") {
-          context.shadowBlur = 5;
-          context.strokeStyle = "#9e845e";
-          context.lineWidth = 3;
-          context.beginPath();
-          context.moveTo(-14, 15); context.lineTo(-7, -14);
-          context.moveTo(-4, 16); context.lineTo(1, -19);
-          context.moveTo(5, 15); context.lineTo(13, -13);
-          context.moveTo(12, 15); context.lineTo(19, -7);
-          context.stroke();
-        } else if (decoration.kind === "scorchedRoot") {
-          context.strokeStyle = "#3a2922";
-          context.lineWidth = 5;
-          context.beginPath();
-          context.moveTo(-3, 18); context.lineTo(-5, -4); context.lineTo(-19, -19);
-          context.moveTo(-5, 0); context.lineTo(10, -17);
-          context.moveTo(-4, 8); context.lineTo(15, 1);
-          context.stroke();
-        } else if (decoration.kind === "crate") {
-          context.fillStyle = "#573b2c"; context.fillRect(-16, -16, 32, 32);
-          context.fillStyle = "#8f5f3d"; context.fillRect(-13, -13, 26, 26);
-          context.strokeStyle = "#d39a5f"; context.lineWidth = 2; context.strokeRect(-13, -13, 26, 26);
-          context.strokeStyle = "rgba(48, 30, 23, 0.8)"; context.lineWidth = 4;
-          context.beginPath(); context.moveTo(-12, -12); context.lineTo(12, 12); context.moveTo(12, -12); context.lineTo(-12, 12); context.stroke();
-          context.fillStyle = "rgba(245, 183, 104, 0.4)"; context.fillRect(-11, -11, 7, 3); context.fillRect(5, 5, 6, 3);
-        } else {
-          context.fillStyle = "#5a3829"; context.fillRect(-17, -12, 34, 24);
-          context.fillStyle = "#9b6546"; context.fillRect(-15, -10, 30, 20);
-          context.strokeStyle = "#ddb075"; context.lineWidth = 2; context.strokeRect(-14, -9, 28, 18);
-          context.strokeStyle = "rgba(55, 35, 26, 0.8)";
-          context.beginPath(); context.moveTo(-8, -9); context.lineTo(-8, 9); context.moveTo(0, -9); context.lineTo(0, 9); context.moveTo(8, -9); context.lineTo(8, 9); context.stroke();
-          context.fillStyle = "#d9a06b"; context.fillRect(-12, -7, 4, 3); context.fillRect(0, -7, 4, 3); context.fillRect(8, -7, 4, 3);
-        }
-        context.restore();
-      });
+      }
+
+      if (decoration.kind === "rock") {
+        context.fillStyle = "#202a29";
+        context.beginPath();
+        context.moveTo(-19, 13); context.lineTo(-16, -7); context.lineTo(-4, -16);
+        context.lineTo(8, -14); context.lineTo(19, -3); context.lineTo(14, 14);
+        context.lineTo(-4, 17); context.closePath(); context.fill();
+        context.fillStyle = "#52605a";
+        context.beginPath();
+        context.moveTo(-13, -5); context.lineTo(-4, -12); context.lineTo(7, -10);
+        context.lineTo(12, -2); context.lineTo(4, 3); context.lineTo(-7, 2); context.closePath(); context.fill();
+        context.fillStyle = "rgba(181, 191, 169, 0.48)";
+        context.fillRect(-7, -9, 8, 3);
+        context.fillRect(5, -5, 5, 3);
+      } else if (decoration.kind === "bush") {
+        context.fillStyle = "#112b20";
+        context.beginPath(); context.arc(-10, 3, 13, 0, Math.PI * 2); context.arc(7, 1, 15, 0, Math.PI * 2); context.arc(0, -9, 12, 0, Math.PI * 2); context.fill();
+        context.fillStyle = "#2f6338";
+        context.beginPath(); context.arc(-9, 0, 8, 0, Math.PI * 2); context.arc(3, -8, 8, 0, Math.PI * 2); context.arc(10, 4, 8, 0, Math.PI * 2); context.fill();
+        context.fillStyle = "#68a047";
+        context.fillRect(-9, -8, 5, 3); context.fillRect(1, -14, 5, 3); context.fillRect(7, -1, 5, 3);
+        context.fillStyle = "rgba(9, 34, 21, 0.8)";
+        context.fillRect(-14, 8, 25, 5);
+      } else if (decoration.kind === "deadGrass") {
+        context.strokeStyle = "#9e845e";
+        context.lineWidth = 3;
+        context.beginPath();
+        context.moveTo(-14, 15); context.lineTo(-7, -14);
+        context.moveTo(-4, 16); context.lineTo(1, -19);
+        context.moveTo(5, 15); context.lineTo(13, -13);
+        context.moveTo(12, 15); context.lineTo(19, -7);
+        context.stroke();
+      } else if (decoration.kind === "scorchedRoot") {
+        context.strokeStyle = "#3a2922";
+        context.lineWidth = 5;
+        context.beginPath();
+        context.moveTo(-3, 18); context.lineTo(-5, -4); context.lineTo(-19, -19);
+        context.moveTo(-5, 0); context.lineTo(10, -17);
+        context.moveTo(-4, 8); context.lineTo(15, 1);
+        context.stroke();
+      } else if (decoration.kind === "crate") {
+        context.fillStyle = "#573b2c"; context.fillRect(-16, -16, 32, 32);
+        context.fillStyle = "#8f5f3d"; context.fillRect(-13, -13, 26, 26);
+        context.strokeStyle = "#d39a5f"; context.lineWidth = 2; context.strokeRect(-13, -13, 26, 26);
+        context.strokeStyle = "rgba(48, 30, 23, 0.8)"; context.lineWidth = 4;
+        context.beginPath(); context.moveTo(-12, -12); context.lineTo(12, 12); context.moveTo(12, -12); context.lineTo(-12, 12); context.stroke();
+        context.fillStyle = "rgba(245, 183, 104, 0.4)"; context.fillRect(-11, -11, 7, 3); context.fillRect(5, 5, 6, 3);
+      } else {
+        context.fillStyle = "#5a3829"; context.fillRect(-17, -12, 34, 24);
+        context.fillStyle = "#9b6546"; context.fillRect(-15, -10, 30, 20);
+        context.strokeStyle = "#ddb075"; context.lineWidth = 2; context.strokeRect(-14, -9, 28, 18);
+        context.strokeStyle = "rgba(55, 35, 26, 0.8)";
+        context.beginPath(); context.moveTo(-8, -9); context.lineTo(-8, 9); context.moveTo(0, -9); context.lineTo(0, 9); context.moveTo(8, -9); context.lineTo(8, 9); context.stroke();
+        context.fillStyle = "#d9a06b"; context.fillRect(-12, -7, 4, 3); context.fillRect(0, -7, 4, 3); context.fillRect(8, -7, 4, 3);
+      }
+      context.restore();
     },
 
     drawBossFence: function (context, obstacle, breakable) {
