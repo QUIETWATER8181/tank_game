@@ -207,7 +207,7 @@
 
       <section id="onlineModePanel" class="overlay-panel online-panel" hidden aria-label="联机模式">
         <button id="onlineBackButton" class="online-back-button" type="button" title="返回主菜单" aria-label="返回主菜单">←</button>
-        <p class="eyebrow">本地房间 · 同一网络设备</p>
+        <p class="eyebrow">跨网联机 · 快速匹配或好友房</p>
         <h2>联机模式</h2>
         <div class="mode-selector online-mode-selector" role="list">
           <button class="mode-option online-mode-option is-selected" type="button" data-online-mode="field"><strong>野战</strong><span>2～10 人 · 普通地图</span></button>
@@ -220,15 +220,18 @@
 
       <section id="roomPanel" class="overlay-panel room-panel" hidden aria-label="野战房间">
         <button id="roomBackButton" class="online-back-button" type="button" title="返回联机模式" aria-label="返回联机模式">←</button>
-        <p class="eyebrow">野战 · 本地房间</p>
+        <p class="eyebrow">野战 · 快速匹配 / 好友房</p>
         <h2>准备出发</h2>
         <form id="roomForm" class="room-form">
-          <label for="playerNameInput">英文昵称</label>
-          <input id="playerNameInput" type="text" maxlength="16" autocomplete="off" spellcheck="false" placeholder="仅限英文，例如 Tanker" required pattern="[A-Za-z]+">
-          <div class="room-actions"><button id="hostRoomButton" class="primary-button" type="button">开房</button><button id="joinRoomButton" class="secondary-button" type="button">入房</button></div>
-          <label for="roomCodeInput">房间号（入房时填写）</label>
+          <label for="playerNameInput">昵称</label>
+          <input id="playerNameInput" type="text" maxlength="8" autocomplete="off" spellcheck="false" placeholder="1-8 个字符，支持中文" required>
+          <button id="quickMatchButton" class="primary-button quick-match-button" type="button">⚡ 快速匹配</button>
+          <p class="quick-match-hint">自动加入在线房间；没有房间时会替你开一间</p>
+          <button id="cancelMatchButton" class="secondary-button cancel-match-button" type="button" hidden>取消匹配</button>
+          <div class="room-actions"><button id="hostRoomButton" class="secondary-button" type="button">开好友房</button><button id="joinRoomButton" class="secondary-button" type="button">加入好友房</button></div>
+          <label for="roomCodeInput">房间号（加入好友房时填写）</label>
           <input id="roomCodeInput" type="text" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="6 位房间号">
-          <p id="roomStatus" class="room-status" aria-live="polite">请输入英文昵称后开房或入房</p>
+          <p id="roomStatus" class="room-status" aria-live="polite">输入昵称后可直接快速匹配</p>
         </form>
         <div id="roomLobby" class="room-lobby" hidden>
           <div><span>房间号</span><strong id="roomCodeValue">------</strong></div>
@@ -381,10 +384,10 @@
       </section>
     </section>
 
-    <footer class="footer-note">支持本地房间 · 双击即可运行 · 建议使用 Chrome 或 Edge</footer>
+    <footer class="footer-note">支持跨网联机 · 双击即可运行 · 建议使用 Chrome 或 Edge</footer>
   </main>
 
-  <script defer src="js/config.js?v=20260905-lava-core"></script>
+  <script defer src="js/config.js?v=20261031-quick-match"></script>
   <script defer src="js/audio.js?v=20260903-rapid-bullet"></script>
   <script defer src="js/input.js?v=20260903-rapid-bullet"></script>
   <script defer src="js/collision.js?v=20260903-rapid-bullet"></script>
@@ -393,9 +396,9 @@
   <script defer src="js/map.js?v=20260903-rapid-bullet"></script>
   <script defer src="js/ai.js?v=20260903-rapid-bullet"></script>
   <script defer src="js/effects.js?v=20260903-rapid-bullet"></script>
-  <script defer src="js/game.js?v=20260905-lava-core"></script>
-  <script defer src="js/multiplayer.js?v=20260905-lava-core"></script>
+  <script defer src="js/game.js?v=20261031-quick-match"></script>
+  <script defer src="js/multiplayer.js?v=20261031-quick-match"></script>
   <script defer src="js/field-skills.js?v=20260903-rapid-bullet"></script>
-  <script defer src="js/main.js?v=20260905-lava-core"></script>
+  <script defer src="js/main.js?v=20261031-quick-match"></script>
 </body>
 </html>

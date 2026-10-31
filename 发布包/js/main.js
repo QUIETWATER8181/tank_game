@@ -24,6 +24,8 @@
   var roomCodeInput = document.getElementById("roomCodeInput");
   var hostRoomButton = document.getElementById("hostRoomButton");
   var joinRoomButton = document.getElementById("joinRoomButton");
+  var quickMatchButton = document.getElementById("quickMatchButton");
+  var cancelMatchButton = document.getElementById("cancelMatchButton");
   var roomStatus = document.getElementById("roomStatus");
   var roomLobby = document.getElementById("roomLobby");
   var roomCodeValue = document.getElementById("roomCodeValue");
@@ -641,20 +643,46 @@
     });
     return peerLoadPromise;
   }
-  function validName() { return /^[A-Za-z]+$/.test(playerNameInput.value.trim()); }
+  function normalizeName(value) { return String(value || "").trim(); }
+  function validName() { return /^[\u4e00-\u9fa5A-Za-z0-9_\-·]{1,8}$/.test(normalizeName(playerNameInput.value)); }
+  function quickRoomLabel(room) {
+    var slot = Number(String(room.code || "").split("-").pop());
+    return Number.isFinite(slot) ? "快速房 #" + (slot + 1) : "快速房";
+  }
   function updateRoomLobby(room) {
-    if (!room) { roomLobby.hidden = true; return; }
+    if (!room) {
+      roomLobby.hidden = true;
+      if (cancelMatchButton) { cancelMatchButton.hidden = true; }
+      return;
+    }
+    if (room.matching) {
+      roomLobby.hidden = true;
+      if (cancelMatchButton) { cancelMatchButton.hidden = false; }
+      roomStatus.textContent = "正在寻找在线对手……";
+      return;
+    }
+    if (room.closed) {
+      roomLobby.hidden = true;
+      if (cancelMatchButton) { cancelMatchButton.hidden = true; }
+      roomStatus.textContent = room.error || "房间已关闭";
+      return;
+    }
+    if (cancelMatchButton) { cancelMatchButton.hidden = true; }
     roomLobby.hidden = false;
-    roomCodeValue.textContent = room.code;
-    roomMembersValue.textContent = room.names.length + " / 10";
+    roomCodeValue.textContent = room.quick ? quickRoomLabel(room) : room.code;
+    roomMembersValue.textContent = room.names.length + " / " + (Number(room.maxPlayers) || 10);
     roomMembersList.textContent = room.names.map(function (name) {
       return name + ((room.readyNames || []).indexOf(name) !== -1 ? " · 已确认" : "");
     }).join("  ·  ");
     startRoomButton.hidden = !room.host;
-    if (room.started) {
+    if (room.error) {
+      roomStatus.textContent = room.error;
+    } else if (room.started) {
       roomStatus.textContent = "战场已开启，正在进入……";
     } else if (room.phase === "lobby" && room.result) {
       roomStatus.textContent = room.host ? "选择继续游戏的玩家将加入下一局" : "等待房主开启下一局";
+    } else if (room.quick) {
+      roomStatus.textContent = room.host ? "已开设快速房，等待陌生人加入" : "匹配成功，等待房主开启";
     } else {
       roomStatus.textContent = room.host ? "等待队友加入后开启战场" : "已加入房间，等待房主开启";
     }
@@ -663,18 +691,38 @@
   onlineButton.addEventListener("click", function () { showOnlineView("modes"); });
   onlineBackButton.addEventListener("click", function () { showOnlineView(null); });
   fieldModeButton.addEventListener("click", function () { showOnlineView("room"); });
-  roomBackButton.addEventListener("click", function () { showOnlineView("modes"); });
+  roomBackButton.addEventListener("click", function () {
+    if (TankGame.Multiplayer.isMatching && TankGame.Multiplayer.isMatching()) { TankGame.Multiplayer.cancelQuickMatch(); }
+    showOnlineView("modes");
+  });
   roomForm.addEventListener("submit", function (event) { event.preventDefault(); });
+  if (quickMatchButton) {
+    quickMatchButton.addEventListener("click", function () {
+      var name = normalizeName(playerNameInput.value);
+      if (!validName()) { roomStatus.textContent = "昵称需为 1-8 个中英文、数字或下划线字符"; playerNameInput.focus(); return; }
+      roomStatus.textContent = "正在连接联机服务……";
+      if (cancelMatchButton) { cancelMatchButton.hidden = false; }
+      loadPeerJS().catch(function () {}).then(function () { updateRoomLobby(TankGame.Multiplayer.quickMatch(name)); });
+    });
+  }
+  if (cancelMatchButton) {
+    cancelMatchButton.addEventListener("click", function () {
+      if (TankGame.Multiplayer.cancelQuickMatch) { TankGame.Multiplayer.cancelQuickMatch(); }
+      cancelMatchButton.hidden = true;
+      roomLobby.hidden = true;
+      roomStatus.textContent = "已取消匹配";
+    });
+  }
   hostRoomButton.addEventListener("click", function () {
-    var name = playerNameInput.value.trim();
-    if (!validName()) { roomStatus.textContent = "昵称仅限英文字母"; playerNameInput.focus(); return; }
+    var name = normalizeName(playerNameInput.value);
+    if (!validName()) { roomStatus.textContent = "昵称需为 1-8 个中英文、数字或下划线字符"; playerNameInput.focus(); return; }
     roomStatus.textContent = "正在连接联机服务……";
     loadPeerJS().catch(function () {}).then(function () { updateRoomLobby(TankGame.Multiplayer.host(name)); });
   });
   joinRoomButton.addEventListener("click", function () {
-    var name = playerNameInput.value.trim();
+    var name = normalizeName(playerNameInput.value);
     var code = roomCodeInput.value.trim();
-    if (!validName()) { roomStatus.textContent = "昵称仅限英文字母"; playerNameInput.focus(); return; }
+    if (!validName()) { roomStatus.textContent = "昵称需为 1-8 个中英文、数字或下划线字符"; playerNameInput.focus(); return; }
     if (!/^\d{6}$/.test(code)) { roomStatus.textContent = "请输入 6 位房间号"; roomCodeInput.focus(); return; }
     roomStatus.textContent = "正在连接联机服务……";
     loadPeerJS().catch(function () {}).then(function () { updateRoomLobby(TankGame.Multiplayer.join(code, name)); });
@@ -711,12 +759,17 @@
     if (button) { button.addEventListener("click", closeOnlineRoom); }
   });
   TankGame.Multiplayer.onChange(function (room) {
-    if (!room) { return; }
+    if (!room) {
+      roomLobby.hidden = true;
+      if (cancelMatchButton) { cancelMatchButton.hidden = true; }
+      return;
+    }
     updateRoomLobby(room);
     if (room.closed || room.excluded) {
-      game.reset();
-      onlineView = null;
-      if (TankGame.Multiplayer.clear) { TankGame.Multiplayer.clear(); }
+      if (game.selectedMode === "online" && game.state !== Config.states.MENU) {
+        game.reset();
+        onlineView = "room";
+      }
       syncInterface();
       return;
     }
@@ -761,8 +814,11 @@
   });
   if (TankGame.Multiplayer.onKill) {
     TankGame.Multiplayer.onKill(function (message) {
-      var activeRoom = TankGame.Multiplayer.getRoom && TankGame.Multiplayer.getRoom();
-      if (game.selectedMode === "online" && message && message.from !== (activeRoom && activeRoom.localId) && message.killer === game.player.name) {
+      var selfId = TankGame.Multiplayer.getSelfId ? TankGame.Multiplayer.getSelfId() : "";
+      if (game.selectedMode !== "online" || !message || (selfId && message.from === selfId)) { return; }
+      var killerId = message.killerId || "";
+      var isMine = (killerId && selfId && killerId === selfId) || (!killerId && message.killer === game.player.name);
+      if (isMine) {
         game.onlineKills = Math.max(game.onlineKills, Number(message.kills) || 0);
         game.stats.kills = game.onlineKills;
       }

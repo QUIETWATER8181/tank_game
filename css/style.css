@@ -881,6 +881,10 @@ button:focus-visible {
 .room-form label { color:#cbd7d1; font-size:13px; }
 .room-form input { min-height:44px; padding:10px 12px; border:1px solid rgba(255,255,255,.3); border-radius:4px; background:rgba(8,16,12,.88); color:#fff; font:600 16px Consolas,monospace; }
 .room-form input:focus { outline:2px solid #72cfff; outline-offset:1px; }
+.quick-match-button { width:100%; min-width:0; margin-top:4px; border-color:#ffd166; background:linear-gradient(135deg,#ffd166,#8cf6c3); color:#0b1410; }
+.quick-match-button:hover,.quick-match-button:focus-visible { background:linear-gradient(135deg,#ffe4a3,#d7ffe9); }
+.quick-match-hint { margin:0; color:#9fb2a8; font-size:12px; text-align:center; }
+.cancel-match-button { width:100%; min-width:0; border-color:#ff9b8a; color:#ffd9d2; }
 .room-actions { display:flex; gap:10px; margin:8px 0; }
 .room-actions button { flex:1; min-width:0; }
 .room-status { min-height: 24px; margin: 8px 0 0; color:#9fb2a8; font-size:13px; }

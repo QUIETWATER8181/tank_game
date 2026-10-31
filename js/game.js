@@ -182,12 +182,17 @@
     this.onlineResult = result || null;
     if (result && Number.isFinite(Number(result.elapsed))) { this.elapsed = Math.max(0, Number(result.elapsed)); }
     if (result && result.standings) {
-      var localStanding = result.standings.find(function (entry) { return entry.name === this.player.name; }, this);
+      var selfId = TankGame.Multiplayer && TankGame.Multiplayer.getSelfId ? TankGame.Multiplayer.getSelfId() : "";
+      var localStanding = result.standings.find(function (entry) {
+        return (selfId && entry.id === selfId) || entry.name === this.player.name;
+      }, this);
       if (localStanding) { this.player.survivalTime = Math.max(0, Number(localStanding.survivalTime) || 0); }
     }
     this.player.ghost = this.player.ghost || !this.player.alive;
-    this.settleParts(Boolean(result && result.winner === this.player.name));
-    if (result && result.winner === this.player.name) {
+    var selfPeerId = TankGame.Multiplayer && TankGame.Multiplayer.getSelfId ? TankGame.Multiplayer.getSelfId() : "";
+    var won = result ? ((selfPeerId && result.winnerId) ? result.winnerId === selfPeerId : result.winner === this.player.name) : false;
+    this.settleParts(won);
+    if (won) {
       this.setState(Config.states.VICTORY);
       TankGame.Audio.play("victory");
     } else {
@@ -705,6 +710,7 @@
     var playerSpawn = this.selectedMode === "online" ? (onlineSpawns[this.onlinePlayerIndex % onlineSpawns.length] || this.worldMap.playerSpawn) : this.worldMap.playerSpawn;
     this.player = TankGame.Entities.createTank(playerSpawn.x, playerSpawn.y, "player");
     this.player.name = this.onlineRoom && this.onlineRoom.names ? this.onlineRoom.names[this.onlinePlayerIndex] : "";
+    this.player.netId = TankGame.Multiplayer && TankGame.Multiplayer.getSelfId ? TankGame.Multiplayer.getSelfId() : "";
     this.player.bodyAngle = -Math.PI / 2;
     this.player.turretAngle = -Math.PI / 2;
     this.player.invulnerable = 0;
@@ -1245,6 +1251,7 @@
   Game.prototype.respawnPlayer = function () {
     var spawn = this.worldMap.playerSpawn;
     this.player = TankGame.Entities.createTank(spawn.x, spawn.y, "player");
+    this.player.netId = TankGame.Multiplayer && TankGame.Multiplayer.getSelfId ? TankGame.Multiplayer.getSelfId() : "";
     this.player.bodyAngle = -Math.PI / 2;
     this.player.turretAngle = -Math.PI / 2;
     this.player.invulnerable = 2.2;
@@ -2450,7 +2457,7 @@
     }
     if (target.team === "player") { this.registerPlayerDamage(); }
     if (this.selectedMode === "online" && !bullet.remote && target.remoteId && TankGame.Multiplayer.sendHit) {
-      TankGame.Multiplayer.sendHit(target.name, bullet.damage, this.player.name, this.onlineKills + (target.health <= 0 ? 1 : 0));
+      TankGame.Multiplayer.sendHit(target.remoteId, target.name, bullet.damage, this.player.netId, this.player.name, this.onlineKills + (target.health <= 0 ? 1 : 0));
     }
     target.hitFlash = 0.12;
     if (target.team === "player" && target.levelRepair) {
@@ -2479,7 +2486,7 @@
         if (this.selectedMode === "online" && bullet.team === "player" && !bullet.remote) {
           this.onlineKills += 1;
           this.stats.kills = this.onlineKills;
-          if (TankGame.Multiplayer.sendKill) { TankGame.Multiplayer.sendKill(this.player.name, this.onlineKills); }
+          if (TankGame.Multiplayer.sendKill) { TankGame.Multiplayer.sendKill(this.player.netId, this.player.name, this.onlineKills); }
         }
       }
       if (target.isBoss || target.isBossClone || target.isElite) { this.deactivateBossThreats(target); }

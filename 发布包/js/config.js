@@ -221,6 +221,26 @@
       Object.freeze({ id: "paradiseMade", label: "天堂制造", color: "#fff0a8", icon: "field-skill-icons/paradise-made.svg", iconFront: "field-skill-icons/paradise-made-front.svg" }),
       Object.freeze({ id: "bitterWinter", label: "凛冽寒冬", color: "#9edcff", icon: "field-skill-icons/bitter-winter.svg", iconFront: "field-skill-icons/bitter-winter-front.svg" })
     ]),
+    online: Object.freeze({
+      // 协议版本：客户端与房主不一致时拒绝加入，避免旧客户端混进新房间。
+      protocol: 2,
+      maxPlayers: 10,
+      quickMaxPlayers: 4,
+      // 快速匹配的固定槽位：陌生人不需要房间号，直接抢占/加入这些全局 peer id。
+      quickSlots: 12,
+      quickSlotPrefix: "xpz-tank-qp-",
+      quickProbeTimeout: 4500,
+      hostCodeAttempts: 4,
+      disconnectGrace: 15000,
+      // PeerJS 默认只有 Google STUN，国内经常拿不到候选地址；这里补上国内与 Cloudflare 的 STUN。
+      // 若要启用 TURN，把 { urls, username, credential } 填进 turn 即可（凭证不能长期写死在前端）。
+      iceServers: Object.freeze([
+        Object.freeze({ urls: Object.freeze(["stun:stun.miwifi.com:3478", "stun:stun.chat.bilibili.com:3478"]) }),
+        Object.freeze({ urls: "stun:stun.cloudflare.com:3478" }),
+        Object.freeze({ urls: "stun:stun.l.google.com:19302" })
+      ]),
+      turn: null
+    }),
     states: Object.freeze({
       MENU: "MENU",
       FIELD_ROLL: "FIELD_ROLL",
