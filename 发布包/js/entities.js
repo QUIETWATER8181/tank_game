@@ -112,11 +112,17 @@
       context.save();
       context.globalAlpha = ghost;
       context.translate(tank.x, drawY + extrude * (1 - step / SIDE_STEPS));
+      billboard(context);
       context.rotate(angle);
       context.scale(scale, scale);
       context.drawImage(silhouette, -256, -256, 512, 512);
       context.restore();
     }
+  }
+
+  // 斜视下的「广告牌」：抵消全局的纵向压扁，让贴在坦克上的精灵保持原比例。
+  function billboard(context) {
+    if (TankGame.View && TankGame.View.isPitched()) { context.scale(1, 1 / TankGame.View.k); }
   }
 
   function drawSpriteLayer(context, image, tank, angle, drawY, definition, shadow, extrude) {
@@ -126,6 +132,7 @@
     context.save();
     context.globalAlpha = shadow ? 0.48 : (tank.ghost ? 0.28 : 1);
     context.translate(tank.x, drawY);
+    billboard(context);
     context.rotate(angle);
     context.scale((tank.visualScale || 1) * definition.scale, (tank.visualScale || 1) * definition.scale);
     context.imageSmoothingEnabled = !definition.pixelated;
@@ -155,6 +162,7 @@
     var spin = time * 1.7;
     context.save();
     context.translate(tank.x, drawY);
+    billboard(context);
     context.globalAlpha = tank.ghost ? 0.25 : 1;
     context.globalCompositeOperation = "lighter";
     if (!foreground) {
@@ -231,6 +239,7 @@
     var pulse = 0.76 + Math.sin(time * 5.2 + tank.x * 0.012) * 0.24;
     context.save();
     context.translate(tank.x, drawY);
+    billboard(context);
     context.globalAlpha = tank.ghost ? 0.24 : 1;
     context.globalCompositeOperation = "lighter";
     if (!foreground) {
@@ -315,6 +324,7 @@
     var lightHull = burning ? "#c24c35" : (flash ? "#efe5d0" : "#b6a78d");
     context.save();
     context.translate(tank.x, drawY);
+    billboard(context);
     context.scale(scale, scale);
     context.shadowColor = "rgba(0, 0, 0, 0.78)";
     context.shadowBlur = 15;
@@ -350,6 +360,7 @@
 
     context.save();
     context.translate(tank.x, drawY);
+    billboard(context);
     context.rotate(tank.turretAngle);
     context.scale(scale, scale);
     context.shadowColor = "rgba(0, 0, 0, 0.7)";
@@ -388,6 +399,7 @@
     var now = performance.now();
     context.save();
     context.translate(tank.x, drawY);
+    billboard(context);
     context.globalAlpha = 0.72;
     context.strokeStyle = "#ff453a";
     context.lineWidth = 4;
@@ -528,7 +540,7 @@
       var boss = tank.team === "enemy" && tank.isBoss;
       var turret = tank.team === "enemy" && tank.isTurret;
       var shadow = tank.team === "enemy" && tank.isShadow;
-      var drawY = tank.y - (tank.leapHeight || 0);
+      var drawY = tank.y - (tank.leapHeight || 0) - (TankGame.View ? TankGame.View.lift : 0);
       if (tank.wreck) {
         this.drawWreck(context, tank);
         return;
@@ -550,6 +562,7 @@
         context.save();
         context.globalAlpha = shadow ? 0.48 : (tank.ghost ? 0.28 : 1);
         context.translate(tank.x, drawY);
+        billboard(context);
         context.rotate(tank.bodyAngle);
         context.scale(scale, scale);
         context.shadowColor = "rgba(0, 0, 0, 0.55)";
@@ -579,6 +592,7 @@
         context.save();
         context.globalAlpha = shadow ? 0.48 : (tank.ghost ? 0.28 : 1);
         context.translate(tank.x, drawY);
+        billboard(context);
         context.rotate(tank.turretAngle);
         context.scale(scale, scale);
         context.fillStyle = boss ? "#ffd700" : (elite ? "#e3b957" : "#d9eee4");
@@ -607,6 +621,7 @@
       context.save();
       context.globalAlpha = shadow ? 0.48 : (tank.ghost ? 0.28 : 1);
       context.translate(tank.x, drawY);
+      billboard(context);
       context.rotate(tank.bodyAngle);
       context.scale(scale, scale);
       context.strokeStyle = tank.team === "player" ? "#58f3ff" : (boss ? "#ffd700" : (elite ? "#ff4b3e" : (shadow ? "#c77dff" : "#ffd75f")));
@@ -648,6 +663,7 @@
       if (boss && tank.bossShieldCharges > 0) {
         context.save();
         context.translate(tank.x, drawY);
+        billboard(context);
         context.rotate(tank.bodyAngle);
         context.strokeStyle = "rgba(255, 215, 0, 0.9)";
         context.fillStyle = "rgba(255, 215, 0, 0.16)";
@@ -666,6 +682,7 @@
       if (tank.team === "player" && tank.frontShieldCharges > 0) {
         context.save();
         context.translate(tank.x, drawY);
+        billboard(context);
         context.rotate(tank.bodyAngle);
         context.strokeStyle = "#72cfff";
         context.lineWidth = 5;
@@ -680,6 +697,7 @@
       if (tank.team === "player" && tank.blueShieldActive) {
         context.save();
         context.translate(tank.x, drawY);
+        billboard(context);
         context.globalCompositeOperation = "lighter";
         context.strokeStyle = "rgba(58, 218, 255, 0.78)";
         context.lineWidth = 2.5;

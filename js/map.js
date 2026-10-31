@@ -938,6 +938,16 @@
         this.drawBossFence(context, obstacle, obstacle.kind === "B");
         return;
       }
+      // 斜俯视：给墙、砖墙补一块朝南的立面，再把顶面往上抬，看起来才是一堵有高度的墙。
+      var facade = 0;
+      if (TankGame.View && TankGame.View.isPitched() && ["#", "B", "I"].indexOf(obstacle.kind) !== -1) {
+        facade = Math.round(26 / TankGame.View.k);
+        context.fillStyle = obstacle.kind === "B" ? "#3a1d18" : "#1b2422";
+        context.fillRect(x + 2, y + size - facade, size - 4, facade);
+        context.fillStyle = obstacle.kind === "B" ? "rgba(140, 74, 56, 0.55)" : "rgba(94, 108, 112, 0.45)";
+        context.fillRect(x + 2, y + size - facade, size - 4, 3);
+        context.translate(0, -facade);
+      }
       if (obstacle.kind === "#") {
         context.shadowColor = "rgba(0, 0, 0, 0.6)"; context.shadowBlur = 0; context.shadowOffsetX = 5; context.shadowOffsetY = 6;
         context.fillStyle = "#253137"; context.fillRect(x + 2, y + 4, size - 4, size - 4);

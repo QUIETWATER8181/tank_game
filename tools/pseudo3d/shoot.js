@@ -177,11 +177,18 @@ async function main() {
     await client.send("Page.navigate", { url: url });
     await delay(waitMs);
 
-    var ready = await evaluate(client, "Boolean(window.__pseudo3d && window.__pseudo3d.ready)");
-    if (!ready) { throw new Error("prototype never became ready: " + url); }
+    // 给正式游戏用：先进战场再截图（--after 点击开始按钮，--afterWait 等战场加载）
+    if (args.after) {
+      await evaluate(client, args.after);
+      await delay(Number(args.afterWait || 2000));
+    }
 
-    var stats = await evaluate(client, "window.__pseudo3d.getStats()");
-    var state = await evaluate(client, "window.__pseudo3d.getState()");
+    var hasApi = await evaluate(client, "Boolean(window.__pseudo3d && window.__pseudo3d.getStats)");
+    var ready = hasApi ? await evaluate(client, "Boolean(window.__pseudo3d.ready)") : true;
+    if (args.raw !== "1" && !ready) { throw new Error("prototype never became ready: " + url); }
+
+    var stats = hasApi ? await evaluate(client, "window.__pseudo3d.getStats()") : null;
+    var state = hasApi ? await evaluate(client, "window.__pseudo3d.getState()") : null;
     var extra = null;
     if (args.eval) { extra = await evaluate(client, args.eval); }
 

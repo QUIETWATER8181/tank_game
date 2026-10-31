@@ -483,17 +483,19 @@
   Game.prototype.updateCamera = function (deltaTime, force) {
     var viewportWidth = Config.viewportWidth || this.canvas.width;
     var viewportHeight = Config.viewportHeight || this.canvas.height;
+    // 斜视下纵向可视范围被压扁，等价于「看到更高的世界区域」。
+    var viewHeight = TankGame.View ? TankGame.View.visibleWorldHeight(viewportHeight) : viewportHeight;
     var targetX;
     var targetY;
     if (this.state === Config.states.MENU && this.worldMap && this.worldMap.bossArena) {
       targetX = this.worldMap.bossArena.centerX - viewportWidth / 2;
-      targetY = this.worldMap.bossArena.centerY - viewportHeight / 2;
+      targetY = this.worldMap.bossArena.centerY - viewHeight / 2;
     } else {
       targetX = (this.player ? this.player.x : viewportWidth / 2) - viewportWidth / 2;
-      targetY = (this.player ? this.player.y : viewportHeight / 2) - viewportHeight / 2;
+      targetY = (this.player ? this.player.y : viewHeight / 2) - viewHeight / 2;
     }
     targetX = Math.max(0, Math.min(Config.worldWidth - viewportWidth, targetX));
-    targetY = Math.max(0, Math.min(Config.worldHeight - viewportHeight, targetY));
+    targetY = Math.max(0, Math.min(Config.worldHeight - viewHeight, targetY));
     if (force) {
       this.camera.x = targetX;
       this.camera.y = targetY;
@@ -507,11 +509,13 @@
 
   Game.prototype.getCameraBounds = function (margin) {
     margin = margin || 0;
+    var viewportHeight = Config.viewportHeight || this.canvas.height;
+    var viewHeight = TankGame.View ? TankGame.View.visibleWorldHeight(viewportHeight) : viewportHeight;
     return {
       left: Math.max(0, this.camera.x - margin),
       top: Math.max(0, this.camera.y - margin),
       right: Math.min(Config.worldWidth, this.camera.x + Config.viewportWidth + margin),
-      bottom: Math.min(Config.worldHeight, this.camera.y + Config.viewportHeight + margin)
+      bottom: Math.min(Config.worldHeight, this.camera.y + viewHeight + margin)
     };
   };
 
@@ -3207,6 +3211,9 @@
         context.scale(0.625, 0.625);
         context.translate(-this.player.x, -this.player.y);
       } else {
+        // 斜俯视：先压扁再平移，屏幕 y = (worldY - camera.y) * k。
+        // 顺序不能反——先平移再压扁会把相机位移也压掉，画面直接飞出可视区。
+        if (TankGame.View && TankGame.View.isPitched()) { context.scale(1, TankGame.View.k); }
         context.translate(-this.camera.x, -this.camera.y);
       }
     }

@@ -86,12 +86,17 @@
 
   InputManager.prototype.toWorldPoint = function (clientX, clientY) {
     var bounds = this.canvas.getBoundingClientRect();
+    var view = window.TankGame && window.TankGame.View;
+    var pitchK = view && view.isPitched() ? view.k : 1;
     if (!bounds.width || !bounds.height) {
       return { x: this.camera.x + this.canvas.width / 2, y: this.camera.y + this.canvas.height / 2 };
     }
+    var screenX = Math.max(0, Math.min(this.canvas.width, (clientX - bounds.left) * (this.canvas.width / bounds.width)));
+    var screenY = Math.max(0, Math.min(this.canvas.height, (clientY - bounds.top) * (this.canvas.height / bounds.height)));
+    // 逆投影：画面纵向被压扁了 pitchK 倍，反算世界坐标时要除回去，否则瞄准整体偏上。
     return {
-      x: this.camera.x + Math.max(0, Math.min(this.canvas.width, (clientX - bounds.left) * (this.canvas.width / bounds.width))),
-      y: this.camera.y + Math.max(0, Math.min(this.canvas.height, (clientY - bounds.top) * (this.canvas.height / bounds.height)))
+      x: this.camera.x + screenX,
+      y: this.camera.y + screenY / pitchK
     };
   };
 
