@@ -7,6 +7,8 @@
   // 开关走 URL 参数 ?pitch=50，并记进 localStorage，刷新后保持。
   var STORAGE_KEY = "tankGameViewPitch";
   var MAX_PITCH = 65;
+  // 默认就是斜俯视；想要原来的平铺就加 ?pitch=0
+  var DEFAULT_PITCH = 50;
   // 坦克在斜视下的屏幕抬升量（像素）；地面接触点保持在原位置，抬起来的部分就是车身高度。
   var TANK_LIFT_PX = 14;
 
@@ -84,7 +86,7 @@
   var paramPitch = readParam("pitch");
   if (paramPitch === null || paramPitch === "") {
     var stored = readStored();
-    View.setPitch(stored === null ? 0 : stored, false);
+    View.setPitch(stored === null ? DEFAULT_PITCH : stored, false);
   } else if (paramPitch === "off" || paramPitch === "0") {
     View.setPitch(0);
   } else {

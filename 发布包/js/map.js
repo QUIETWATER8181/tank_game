@@ -406,16 +406,18 @@
       }
     },
 
-    draw: function (context, worldMap, bounds) {
+    draw: function (context, worldMap, bounds, skipObstacles) {
       var self = this;
       this.drawWater(context, worldMap, bounds);
       this.drawDriedGround(context, worldMap, bounds);
       this.drawDecorations(context, worldMap, bounds);
       this.drawStonePlatform(context, worldMap);
-      var obstacles = bounds ? this.queryObstacles(worldMap, bounds.left, bounds.top, bounds.right, bounds.bottom) : worldMap.obstacles;
-      obstacles.forEach(function (obstacle) {
-        if (obstacle.kind !== "W") { self.drawObstacle(context, obstacle, worldMap); }
-      });
+      if (!skipObstacles) {
+        var obstacles = bounds ? this.queryObstacles(worldMap, bounds.left, bounds.top, bounds.right, bounds.bottom) : worldMap.obstacles;
+        obstacles.forEach(function (obstacle) {
+          if (obstacle.kind !== "W") { self.drawObstacle(context, obstacle, worldMap); }
+        });
+      }
       this.drawFirePatches(context, worldMap, bounds);
       this.drawSpawnMarkers(context, worldMap);
     },

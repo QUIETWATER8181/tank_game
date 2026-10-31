@@ -3222,7 +3222,7 @@
     if (this.drawFieldSite) { this.drawFieldSite(context); }
     this.drawTracks(context);
     this.drawWrecks(context);
-    TankGame.Map.draw(context, this.worldMap, bounds);
+    TankGame.Map.draw(context, this.worldMap, bounds, true);
     this.drawBossBattleEffects(context);
     this.drawBossFirePits(context);
     if (cinematicActive) { this.cinematic.drawRotorWash(context); }
@@ -3234,12 +3234,30 @@
     if (this.drawFieldPoisonTrails) { this.drawFieldPoisonTrails(context); }
     this.drawSpecialEnemyIndicators(context);
     this.drawEliteChargePaths(context);
+    // 深度排序：墙和坦克按「最靠近镜头的那条边」混排，坦克站在墙后面就会被墙挡住。
+    var depthItems = [];
+    var tileSize = TankGame.Map.tileSize || 60;
+    TankGame.Map.queryObstacles(this.worldMap, bounds.left, bounds.top, bounds.right, bounds.bottom).forEach(function (obstacle) {
+      if (obstacle.kind === "W") { return; }
+      depthItems.push({
+        depth: obstacle.y + tileSize,
+        draw: function () { TankGame.Map.drawObstacle(context, obstacle, this.worldMap); }.bind(this)
+      });
+    }, this);
     this.enemies.forEach(function (enemy) {
-      if (!cinematicActive || enemy !== this.cinematic.boss) { TankGame.Entities.drawTank(context, enemy); }
+      if (cinematicActive && enemy === this.cinematic.boss) { return; }
+      depthItems.push({ depth: enemy.y, draw: function () { TankGame.Entities.drawTank(context, enemy); } });
     }, this);
     (this.remotePlayers || []).forEach(function (remote) {
-      if (remote && remote.alive !== false) { TankGame.Entities.drawTank(context, remote); }
+      if (remote && remote.alive !== false) {
+        depthItems.push({ depth: remote.y, draw: function () { TankGame.Entities.drawTank(context, remote); } });
+      }
     });
+    if (this.player.alive && (this.player.ghost || this.player.paradiseMade || this.player.invulnerable <= 0 || Math.floor(this.elapsed * 10) % 2 === 0)) {
+      depthItems.push({ depth: this.player.y, draw: function () { TankGame.Entities.drawTank(context, this.player); }.bind(this) });
+    }
+    depthItems.sort(function (a, b) { return a.depth - b.depth; });
+    depthItems.forEach(function (item) { item.draw(); });
     this.drawMarkedTarget(context);
     this.drawMortarWarnings(context);
     this.drawRearGuards(context);
@@ -3956,6 +3974,30 @@
     });
   };
 
+  // 草地大色斑用的柔边贴图：只生成一次，之后全是 drawImage（每帧 createRadialGradient 太贵）
+  var grassBlobSprites = null;
+  function getGrassBlobs() {
+    if (grassBlobSprites) { return grassBlobSprites; }
+    var make = function (color) {
+      var surface = document.createElement("canvas");
+      surface.width = 128;
+      surface.height = 128;
+      var surfaceContext = surface.getContext ? surface.getContext("2d") : null;
+      if (!surfaceContext) { return null; }
+      var gradient = surfaceContext.createRadialGradient(64, 64, 0, 64, 64, 64);
+      gradient.addColorStop(0, color);
+      gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+      surfaceContext.fillStyle = gradient;
+      surfaceContext.fillRect(0, 0, 128, 128);
+      return surface;
+    };
+    grassBlobSprites = {
+      light: make("rgba(152, 180, 94, 0.17)"),
+      dark: make("rgba(9, 38, 21, 0.22)")
+    };
+    return grassBlobSprites;
+  }
+
   Game.prototype.drawGround = function (context, bounds) {
     if (this.worldMap && this.worldMap.isBossMap) {
       this.drawWastelandGround(context, bounds);
@@ -3979,6 +4021,20 @@
     var patchRight = Math.ceil(right / 36) * 36;
     var patchTop = Math.floor(top / 36) * 36;
     var patchBottom = Math.ceil(bottom / 36) * 36;
+    // 宏观色斑：96px 一格、176px 柔边贴图叠着画，草地才有大块的明暗起伏而不是一片死绿。
+    var blobs = getGrassBlobs();
+    if (blobs && blobs.light && blobs.dark) {
+      for (var macroY = Math.floor(top / 96) * 96; macroY <= bottom + 96; macroY += 96) {
+        for (var macroX = Math.floor(left / 96) * 96; macroX <= right + 96; macroX += 96) {
+          var macroTone = hash(Math.floor(macroX / 96), Math.floor(macroY / 96), 211);
+          if (macroTone > 0.58) {
+            context.drawImage(blobs.light, macroX - 40, macroY - 40, 176, 176);
+          } else if (macroTone < 0.34) {
+            context.drawImage(blobs.dark, macroX - 40, macroY - 40, 176, 176);
+          }
+        }
+      }
+    }
     for (var y = patchTop; y <= patchBottom; y += 36) {
       for (var x = patchLeft; x <= patchRight; x += 36) {
         var cellX = Math.floor(x / 36);
@@ -4020,6 +4076,24 @@
           context.fillStyle = "rgba(195, 193, 91, 0.5)";
           context.fillRect(detailX + 7, detailY + 6, 2, 3);
           context.fillRect(detailX + 10, detailY + 4, 2, 5);
+        }
+      }
+    }
+    // 细颗粒：20px 一格的碎草与土点，近距离看才不会是一片色块
+    var gritLeft = Math.floor(left / 20) * 20;
+    var gritRight = Math.ceil(right / 20) * 20;
+    var gritTop = Math.floor(top / 20) * 20;
+    var gritBottom = Math.ceil(bottom / 20) * 20;
+    for (var gritY = gritTop; gritY <= gritBottom; gritY += 20) {
+      for (var gritX = gritLeft; gritX <= gritRight; gritX += 20) {
+        var grit = hash(Math.floor(gritX / 20), Math.floor(gritY / 20), 307);
+        if (grit > 0.87) {
+          context.fillStyle = "rgba(203, 206, 126, 0.36)";
+          context.fillRect(gritX + 4, gritY + 5, 2, 2);
+          if (grit > 0.95) { context.fillRect(gritX + 11, gritY + 12, 2, 2); }
+        } else if (grit < 0.14) {
+          context.fillStyle = "rgba(9, 36, 19, 0.38)";
+          context.fillRect(gritX + 8, gritY + 3, 2, 3);
         }
       }
     }
