@@ -840,12 +840,12 @@
       var y = obstacle.y;
       if (!solidAt(worldMap, obstacle.column, obstacle.row + 1) ||
           !solidAt(worldMap, obstacle.column + 1, obstacle.row)) {
-        ctx.globalAlpha = 0.30;
+        ctx.globalAlpha = 0.26;
         ctx.drawImage(B.sprites.ao, x - 13, y - 13, TILE + 26, TILE + 26);
       }
       if (!solidAt(worldMap, obstacle.column, obstacle.row + 1)) {
         var shadowLength = Math.max(20, height * 0.62);
-        ctx.globalAlpha = 0.62;
+        ctx.globalAlpha = 0.52;
         ctx.drawImage(B.sprites.wallShadow,
           x - 10 + height * 0.22, y + TILE - 14,
           TILE + 20, shadowLength + 26);
