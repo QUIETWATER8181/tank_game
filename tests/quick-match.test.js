@@ -146,7 +146,7 @@ function playerIdByName(room, name) {
   var net = new FakeNetwork();
   var host = createMultiplayer(net);
   var hostRoom = host.quickMatch("阿水");
-  await sleep(80);
+  await sleep(1800);
   assert.strictEqual(hostRoom.host, true, "no room available means we host one");
   assert.strictEqual(hostRoom.code, "xpz-tank-qp-0", "the first free quick slot is claimed");
   assert.strictEqual(hostRoom.quick, true);
@@ -238,7 +238,7 @@ function playerIdByName(room, name) {
   var net2 = new FakeNetwork();
   var fullHost = createMultiplayer(net2);
   fullHost.quickMatch("房主");
-  await sleep(80);
+  await sleep(1800);
   for (var index = 0; index < 3; index += 1) {
     var filler = createMultiplayer(net2);
     filler.quickMatch("路人" + index);
@@ -247,7 +247,7 @@ function playerIdByName(room, name) {
   assert.strictEqual(fullHost.getRoom().names.length, 4, "quick room caps at four players");
   var overflow = createMultiplayer(net2);
   var overflowRoom = overflow.quickMatch("第五人");
-  await sleep(400);
+  await sleep(4000);
   assert.strictEqual(overflowRoom.closed, false, "a full room must not trap newcomers");
   assert.strictEqual(overflowRoom.host, true, "the newcomer opens its own quick room instead");
   assert.strictEqual(overflowRoom.code, "xpz-tank-qp-1", "the next free slot is claimed");

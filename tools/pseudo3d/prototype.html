@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>钢铁征途 · 伪3D视图原型</title>
+<style>
+  :root {
+    --ink: #d7f5e8;
+    --muted: #8bb7a7;
+    --line: rgba(120, 220, 190, 0.28);
+    --panel: rgba(6, 14, 12, 0.86);
+    --accent: #6ee7b7;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100%;
+    background: radial-gradient(circle at 50% 0%, #10231d 0%, #060b0a 70%);
+    color: var(--ink);
+    font: 14px/1.5 "Segoe UI", system-ui, "Microsoft YaHei", sans-serif;
+  }
+  body { display: flex; flex-direction: column; align-items: center; padding: 18px 18px 28px; }
+  h1 { margin: 0 0 4px; font-size: 18px; letter-spacing: 0.08em; }
+  .sub { margin: 0 0 14px; color: var(--muted); font-size: 12.5px; text-align: center; max-width: 980px; }
+  .stage-wrap {
+    position: relative;
+    width: min(1440px, 100%);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+    background: #060b0a;
+  }
+  canvas { display: block; width: 100%; height: auto; }
+  #panel {
+    width: min(1440px, 100%);
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 10px;
+    padding: 12px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+  .group { display: flex; flex-direction: column; gap: 6px; }
+  .group > span { font-size: 12px; color: var(--muted); letter-spacing: 0.06em; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; }
+  button {
+    flex: 1 1 auto;
+    min-width: 88px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    border: 1px solid var(--line);
+    background: rgba(18, 40, 34, 0.9);
+    color: var(--ink);
+    font: inherit;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  button:hover { background: rgba(30, 64, 54, 0.95); }
+  button.is-active { border-color: var(--accent); background: rgba(46, 120, 96, 0.9); color: #eafff6; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  label.check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); }
+  input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; }
+  #readout { font: 12px "Consolas", monospace; color: var(--muted); }
+  .hint { color: var(--muted); font-size: 12px; line-height: 1.7; }
+  kbd { padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); background: rgba(255,255,255,0.06); font-size: 11px; }
+  /* 截图模式：去掉页面装饰，画布 1:1 铺满 1440×900，保证截图与 canvas 坐标一致 */
+  body.shot { padding: 0; display: block; background: #060b0a; }
+  body.shot h1, body.shot .sub, body.shot #panel { display: none; }
+  body.shot .stage-wrap { width: 1440px; height: 900px; border: 0; border-radius: 0; box-shadow: none; }
+  body.shot canvas { width: 1440px; height: 900px; }
+</style>
+</head>
+<body>
+  <h1>钢铁征途 · 伪3D视图可行性原型</h1>
+  <p class="sub">
+    复用正式项目的地图生成、碰撞与坦克精灵，只替换「世界 → 屏幕」的投影。
+    世界坐标 / 碰撞 / 射程全部不变，用来验证伪3D视图在现有代码上是否可行。
+  </p>
+
+  <div class="stage-wrap">
+    <canvas id="stage" width="1440" height="900"></canvas>
+  </div>
+
+  <div id="panel">
+    <div class="group">
+      <span>投影模式</span>
+      <div class="row">
+        <button data-preset="flat">平铺俯视</button>
+        <button data-preset="pitch">斜俯视 34°</button>
+        <button data-preset="iso">等距 45°</button>
+      </div>
+      <div id="readout"></div>
+    </div>
+
+    <div class="group">
+      <span>俯角 pitch <b id="pitchValue"></b></span>
+      <input id="pitch" type="range" min="0" max="70" step="1" value="30">
+      <span>偏航 yaw</span>
+      <input id="yaw" type="range" min="0" max="90" step="1" value="45">
+    </div>
+
+    <div class="group">
+      <span>缩放 zoom</span>
+      <input id="zoom" type="range" min="0.6" max="1.6" step="0.05" value="1">
+      <span>高度系数（挤出厚度）</span>
+      <input id="height" type="range" min="0" max="2" step="0.1" value="1">
+    </div>
+
+    <div class="group">
+      <span>渲染开关</span>
+      <label class="check"><input id="depthSort" type="checkbox" checked> 深度排序（画家算法）</label>
+      <label class="check"><input id="wallExtrude" type="checkbox" checked> 墙体立面挤出</label>
+      <label class="check"><input id="tankExtrude" type="checkbox" checked> 坦克厚度挤出</label>
+      <label class="check"><input id="shadows" type="checkbox" checked> 落地阴影</label>
+    </div>
+
+    <div class="group">
+      <span>地面质感</span>
+      <label class="check"><input id="groundDetail" type="checkbox" checked> 有机地表（大块色斑）</label>
+      <label class="check"><input id="ambientOcclusion" type="checkbox" checked> 墙根遮蔽 + 石台倒角</label>
+      <label class="check"><input id="haze" type="checkbox" checked> 远景雾 + 暗角</label>
+      <label class="check"><input id="craters" type="checkbox" checked> 弹坑</label>
+      <label class="check"><input id="grassFringe" type="checkbox" checked> 墙脚草丛 + 泥土过渡</label>
+    </div>
+
+    <div class="group">
+      <span>操作</span>
+      <div class="hint">
+        <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 驾驶 · 鼠标瞄准 · <kbd>空格</kbd> 开火<br>
+        关掉「深度排序」可以直观看到它解决的是什么问题。
+      </div>
+    </div>
+  </div>
+
+  <script src="../../js/config.js"></script>
+  <script src="../../js/collision.js"></script>
+  <script src="../../js/map.js"></script>
+  <script src="../../js/entities.js"></script>
+  <script src="pseudo3d.js"></script>
+</body>
+</html>

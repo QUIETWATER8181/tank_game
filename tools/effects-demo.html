@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>粒子效果预览</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #1a1f1a; }
+  canvas { display: block; }
+  #label {
+    position: absolute; left: 16px; top: 12px;
+    font: 13px/1.6 "Microsoft YaHei", sans-serif; color: #9fb59f;
+  }
+</style>
+</head>
+<body>
+<canvas id="stage" width="1200" height="620"></canvas>
+<div id="label"></div>
+<script src="../../js/effects.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var canvas = document.getElementById("stage");
+  var context = canvas.getContext("2d");
+  var effects = window.TankGame.Effects;
+  var params = new URLSearchParams(location.search);
+  var freeze = params.get("shot") === "1";
+  var elapsed = 0;
+
+  function drawGround() {
+    var gradient = context.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, "#26301f");
+    gradient.addColorStop(1, "#151a13");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.strokeStyle = "rgba(120,150,110,0.10)";
+    context.lineWidth = 1;
+    for (var x = 0; x < canvas.width; x += 60) {
+      context.beginPath(); context.moveTo(x, 0); context.lineTo(x, canvas.height); context.stroke();
+    }
+    for (var y = 0; y < canvas.height; y += 60) {
+      context.beginPath(); context.moveTo(0, y); context.lineTo(canvas.width, y); context.stroke();
+    }
+  }
+
+  var scenes = [
+    { label: "爆炸：火球 + 火星 + 烟 + 冲击波 + 碎块", run: function () {
+        effects.burst(210, 210, "#ffb000", 72, 300);
+        effects.burst(210, 210, "#ff5b24", 36, 220);
+        effects.burst(210, 210, "#ffe66d", 24, 370);
+        effects.ring(210, 210, "#ffd9a0", 18);
+        effects.debris(210, 210, 8, 1);
+      } },
+    { label: "能量命中：青色", run: function () {
+        effects.burst(610, 200, "#72cfff", 30, 190);
+      } },
+    { label: "墙体命中：浅灰白", run: function () {
+        effects.burst(960, 190, "#d9eee4", 18, 140);
+      } },
+    { label: "炮口焰：朝右", run: function () {
+        effects.muzzle(300, 470, 0, "#c8ffe5", 1);
+      } },
+    { label: "炮口焰：斜上，BOSS 尺寸", run: function () {
+        effects.muzzle(620, 480, -Math.PI / 3, "#ff9a78", 1.4);
+      } },
+    { label: "金色能量：拾取 / 护盾", run: function () {
+        effects.burst(930, 470, "#ffd700", 28, 210);
+      } }
+  ];
+
+  function spawnAll() {
+    effects.reset();
+    scenes.forEach(function (scene) { scene.run(); });
+  }
+
+  function step(deltaTime) {
+    effects.update(deltaTime);
+    elapsed += deltaTime;
+  }
+
+  window.__pseudo3d = {
+    ready: true,
+    getStats: function () { return { particles: effects.particles.length }; },
+    getState: function () { return { frozen: freeze }; }
+  };
+
+  spawnAll();
+  document.getElementById("label").innerHTML = scenes.map(function (scene) {
+    return "· " + scene.label;
+  }).join("<br>");
+
+  if (freeze) {
+    // 冻结在指定帧：默认 0.133 秒，火星还在飞、烟刚起来
+    var steps = parseInt(params.get("steps") || "8", 10);
+    for (var index = 0; index < steps; index += 1) { step(1 / 60); }
+    drawGround();
+    effects.draw(context);
+    window.__particleStats = { count: effects.particles.length, frozen: true };
+    return;
+  }
+
+  var last = performance.now();
+  function frame(now) {
+    var deltaTime = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (elapsed > 1.4) { spawnAll(); elapsed = 0; }
+    step(deltaTime);
+    drawGround();
+    effects.draw(context);
+    window.__particleStats = { count: effects.particles.length };
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}());
+</script>
+</body>
+</html>
