@@ -110,7 +110,12 @@ FakePeer.prototype.destroy = function () {
   this.connections = {};
 };
 
-function createMultiplayer(net) {
+function createMultiplayer(net, options) {
+  var opts = options || {};
+  var browser = { TankGame: {} };
+  if (!opts.noPeer) {
+    browser.Peer = function (id) { return new FakePeer(net, id); };
+  }
   var context = {
     console: console,
     setTimeout: setTimeout,
@@ -118,10 +123,7 @@ function createMultiplayer(net) {
     setInterval: setInterval,
     clearInterval: clearInterval,
     setImmediate: setImmediate,
-    window: {
-      TankGame: {},
-      Peer: function (id) { return new FakePeer(net, id); }
-    }
+    window: browser
   };
   vm.createContext(context);
   vm.runInContext(fs.readFileSync(path.join(root, "js", "config.js"), "utf8"), context);
@@ -249,6 +251,19 @@ function playerIdByName(room, name) {
   assert.strictEqual(overflowRoom.closed, false, "a full room must not trap newcomers");
   assert.strictEqual(overflowRoom.host, true, "the newcomer opens its own quick room instead");
   assert.strictEqual(overflowRoom.code, "xpz-tank-qp-1", "the next free slot is claimed");
+
+  // 11. PeerJS 加载失败时必须明确报错，绝不能伪装成可用房间（否则会给一个别人连不进的房间号）。
+  var offline = createMultiplayer(new FakeNetwork(), { noPeer: true });
+  var offlineHost = offline.host("断网甲");
+  assert.strictEqual(offlineHost.closed, true, "host must not fake a room without PeerJS");
+  assert.strictEqual(offlineHost.connected, false);
+  assert.ok(/加载失败/.test(offlineHost.error), "host should explain why it failed");
+  var offlineJoin = offline.join("123456", "断网乙");
+  assert.strictEqual(offlineJoin.closed, true, "join must not fake a room without PeerJS");
+  assert.ok(/加载失败/.test(offlineJoin.error));
+  var offlineQuick = offline.quickMatch("断网丙");
+  assert.strictEqual(offlineQuick.closed, true, "quick match must not fake a room without PeerJS");
+  assert.strictEqual(offline.isMatching(), false);
 
   console.log("quick match and lobby tests passed");
 }()).catch(function (error) {

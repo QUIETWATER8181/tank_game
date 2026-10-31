@@ -624,22 +624,29 @@
 
   function showOnlineView(view) { onlineView = view; syncInterface(); }
   var peerLoadPromise = null;
+  var PEER_SOURCES = [
+    "js/vendor/peerjs.min.js?v=20261101-local-peerjs",
+    "https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"
+  ];
+  function loadPeerScript(src) {
+    return new Promise(function (resolve, reject) {
+      var script = document.createElement("script");
+      script.src = src;
+      script.async = true;
+      script.fetchPriority = "low";
+      script.dataset.peerjs = "true";
+      script.addEventListener("load", function () {
+        if (window.Peer) { resolve(); } else { reject(new Error("PeerJS missing in " + src)); }
+      }, { once: true });
+      script.addEventListener("error", function () { reject(new Error("cannot load " + src)); }, { once: true });
+      document.head.appendChild(script);
+    });
+  }
   function loadPeerJS() {
-    var script;
     if (window.Peer) { return Promise.resolve(); }
     if (peerLoadPromise) { return peerLoadPromise; }
-    peerLoadPromise = new Promise(function (resolve, reject) {
-      script = document.querySelector("script[data-peerjs]");
-      if (!script) {
-        script = document.createElement("script");
-        script.src = "https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js";
-        script.async = true;
-        script.fetchPriority = "low";
-        script.dataset.peerjs = "true";
-        document.head.appendChild(script);
-      }
-      script.addEventListener("load", function () { resolve(); }, { once: true });
-      script.addEventListener("error", function () { reject(new Error("PeerJS unavailable")); }, { once: true });
+    peerLoadPromise = loadPeerScript(PEER_SOURCES[0]).catch(function () {
+      return loadPeerScript(PEER_SOURCES[1]);
     });
     return peerLoadPromise;
   }
@@ -679,6 +686,8 @@
       roomStatus.textContent = room.error;
     } else if (room.started) {
       roomStatus.textContent = "战场已开启，正在进入……";
+    } else if (!room.connected) {
+      roomStatus.textContent = "正在连接联机服务……";
     } else if (room.phase === "lobby" && room.result) {
       roomStatus.textContent = room.host ? "选择继续游戏的玩家将加入下一局" : "等待房主开启下一局";
     } else if (room.quick) {

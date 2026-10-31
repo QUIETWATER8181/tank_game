@@ -11,6 +11,7 @@
   var QUICK_PREFIX = onlineConfig.quickSlotPrefix || "xpz-tank-qp-";
   var PROBE_TIMEOUT = Number(onlineConfig.quickProbeTimeout) || 4500;
   var HOST_ATTEMPTS = Number(onlineConfig.hostCodeAttempts) || 4;
+  var PEER_MISSING = "联机组件加载失败，请刷新页面后重试";
 
   var id = Math.random().toString(36).slice(2) + Date.now().toString(36).slice(-4);
   var room = null;
@@ -20,7 +21,6 @@
   var killListeners = [];
   var peer = null;
   var connections = {};
-  var fallback = null;
   var quick = null;
   var heartbeatTimer = null;
 
@@ -72,7 +72,6 @@
       if (exceptPeerId && key === exceptPeerId) { return; }
       try { connections[key].send(outbound); } catch (error) {}
     });
-    if (fallback) { fallback.postMessage(outbound); }
   }
 
   function peerOptions() {
@@ -457,19 +456,15 @@
     conn.on("error", function () { dropPeer(conn.peer); });
   }
 
-  function ensureFallback() {
-    if (fallback || !window.BroadcastChannel) { return; }
-    fallback = new window.BroadcastChannel("xpz-tank-local-rooms");
-    fallback.onmessage = function (event) { handleMessage(event.data || {}, null); };
-  }
 
   function startHostPeer(attempt) {
-    if (!window.Peer || !room) { ensureFallback(); return; }
+    if (!room) { return; }
+    if (!window.Peer) { failRoom(PEER_MISSING); return; }
     var candidate;
     try {
       candidate = new window.Peer(room.code, peerOptions());
     } catch (error) {
-      ensureFallback();
+      failRoom(PEER_MISSING);
       return;
     }
     peer = candidate;
@@ -494,13 +489,13 @@
       if (type === "peer-unavailable") { return; }
       room.connected = false;
       room.error = "联机服务连接失败：" + type;
-      ensureFallback();
       emit();
     });
   }
 
   function startClientPeer() {
-    if (!window.Peer || !room) { ensureFallback(); return; }
+    if (!room) { return; }
+    if (!window.Peer) { failRoom(PEER_MISSING); return; }
     var candidate = new window.Peer(undefined, peerOptions());
     peer = candidate;
     candidate.on("open", function () {
@@ -518,7 +513,7 @@
       var type = error && error.type ? error.type : "network";
       if (type === "peer-unavailable") { failRoom("房间不存在或已关闭"); return; }
       if (type === "unavailable-id") { failRoom("联机服务繁忙，请稍后重试"); return; }
-      if (type === "network" || type === "server-error" || type === "socket-error") { failRoom("联机服务不可用"); }
+      if (type === "network" || type === "server-error" || type === "socket-error") { failRoom(PEER_MISSING); }
     });
   }
 
@@ -549,7 +544,7 @@
     try {
       candidate = new window.Peer(slotId, peerOptions());
     } catch (error) {
-      failQuick("联机服务不可用");
+      failQuick(PEER_MISSING);
       return;
     }
     var claimed = false;
@@ -577,7 +572,7 @@
       }
       try { candidate.destroy(); } catch (destroyError) {}
       if (error && error.type === "unavailable-id") { claimNextSlot(index + 1); return; }
-      failQuick("联机服务不可用");
+      failQuick(PEER_MISSING);
     });
   }
 
@@ -726,7 +721,7 @@
       if (quick || !window.Peer) {
         if (!window.Peer) {
           resetSession();
-          createRoom({ localName: name, names: [name], quick: true, phase: "closed", closed: true, error: "联机服务不可用" });
+          createRoom({ localName: name, names: [name], quick: true, phase: "closed", closed: true, error: PEER_MISSING });
           emit();
         }
         return room;
