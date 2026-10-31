@@ -12,6 +12,8 @@
   var PROBE_TIMEOUT = Number(onlineConfig.quickProbeTimeout) || 4500;
   var HOST_ATTEMPTS = Number(onlineConfig.hostCodeAttempts) || 4;
   var PEER_MISSING = "联机组件加载失败，请刷新页面后重试";
+  var MERGE_ATTEMPTS = 3;
+  var MERGE_ROUND_TIMEOUT = 2500;
 
   var id = Math.random().toString(36).slice(2) + Date.now().toString(36).slice(-4);
   var room = null;
@@ -22,6 +24,7 @@
   var peer = null;
   var connections = {};
   var quick = null;
+  var quickMerge = null;
   var heartbeatTimer = null;
 
   function startHeartbeat() {
@@ -92,6 +95,7 @@
       broadcast({ type: "leave", code: room.code, name: room.localName });
     }
     teardownQuick();
+    stopMergeScan();
     shutdownPeer();
     room = null;
   }
@@ -118,6 +122,7 @@
       quick: false,
       matching: false,
       retrying: false,
+      note: "",
       connected: false,
       error: "",
       closed: false,
@@ -521,6 +526,7 @@
   }
 
   function teardownQuick() {
+    stopMergeScan();
     if (!quick) { return; }
     if (quick.timer) { clearTimeout(quick.timer); }
     if (quick.confirmTimer) { clearTimeout(quick.confirmTimer); }
@@ -563,10 +569,12 @@
       room.matching = false;
       room.phase = "lobby";
       room.connected = true;
+      room.note = "";
       candidate.on("connection", acceptConnection);
       startHeartbeat();
       if (quick) { quick.claimPeer = null; quick = null; }
       emit();
+      startMergeScan(index);
     });
     candidate.on("error", function (error) {
       if (claimed) {
@@ -602,83 +610,119 @@
     room.error = "";
     room.retrying = false;
     emit();
-    probeForRoom();
+    claimNextSlot(0);
   }
 
-  function probeForRoom() {
-    if (!quick) { return; }
-    if (!quick.slots.length) { failQuick("暂时没有可加入的房间，请稍后再试"); return; }
-    var probe;
-    try {
-      probe = new window.Peer(undefined, peerOptions());
-    } catch (error) {
-      claimNextSlot(0);
-      return;
-    }
-    quick.probe = probe;
-    var settled = false;
-    var failed = 0;
+  function startMergeScan(myIndex, probePeer) {
+    if (!room || !room.quick || !room.host || myIndex <= 0) { return; }
+    var state = { cancelled: false, done: false, peer: probePeer || null, timer: 0, attempts: 0 };
+    quickMerge = state;
+    if (room) { room.note = "（正在寻找已有房间……）"; emit(); }
 
-    function finish(hit) {
-      if (settled) { return; }
-      settled = true;
-      if (quick && quick.timer) { clearTimeout(quick.timer); quick.timer = 0; }
-      if (!room || (quick && quick.cancelled)) { return; }
-      if (hit) {
-        room.matching = false;
-        room.phase = "lobby";
-        room.code = hit.slotId;
-        room.peerId = hit.slotId;
-        acceptConnection(hit.conn);
-        room.lastHostSeen = Date.now();
-        startHeartbeat();
-        sendTo(hit.conn, { type: "join", code: hit.slotId, name: room.localName, protocol: PROTOCOL });
-        if (quick) {
-          quick.probe = probe;
-          quick.joining = hit;
-          quick.confirmTimer = setTimeout(function () {
-            if (quick && quick.joining === hit) { retryQuickSlot(); }
-          }, 5000);
-          if (quick.confirmTimer.unref) { quick.confirmTimer.unref(); }
-        }
-        emit();
+    function stop() {
+      if (state.cancelled) { return; }
+      state.cancelled = true;
+      if (state.timer) { clearTimeout(state.timer); state.timer = 0; }
+      if (state.peer && state.peer !== peer) { try { state.peer.destroy(); } catch (error) {} }
+      state.peer = null;
+      if (quickMerge === state) { quickMerge = null; }
+      if (room && room.note === "（正在寻找已有房间……）") { room.note = ""; emit(); }
+    }
+
+    function attempt() {
+      if (state.cancelled || state.done) { return; }
+      if (!room || !room.host || room.names.length > 1) { stop(); return; }
+      var targets = [];
+      for (var i = 0; i < myIndex; i += 1) { targets.push(QUICK_PREFIX + i); }
+      if (!targets.length) { stop(); return; }
+      var prober;
+      try {
+        prober = new window.Peer(undefined, peerOptions());
+      } catch (error) {
+        stop();
         return;
       }
-      try { probe.destroy(); } catch (error) {}
-      if (quick) { quick.probe = null; }
-      claimNextSlot(0);
-    }
+      state.peer = prober;
+      var settled = false;
 
-    if (quick) {
-      quick.timer = setTimeout(function () { finish(null); }, PROBE_TIMEOUT);
-      if (quick.timer.unref) { quick.timer.unref(); }
-    }
-
-    probe.on("open", function () {
-      if (!quick || !room) { return; }
-      peer = probe;
-      quick.slots.forEach(function (slotId) {
-        var conn = probe.connect(slotId, { reliable: true });
-        conn.on("open", function () {
-          if (settled) { try { conn.close(); } catch (error) {} return; }
-          finish({ slotId: slotId, conn: conn });
+      prober.on("open", function () {
+        if (state.cancelled || state.done) { return; }
+        targets.forEach(function (slotId) {
+          var conn = prober.connect(slotId, { reliable: true });
+          conn.on("open", function () {
+            if (settled || state.cancelled || state.done) { try { conn.close(); } catch (error) {} return; }
+            sendTo(conn, { type: "join", code: slotId, name: room ? room.localName : "", protocol: PROTOCOL });
+          });
+          conn.on("data", function (message) {
+            if (settled || state.cancelled || state.done || !message) { return; }
+            if (message.type === "lobby") {
+              settled = true;
+              adoptRoom(slotId, conn, message, prober);
+              return;
+            }
+            if (message.type !== "join-rejected") { return; }
+            settled = true;
+            if (message.reason === "full") { stop(); return; }
+            var reason = message.reason === "version"
+              ? "双方版本不一致，请刷新页面后再试"
+              : "昵称已被占用，请换一个";
+            stop();
+            failQuick(reason);
+          });
         });
-        conn.on("error", function () {});
       });
-    });
 
-    probe.on("error", function (error) {
-      if (!error) { return; }
-      if (error.type === "peer-unavailable") {
-        failed += 1;
-        if (quick && failed >= quick.slots.length) { finish(null); }
-        return;
-      }
-      if (error.type === "network" || error.type === "server-error" || error.type === "socket-error") {
-        finish(null);
-      }
-    });
+      state.timer = setTimeout(function () {
+        state.timer = 0;
+        if (settled || state.cancelled || state.done) { return; }
+        try { prober.destroy(); } catch (error) {}
+        state.peer = null;
+        state.attempts += 1;
+        if (state.attempts < MERGE_ATTEMPTS) { attempt(); } else { stop(); }
+      }, MERGE_ROUND_TIMEOUT);
+      if (state.timer.unref) { state.timer.unref(); }
+    }
+
+    attempt();
   }
+
+  function adoptRoom(slotId, conn, lobbyMessage, probePeer) {
+    if (!room) { return; }
+    if (quickMerge) {
+      quickMerge.done = true;
+      if (quickMerge.timer) { clearTimeout(quickMerge.timer); quickMerge.timer = 0; }
+      quickMerge = null;
+    }
+    // 放弃自己刚占的槽位，改当客户端
+    if (peer && peer !== probePeer) { try { peer.destroy(); } catch (error) {} }
+    peer = probePeer || peer;
+    connections = {};
+    room.host = false;
+    room.code = slotId;
+    room.peerId = slotId;
+    room.quick = true;
+    room.matching = false;
+    room.phase = "lobby";
+    room.note = "";
+    room.retrying = false;
+    acceptConnection(conn);
+    applyLobby(lobbyMessage);
+    room.connected = true;
+    room.lastHostSeen = Date.now();
+    startHeartbeat();
+    emit();
+  }
+
+  function stopMergeScan() {
+    if (!quickMerge) { return; }
+    var state = quickMerge;
+    quickMerge = null;
+    state.cancelled = true;
+    if (state.timer) { clearTimeout(state.timer); state.timer = 0; }
+    if (state.peer && state.peer !== peer) { try { state.peer.destroy(); } catch (error) {} }
+    state.peer = null;
+  }
+
 
   TankGame.Multiplayer = {
     onChange: function (fn) { listeners.push(fn); return function () { listeners = listeners.filter(function (item) { return item !== fn; }); }; },
@@ -742,9 +786,9 @@
         matching: true,
         phase: "matching"
       });
-      quick = { cancelled: false, slots: slots, timer: 0, probe: null, claimPeer: null, joining: null, confirmTimer: 0 };
+      quick = { cancelled: false, slots: slots, timer: 0, probe: null, claimPeer: null, joining: null, confirmTimer: 0, retryTimer: 0, round: 0 };
       emit();
-      probeForRoom();
+      claimNextSlot(0);
       return room;
     },
 

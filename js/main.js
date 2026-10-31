@@ -625,7 +625,7 @@
   function showOnlineView(view) { onlineView = view; syncInterface(); }
   var peerLoadPromise = null;
   var PEER_SOURCES = [
-    "js/vendor/peerjs.min.js?v=20261031-peerjs-local",
+    "js/vendor/peerjs.min.js?v=20261031-merge-scan",
     "https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"
   ];
   function loadPeerScript(src) {
@@ -691,7 +691,7 @@
     } else if (room.phase === "lobby" && room.result) {
       roomStatus.textContent = room.host ? "选择继续游戏的玩家将加入下一局" : "等待房主开启下一局";
     } else if (room.quick) {
-      roomStatus.textContent = room.host ? "已开设快速房，等待陌生人加入" : "匹配成功，等待房主开启";
+      roomStatus.textContent = (room.host ? "已开设快速房，等待陌生人加入" : "匹配成功，等待房主开启") + (room.note || "");
     } else {
       roomStatus.textContent = room.host ? "等待队友加入后开启战场" : "已加入房间，等待房主开启";
     }
