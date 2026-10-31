@@ -625,7 +625,7 @@
   function showOnlineView(view) { onlineView = view; syncInterface(); }
   var peerLoadPromise = null;
   var PEER_SOURCES = [
-    "js/vendor/peerjs.min.js?v=20261101-local-peerjs",
+    "js/vendor/peerjs.min.js?v=20261031-peerjs-local",
     "https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"
   ];
   function loadPeerScript(src) {
