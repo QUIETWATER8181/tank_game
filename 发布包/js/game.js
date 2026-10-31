@@ -1420,6 +1420,9 @@
       this.spawnFrontStepTrails(teleportPath, tank.bodyAngle, tank.turretAngle);
     }
     this.muzzleFlashes.push({ x: x, y: y, life: tank.skin === "futureTech" || tank.skin === "lavaCore" ? 0.14 : 0.09, color: tank.skin === "futureTech" ? "#38dfff" : (tank.skin === "lavaCore" ? "#ff5425" : (tank.team === "player" ? "#c8ffe5" : "#ff9a78")) });
+    TankGame.Effects.muzzle(x, y, tank.turretAngle,
+      tank.skin === "futureTech" ? "#38dfff" : (tank.skin === "lavaCore" ? "#ff5425" : (tank.team === "player" ? "#c8ffe5" : "#ff9a78")),
+      tank.team === "player" ? 1 : 0.85);
     if (tank.team === "player") {
       this.stats.shots += 1;
       TankGame.Audio.play("shoot");
@@ -2559,6 +2562,8 @@
     TankGame.Effects.burst(bullet.x, bullet.y, "#ffb000", Math.round(72 * particleScale), 300);
     TankGame.Effects.burst(bullet.x, bullet.y, "#ff5b24", Math.round(36 * particleScale), 220);
     TankGame.Effects.burst(bullet.x, bullet.y, "#ffe66d", Math.round(24 * particleScale), 370);
+    TankGame.Effects.ring(bullet.x, bullet.y, "#ffd9a0", 18 * particleScale);
+    TankGame.Effects.debris(bullet.x, bullet.y, Math.round(8 * particleScale), particleScale);
     this.shake = Math.max(this.shake, 9);
     return true;
   };

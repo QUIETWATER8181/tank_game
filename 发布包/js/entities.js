@@ -75,7 +75,54 @@
     return Boolean(image && image.complete && image.naturalWidth > 0);
   }
 
-  function drawSpriteLayer(context, image, tank, angle, drawY, definition, shadow) {
+  // 坦克侧壁：把贴图剪影按三档色阶预渲染成 256px 的图，绘制时按高度一层层叠出厚度。
+  // 用硬切色阶而不是渐变，保持和贴图一致的 2D 手绘感。
+  var SIDE_TONES = ["#0a100d", "#141d19", "#233029"];
+  var SIDE_STEPS = 6;
+  var sideCache = {};
+
+  function getSideSilhouette(image, tone) {
+    var key = (image.src || "sprite") + "|" + tone;
+    if (Object.prototype.hasOwnProperty.call(sideCache, key)) {
+      return sideCache[key];
+    }
+    var surface = document.createElement("canvas");
+    surface.width = 256;
+    surface.height = 256;
+    var surfaceContext = surface.getContext ? surface.getContext("2d") : null;
+    if (!surfaceContext) {
+      sideCache[key] = null;
+      return null;
+    }
+    surfaceContext.drawImage(image, 0, 0, 256, 256);
+    surfaceContext.globalCompositeOperation = "source-in";
+    surfaceContext.fillStyle = tone;
+    surfaceContext.fillRect(0, 0, 256, 256);
+    sideCache[key] = surface;
+    return surface;
+  }
+
+  function drawTankSide(context, image, tank, angle, drawY, definition, extrude) {
+    var scale = (tank.visualScale || 1) * definition.scale;
+    var ghost = tank.ghost ? 0.28 : 1;
+    for (var step = 0; step < SIDE_STEPS; step += 1) {
+      var tone = SIDE_TONES[Math.min(SIDE_TONES.length - 1, Math.floor(step / SIDE_STEPS * SIDE_TONES.length))];
+      var silhouette = getSideSilhouette(image, tone);
+      if (!silhouette) { return; }
+      context.save();
+      context.globalAlpha = ghost;
+      context.translate(tank.x, drawY + extrude * (1 - step / SIDE_STEPS));
+      context.rotate(angle);
+      context.scale(scale, scale);
+      context.drawImage(silhouette, -256, -256, 512, 512);
+      context.restore();
+    }
+  }
+
+  function drawSpriteLayer(context, image, tank, angle, drawY, definition, shadow, extrude) {
+    if (!shadow && extrude > 0) {
+      drawTankSide(context, image, tank, angle, drawY, definition, extrude);
+    }
     context.save();
     context.globalAlpha = shadow ? 0.48 : (tank.ghost ? 0.28 : 1);
     context.translate(tank.x, drawY);
@@ -255,8 +302,8 @@
       (tank.team === "player" && tank.skin === "silverTank" ? getSilverTankSprites() :
         (tank.team === "player" && tank.skin === "lavaCore" ? getLavaCoreSprites() : tankSprites[key]));
     if (!sprites || !spriteReady(sprites.hull) || !spriteReady(sprites.turret)) { return false; }
-    drawSpriteLayer(context, sprites.hull, tank, tank.bodyAngle, drawY, definition, shadow);
-    drawSpriteLayer(context, sprites.turret, tank, tank.turretAngle, drawY, definition, shadow);
+    drawSpriteLayer(context, sprites.hull, tank, tank.bodyAngle, drawY, definition, shadow, 9);
+    drawSpriteLayer(context, sprites.turret, tank, tank.turretAngle, drawY, definition, shadow, 6);
     return true;
   }
 
