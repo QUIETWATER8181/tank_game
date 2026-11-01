@@ -863,6 +863,10 @@
     if (game.selectedMode !== "online" || game.state !== Config.states.PLAYING || !game.player.alive || game.player.ghost) { return; }
     var damage = message && typeof message === "object" ? message.damage : message;
     game.player.health = Math.max(0, game.player.health - game.getPlayerDamage(Number(damage || 4), game.player));
+    game.player.hitFlash = 0.16;
+    game.shake = Math.max(game.shake || 0, 8);
+    TankGame.Effects.burst(game.player.x, game.player.y, "#ff5b4f", 18, 190);
+    TankGame.Audio.play("hit");
     if (game.player.health <= 0) {
       game.player.alive = false;
       game.player.deathAt = game.getOnlineNow ? game.getOnlineNow() : Date.now();

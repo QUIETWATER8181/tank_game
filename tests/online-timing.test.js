@@ -82,6 +82,36 @@ var shielded = { shieldCharges: 2, levelShield: true, shieldTimer: 0 };
 assert.strictEqual(shieldGame.consumeTemporaryShield(shielded, 0, 0), true);
 assert.strictEqual(shielded.shieldCharges, 1, "real shields still consume one charge");
 
+var hitCalls = [];
+var oldFindObstacle = TankGame.Map.findSegmentObstacle;
+var oldBurst = TankGame.Effects.burst;
+TankGame.Map.findSegmentObstacle = function () { return null; };
+TankGame.Effects.burst = function () {};
+TankGame.Multiplayer.sendHit = function () { hitCalls.push(Array.prototype.slice.call(arguments)); };
+var hitGame = Object.create(TankGame.Game.prototype);
+hitGame.selectedMode = "online";
+hitGame.player = { x: 0, y: 0, alive: true, ghost: false, netId: "p1", name: "Host", health: 100, maxHealth: 100 };
+hitGame.enemies = [];
+hitGame.wrecks = [];
+hitGame.remotePlayers = [{
+  x: 120, y: 0, alive: true, health: 100, maxHealth: 100,
+  team: "player", remoteId: "p2", radius: 28.75, name: "Guest"
+}];
+hitGame.runShop = {};
+hitGame.endlessPermanent = {};
+hitGame.stats = { hits: 0 };
+hitGame.onlineKills = 0;
+hitGame.registerPlayerDamage = function () {};
+var hitBullet = TankGame.Entities.createBullet(90, 0, 0, "player");
+hitBullet.damage = 4;
+hitBullet.speed = 300;
+hitGame.updateBullet(hitBullet, 0.15);
+assert.strictEqual(hitGame.remotePlayers[0].health, 96, "a local online hit must damage the remote player");
+assert.strictEqual(hitCalls.length, 1, "a local online hit must send one hit message");
+assert.strictEqual(hitCalls[0][0], "p2", "hit message targets the remote player id");
+TankGame.Map.findSegmentObstacle = oldFindObstacle;
+TankGame.Effects.burst = oldBurst;
+
 var game = Object.create(TankGame.Game.prototype);
 game.selectedMode = "online";
 game.onlineCombatStart = 500000;
