@@ -2119,8 +2119,11 @@
   };
 
   Game.prototype.consumeTemporaryShield = function (player, effectX, effectY) {
-    if (!player || player.shieldCharges <= 0 || (!player.levelShield && player.shieldTimer <= 0)) { return false; }
-    player.shieldCharges -= 1;
+    if (!player) { return false; }
+    var charges = Number(player.shieldCharges) || 0;
+    var timer = Number(player.shieldTimer) || 0;
+    if (charges <= 0 || (!player.levelShield && timer <= 0)) { return false; }
+    player.shieldCharges = charges - 1;
     if (player.shieldCharges <= 0) {
       player.shieldCharges = 0;
       player.shieldTimer = 0;

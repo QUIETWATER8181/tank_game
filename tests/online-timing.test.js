@@ -70,6 +70,18 @@ TankGame.Audio = { play: function () {}, playBurning: function () { return {}; }
 TankGame.Multiplayer = { now: function () { return 503000; } };
 require(path.join(root, "js", "game.js"));
 
+var shieldGame = Object.create(TankGame.Game.prototype);
+var remoteLike = { name: "Guest", remoteId: "guest" };
+assert.strictEqual(
+  shieldGame.consumeTemporaryShield(remoteLike, 0, 0),
+  false,
+  "remote players without shieldCharges must not consume a phantom shield"
+);
+assert.ok(!("shieldCharges" in remoteLike), "a remote hit must not create a phantom shield field");
+var shielded = { shieldCharges: 2, levelShield: true, shieldTimer: 0 };
+assert.strictEqual(shieldGame.consumeTemporaryShield(shielded, 0, 0), true);
+assert.strictEqual(shielded.shieldCharges, 1, "real shields still consume one charge");
+
 var game = Object.create(TankGame.Game.prototype);
 game.selectedMode = "online";
 game.onlineCombatStart = 500000;
