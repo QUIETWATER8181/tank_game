@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>2.5D 墙体相邻关系预览（可破坏 / 不可破坏混排）</title>
+<style>
+  html, body { margin: 0; background: #0d100b; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="scene" width="1440" height="980"></canvas>
+<script src="../../js/config.js"></script>
+<script src="../../js/view.js"></script>
+<script src="../../js/map.js"></script>
+<script src="../../js/battlefield.js"></script>
+<script>
+  // 2.5D 墙体相邻关系的预览板 / 回归用例。
+  // 打开方式：起静态服务后访问 tools/pseudo3d/wall-preview.html?legacy=1 可看修复前的画法。
+  //
+  // 四种排布，都是「可破坏砖墙 B」与「不可破坏钢墙 #」贴在一起：
+  //   A 砖墙在钢墙南侧（矮墙挡在高墙前面 —— 就是用户报的那种）
+  //   B 钢墙在砖墙南侧（高墙挡在矮墙前面）
+  //   C 左右相邻（同排，一列钢一列砖）
+  //   D 拐角（L 形，横竖都混）
+  var canvas = document.getElementById("scene");
+  var ctx = canvas.getContext("2d");
+  var View = TankGame.View;
+  var Battlefield = TankGame.Battlefield;
+  var Map = TankGame.Map;
+  var TILE = Map.tileSize || 60;
+  var LEGACY = /[?&]legacy=1/.test(window.location.search);
+
+  View.setPitch(48, false);
+  var k = View.k;
+
+  var previewMap = {
+    seed: 20261106, isBossMap: false, obstacles: [], cells: [],
+    enemySpawns: [], playerSpawn: { x: 720, y: 820 }, bossSpawn: { x: 720, y: 240 }
+  };
+  Battlefield.drawGround(ctx, previewMap, { left: 0, top: 0, right: 1440, bottom: 980 });
+  // 地面参考色必须在画墙之前取样（后面这块空地会被墙盖住就不准了）
+  var groundRef = sampleMean(700, 900, 60, 60);
+
+  var CASES = [
+    { id: "A", title: "A 砖墙在钢墙南侧（矮挡高）", rows: ["###", "BBB"], probe: { row: 0, column: 1 } },
+    { id: "B", title: "B 钢墙在砖墙南侧（高挡矮）", rows: ["BBB", "###"], probe: { row: 0, column: 1 } },
+    { id: "C", title: "C 左右相邻（钢|砖|钢）", rows: ["#B#", "#B#"], probe: { row: 0, column: 1 } },
+    { id: "D", title: "D 拐角 L 形混排", rows: ["#B#", "#BB"], probe: { row: 0, column: 1 } }
+  ];
+
+  function makeMap(rows) {
+    var cells = [];
+    var obstacles = [];
+    rows.forEach(function (line, row) {
+      cells[row] = [];
+      line.split("").forEach(function (kind, column) {
+        cells[row][column] = kind === "." ? " " : kind;
+        if (kind === "." || kind === " ") { return; }
+        obstacles.push({
+          x: column * TILE, y: row * TILE, width: TILE, height: TILE,
+          column: column, row: row, kind: kind
+        });
+      });
+    });
+    return { cells: cells, obstacles: obstacles, isBossMap: false, seed: 1 };
+  }
+
+  function kindAt(map, column, row) {
+    var line = map.cells[row];
+    if (!line) { return null; }
+    var kind = line[column];
+    return kind && kind !== " " ? kind : null;
+  }
+
+  function byDepth(a, b) { return (a.y + TILE) - (b.y + TILE) || a.x - b.x; }
+
+  // 修复前的等价画法：邻居实心就当成「自己这一种」，于是立面整段不画。
+  function drawLegacy(map, target) {
+    map.obstacles.slice().sort(byDepth).forEach(function (obstacle) {
+      var cells = [];
+      cells[obstacle.row] = [];
+      cells[obstacle.row][obstacle.column] = obstacle.kind;
+      cells[obstacle.row + 1] = [];
+      cells[obstacle.row + 1][obstacle.column] =
+        kindAt(map, obstacle.column, obstacle.row + 1) ? obstacle.kind : " ";
+      if (obstacle.column > 0) {
+        cells[obstacle.row][obstacle.column - 1] =
+          kindAt(map, obstacle.column - 1, obstacle.row) ? obstacle.kind : " ";
+      }
+      cells[obstacle.row][obstacle.column + 1] =
+        kindAt(map, obstacle.column + 1, obstacle.row) ? obstacle.kind : " ";
+      Battlefield.drawObstacle(target, obstacle, { cells: cells, isBossMap: false });
+    });
+  }
+
+  function drawCase(map, target, originX, originY, zoom) {
+    target.save();
+    target.scale(zoom, zoom * k);
+    target.translate(originX / zoom, originY / (zoom * k));
+    if (LEGACY) { drawLegacy(map, target); }
+    else {
+      map.obstacles.slice().sort(byDepth).forEach(function (obstacle) {
+        Battlefield.drawObstacle(target, obstacle, map);
+      });
+    }
+    target.restore();
+  }
+
+  function label(text, x, y, color, font) {
+    ctx.save();
+    ctx.font = font || "12px Consolas, 'Microsoft YaHei', monospace";
+    ctx.fillStyle = "rgba(6, 10, 7, 0.78)";
+    ctx.fillRect(x - 2, y - 12, ctx.measureText(text).width + 6, 16);
+    ctx.fillStyle = color || "#d7e2c8";
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
+  // 上面一排 1:1（和游戏里一致），下面一排 2 倍放大（看细节）
+  var layouts = [
+    { zoom: 1, top: 250, gap: 330, label: "1:1 实际尺寸" },
+    { zoom: 2, top: 600, gap: 300, label: "2× 放大" }
+  ];
+
+  var results = [];
+  layouts.forEach(function (layout) {
+    label(layout.label + (LEGACY ? "（修复前 legacy 画法）" : "（当前画法）"), 24, layout.top - 120, "#a9c08d", "13px Consolas, 'Microsoft YaHei', monospace");
+    CASES.forEach(function (testCase, index) {
+      var originX = 40 + index * layout.gap;
+      var originY = layout.top;
+      var map = makeMap(testCase.rows);
+      drawCase(map, ctx, originX, originY, layout.zoom);
+      label(testCase.title, originX - 6, originY - (layout.zoom > 1 ? 96 : 76), "#8fa377");
+      if (layout.zoom === 1) {
+        // 只在 1:1 那排上做像素测量，和游戏里的像素一一对应
+        results.push(measureCase(testCase, map, originX, originY, layout.zoom));
+      }
+    });
+  });
+
+  // ---------------------------------------------------------------- 像素测量
+  // 「洞」的定义：墙群剪影的包围盒里出现「地面色」的像素。
+  // 地面色不写死，直接从画面左下角的空地取样，避免调色变了就失效。
+  function sampleMean(left, top, width, height) {
+    var data = ctx.getImageData(left, top, width, height).data;
+    var red = 0, green = 0, blue = 0, count = 0;
+    for (var index = 0; index < data.length; index += 4) {
+      red += data[index]; green += data[index + 1]; blue += data[index + 2]; count += 1;
+    }
+    return count ? [red / count, green / count, blue / count] : [0, 0, 0];
+  }
+
+  // 和地面参考色的距离小于阈值就算「露出地面」
+  function isGroundLike(red, green, blue) {
+    var dr = red - groundRef[0], dg = green - groundRef[1], db = blue - groundRef[2];
+    return Math.sqrt(dr * dr + dg * dg + db * db) < 26;
+  }
+
+  function measureCase(testCase, map, originX, originY, zoom) {
+    var tallest = 0;
+    map.obstacles.forEach(function (obstacle) {
+      var height = Battlefield.getWallHeight(obstacle.kind);
+      if (height > tallest) { tallest = height; }
+    });
+    var facade = Math.round(tallest / Math.max(0.25, k));
+    var columns = testCase.rows[0].length;
+    var rows = testCase.rows.length;
+    var left = Math.round(originX);
+    var top = Math.round(originY - facade * zoom * k);
+    var width = Math.round(columns * TILE * zoom);
+    var height = Math.round((facade + rows * TILE) * zoom * k);
+    var data = ctx.getImageData(left, top, width, height).data;
+    var holes = 0;
+    var total = 0;
+    for (var index = 0; index < data.length; index += 4) {
+      total += 1;
+      if (isGroundLike(data[index], data[index + 1], data[index + 2])) { holes += 1; }
+    }
+    // 探针：高墙露出来的那段立面（高墙 - 矮墙 的高度差）
+    var probe = testCase.probe;
+    var probeKind = testCase.rows[probe.row].charAt(probe.column);
+    var southKind = kindAt(map, probe.column, probe.row + 1);
+    var probeHeight = Battlefield.getWallHeight(probeKind);
+    var southHeight = southKind ? Battlefield.getWallHeight(southKind) : 0;
+    var visibleWorld = Math.round((probeHeight - Math.min(probeHeight, southHeight)) / Math.max(0.25, k));
+    var band = null;
+    if (visibleWorld > 1) {
+      band = sampleBand(
+        Math.round(left + probe.column * TILE * zoom),
+        Math.round(originY + (TILE * k - probeHeight) * zoom),
+        Math.round(TILE * zoom),
+        Math.max(1, Math.round(visibleWorld * k * zoom))
+      );
+    }
+    return {
+      case: testCase.id,
+      probeKind: probeKind,
+      southKind: southKind || null,
+      exposedFacade: visibleWorld,
+      holeRatio: Number((holes / total).toFixed(4)),
+      band: band
+    };
+  }
+
+  function sampleBand(left, top, width, height) {
+    var data = ctx.getImageData(left, top, width, height).data;
+    var ground = 0;
+    var sumLuma = 0;
+    var count = 0;
+    for (var index = 0; index < data.length; index += 4) {
+      var red = data[index], green = data[index + 1], blue = data[index + 2];
+      sumLuma += red * 0.2126 + green * 0.7152 + blue * 0.0722;
+      if (isGroundLike(red, green, blue)) { ground += 1; }
+      count += 1;
+    }
+    return {
+      pixels: count,
+      groundRatio: count ? Number((ground / count).toFixed(3)) : null,
+      luma: count ? Number((sumLuma / count).toFixed(1)) : null
+    };
+  }
+
+  window.__wallPreview = {
+    k: Number(k.toFixed(4)),
+    legacy: LEGACY,
+    tile: TILE,
+    heights: {
+      steel: Battlefield.getWallHeight("#"),
+      brick: Battlefield.getWallHeight("B")
+    },
+    cases: results
+  };
+</script>
+</body>
+</html>

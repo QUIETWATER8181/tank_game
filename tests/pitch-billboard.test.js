@@ -63,7 +63,7 @@ function makeContext(label) {
     imageSmoothingEnabled: true,
     filter: "none"
   };
-  var recording = ["fillRect", "strokeRect", "fillText", "strokeText", "drawImage", "arc", "ellipse", "moveTo", "lineTo"];
+  var recording = ["fillRect", "strokeRect", "fillText", "strokeText", "drawImage", "arc", "ellipse", "moveTo", "lineTo", "rect"];
   recording.forEach(function (name) {
     target[name] = function () {
       target.calls.push({
@@ -233,6 +233,75 @@ check("2.5D 装饰物：贴图不被压扁，脚底落在地面点上", function
     draw.args[2] + draw.args[4] - pad);
   assertClose(bottomCenter.x, decoration.x, "装饰物脚底 X 应贴在地面点", 0.5);
   assertClose(bottomCenter.y, decoration.y * K, "装饰物脚底 Y 应贴在地面点", 0.5);
+});
+
+check("2.5D 矮墙贴着高墙：高墙露出来的那段立面要补画，不能整段消失", function () {
+  var Battlefield = TankGame.Battlefield;
+  var steelHeight = Battlefield.getWallHeight("#");
+  var brickHeight = Battlefield.getWallHeight("B");
+  assert.ok(steelHeight > brickHeight, "钢墙应比砖墙高，否则这个用例没有意义");
+
+  // 立面 clip 的高度就是「高墙 - 南侧矮墙」露出来的那一段
+  function facadeClipHeights(cells) {
+    var context = makeContext("wall");
+    context.scale(1, K);
+    Battlefield.drawObstacle(context, { x: 0, y: 0, column: 0, row: 0, kind: "#", width: 60, height: 60 },
+      { cells: cells, isBossMap: false }, true);
+    return context.calls.filter(function (call) { return call.name === "rect"; })
+      .map(function (call) { return call.args[3]; });
+  }
+
+  var expected = (steelHeight - brickHeight) / K;
+  var withBrick = facadeClipHeights([["#"], ["B"]]);
+  var withSteel = facadeClipHeights([["#"], ["#"]]);
+  var withNothing = facadeClipHeights([["#"], [" "]]);
+
+  assert.ok(withBrick.some(function (height) { return Math.abs(height - expected) < 0.6; }),
+    "砖墙在前时钢墙应补画 " + expected.toFixed(1) + "px 立面，实际 clip 高度 " + JSON.stringify(withBrick));
+  assert.ok(withSteel.every(function (height) { return Math.abs(height - expected) >= 0.6; }),
+    "同高墙相邻时不该出现这段立面，实际 " + JSON.stringify(withSteel));
+  var full = steelHeight / K;
+  assert.ok(withNothing.some(function (height) { return Math.abs(height - full) < 0.6; }),
+    "南侧空着时应画完整立面 " + full.toFixed(1) + "px，实际 " + JSON.stringify(withNothing));
+});
+
+check("2.5D 装饰物整层画在坦克下面", function () {
+  var game = new TankGame.Game({
+    width: 1440,
+    height: 900,
+    getContext: function () { return makeContext("render"); }
+  }, {
+    pointer: { down: false, inside: false },
+    isDown: function () { return false; },
+    reset: function () {}
+  });
+  game.start();
+  View.setPitch(PITCH, false);
+
+  var order = [];
+  var drawDecoration = TankGame.Map.drawDecoration;
+  var drawTank = TankGame.Entities.drawTank;
+  TankGame.Map.drawDecoration = function () {
+    order.push("decor");
+    return drawDecoration.apply(this, arguments);
+  };
+  TankGame.Entities.drawTank = function () {
+    order.push("tank");
+    return drawTank.apply(this, arguments);
+  };
+  try {
+    game.render(0);
+  } finally {
+    TankGame.Map.drawDecoration = drawDecoration;
+    TankGame.Entities.drawTank = drawTank;
+  }
+
+  var lastDecor = order.lastIndexOf("decor");
+  var firstTank = order.indexOf("tank");
+  assert.ok(lastDecor !== -1, "这一帧应该画到装饰物");
+  assert.ok(firstTank !== -1, "这一帧应该画到坦克");
+  assert.ok(lastDecor < firstTank,
+    "装饰物应全部画在坦克之前（否则草丛/石头会盖住坦克），实际顺序：" + order.join(","));
 });
 
 check("2.5D 装饰物的接地阴影仍然跟着地面压扁", function () {

@@ -3251,6 +3251,14 @@
     if (!pitchedView) { this.drawTracks(context); }
     this.drawWrecks(context);
     TankGame.Map.draw(context, this.worldMap, bounds, pitchedView);
+    if (pitchedView) {
+      // 2.5D 的装饰物单独一层：画在墙、遗骸和坦克之前（2D 的 Map.draw 也是先装饰后墙），
+      // 否则一丛草/一块石头挨着坦克就会把它盖住半截。
+      // 放在 Map.draw 之后，是因为它会补画水面/火痕/出生点，装饰物要压在这些之上。
+      TankGame.Map.queryDecorations(this.worldMap, bounds).forEach(function (decoration) {
+        TankGame.Map.drawDecoration(context, decoration, this.worldMap, true);
+      }, this);
+    }
     this.drawBossBattleEffects(context);
     this.drawBossFirePits(context);
     if (cinematicActive) { this.cinematic.drawRotorWash(context); }
@@ -3274,13 +3282,6 @@
             if (TankGame.Battlefield) { TankGame.Battlefield.drawObstacle(context, obstacle, this.worldMap); }
             else { TankGame.Map.drawObstacle(context, obstacle, this.worldMap); }
           }.bind(this)
-        });
-      }, this);
-      var visibleDecorations = TankGame.Map.queryDecorations(this.worldMap, bounds);
-      visibleDecorations.forEach(function (decoration) {
-        depthItems.push({
-          depth: TankGame.Map.decorationDepth(decoration),
-          draw: function () { TankGame.Map.drawDecoration(context, decoration, this.worldMap, true); }.bind(this)
         });
       }, this);
       var drawDepthTank = function (tank) {

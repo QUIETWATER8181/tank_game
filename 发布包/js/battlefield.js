@@ -609,10 +609,16 @@
   // ---------------------------------------------------------------- 地形查询
 
   function solidAt(worldMap, column, row) {
+    return Boolean(neighborKind(worldMap, column, row));
+  }
+
+  // 返回格子里的实心墙种类（"#"/"B"/"I"/"S"），空格/水/越界都返回 null
+  function neighborKind(worldMap, column, row) {
     var cells = worldMap && worldMap.cells;
     var line = cells && cells[row];
-    if (!line) { return false; }
-    return Boolean(line[column] && SOLID[line[column]]);
+    if (!line) { return null; }
+    var kind = line[column];
+    return kind && SOLID[kind] ? kind : null;
   }
 
   function getRoadPaths(worldMap) {
@@ -1109,21 +1115,36 @@
       return;
     }
 
-    var southOpen = !solidAt(worldMap, obstacle.column, obstacle.row + 1);
-    var westOpen = !solidAt(worldMap, obstacle.column - 1, obstacle.row);
-    var eastOpen = !solidAt(worldMap, obstacle.column + 1, obstacle.row);
+    // 相邻格子的「种类」比「是否实心」有用：墙高不一样时，矮墙挡不住高墙的下半截立面，
+    // 只按布尔值判断就会出现「砖墙贴着钢墙 → 钢墙的正面整块消失、顶面像是错位压过来」。
+    var southKind = neighborKind(worldMap, obstacle.column, obstacle.row + 1);
+    var westKind = neighborKind(worldMap, obstacle.column - 1, obstacle.row);
+    var eastKind = neighborKind(worldMap, obstacle.column + 1, obstacle.row);
+    var southOpen = !southKind;
+    var westOpen = !westKind;
+    var eastOpen = !eastKind;
+    var southHeight = southKind ? (WALL_HEIGHT[southKind] || 0) : 0;
+    var westHeight = westKind ? (WALL_HEIGHT[westKind] || 0) : 0;
+    var eastHeight = eastKind ? (WALL_HEIGHT[eastKind] || 0) : 0;
+    // 南侧矮墙能盖住的立面高度；露出来的那一段才是本块真正要画的
+    var southCover = southHeight > 0 ? Math.round(southHeight / Math.max(0.25, k)) : 0;
+    var facadeVisible = facade - southCover;
+    // 侧面棱线：邻居比本块矮（或干脆没有邻居）时，那道棱是看得见的
+    var southEdge = southOpen || southHeight < screenHeight;
+    var westEdge = westOpen || westHeight < screenHeight;
+    var eastEdge = eastOpen || eastHeight < screenHeight;
     var fringeIndex = (obstacle.column * 7 + obstacle.row * 13) % B.sprites.fringe.length;
 
     if (!noCache) {
-      var cacheKey = obstacle.kind + "|" + (southOpen ? 1 : 0) + (westOpen ? 1 : 0) +
-        (eastOpen ? 1 : 0) + "|" + fringeIndex + "|" + facade.toFixed(2) +
+      var cacheKey = obstacle.kind + "|" + southHeight + "," + westHeight + "," + eastHeight +
+        "|" + fringeIndex + "|" + facade.toFixed(2) +
         "|" + (((obstacle.x % 128) + 128) % 128) + "," + (((obstacle.y % 128) + 128) % 128);
       var cached = B.wallSpriteCache[cacheKey];
       if (cached) {
         ctx.drawImage(cached.canvas, x + cached.offsetX, y + cached.offsetY);
         return;
       }
-      var built = B.buildWallSprite(obstacle, facade, southOpen, westOpen, eastOpen, cacheKey);
+      var built = B.buildWallSprite(obstacle, facade, southKind, westKind, eastKind, cacheKey);
       if (built) {
         ctx.drawImage(built.canvas, x + built.offsetX, y + built.offsetY);
         return;
@@ -1148,27 +1169,28 @@
     ctx.strokeStyle = "rgba(226, 224, 196, 0.20)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    if (southOpen) {
+    if (southEdge) {
       ctx.moveTo(x, y + size);
       ctx.lineTo(x + size, y + size);
     }
-    if (westOpen) {
+    if (westEdge) {
       ctx.moveTo(x, y);
       ctx.lineTo(x, y + size);
     }
-    if (eastOpen) {
+    if (eastEdge) {
       ctx.moveTo(x + size, y);
       ctx.lineTo(x + size, y + size);
     }
     ctx.stroke();
     ctx.restore();
 
-    // 朝南立面
-    if (southOpen) {
+    // 朝南立面：按完整高度画，但只露出没被南侧矮墙挡住的那一段（clip 而不是缩短，
+    // 砖缝相位才不会跟着变，和相邻墙才对得上）
+    if (facadeVisible > 0.5) {
       var faceY = y + size - facade;
       ctx.save();
       ctx.beginPath();
-      ctx.rect(x, faceY, size + 0.6, facade);
+      ctx.rect(x, faceY, size + 0.6, facadeVisible);
       ctx.clip();
       if (pattern) {
         ctx.fillStyle = pattern;
@@ -1186,14 +1208,15 @@
       // 底部积土/烟熏
       ctx.fillStyle = "rgba(18, 20, 16, 0.30)";
       ctx.fillRect(x, y + size - 4, size, 4);
-      // 暴露的左右边缘压暗
+      // 暴露的左右边缘压暗：邻居比本块矮时，那半截立面也是露出来的
       ctx.fillStyle = "rgba(12, 14, 12, 0.26)";
-      if (westOpen) { ctx.fillRect(x, faceY, 2, facade); }
-      if (eastOpen) { ctx.fillRect(x + size - 2, faceY, 2, facade); }
+      if (westEdge) { ctx.fillRect(x, faceY, 2, facade); }
+      if (eastEdge) { ctx.fillRect(x + size - 2, faceY, 2, facade); }
       ctx.restore();
 
-      // 墙脚草：压在墙面上，墙就不会像一块浮在草地上的贴纸
-      var fringe = B.sprites.fringe[fringeIndex];
+      // 墙脚草：压在墙面上，墙就不会像一块浮在草地上的贴纸。
+      // 南侧有墙时墙脚被挡住了，再画就会糊到别人顶面上。
+      var fringe = southOpen ? B.sprites.fringe[fringeIndex] : null;
       if (fringe) {
         ctx.globalAlpha = 0.78;
         ctx.drawImage(fringe, x - 10, y + size - 16, size + 20, 30);
@@ -1203,8 +1226,9 @@
   };
 
   // 把一块墙的顶面/朝南立面/墙脚草预渲染成小图；相邻墙是否实心决定暴露边，
-  // 所以缓存键里要带 south/west/east 和当前俯仰下的立面高度。
-  B.buildWallSprite = function (obstacle, facade, southOpen, westOpen, eastOpen, cacheKey) {
+  // 把一块墙的顶面/朝南立面/墙脚草预渲染成小图；相邻墙的**种类**（决定高矮）决定哪段立面/棱线露出来，
+  // 所以缓存键里要带 south/west/east 三个邻居的高度和当前俯仰下的立面高度。
+  B.buildWallSprite = function (obstacle, facade, southKind, westKind, eastKind, cacheKey) {
     if (typeof document === "undefined" || !document.createElement) { return null; }
     if (B.wallSpriteCacheCount > 192) {
       B.wallSpriteCache = Object.create(null);
@@ -1218,15 +1242,17 @@
     var spriteContext = canvas.getContext("2d");
     if (!spriteContext) { return null; }
 
+    // 用真实邻居种类重放一遍：drawObstacle 内部靠 WALL_HEIGHT 判断遮挡关系，
+    // 这里塞 "#" 会让「砖墙 + 钢墙」的缓存图和直接绘制不一致。
     var cells = [];
     cells[obstacle.row] = [];
     cells[obstacle.row][obstacle.column] = obstacle.kind;
     cells[obstacle.row + 1] = [];
-    cells[obstacle.row + 1][obstacle.column] = southOpen ? " " : "#";
+    cells[obstacle.row + 1][obstacle.column] = southKind || " ";
     if (obstacle.column > 0) {
-      cells[obstacle.row][obstacle.column - 1] = westOpen ? " " : "#";
+      cells[obstacle.row][obstacle.column - 1] = westKind || " ";
     }
-    cells[obstacle.row][obstacle.column + 1] = eastOpen ? " " : "#";
+    cells[obstacle.row][obstacle.column + 1] = eastKind || " ";
 
     var fakeMap = { cells: cells, isBossMap: false };
     var fakeObstacle = {
