@@ -118,6 +118,8 @@ var drawCalls = { arcs: 0, strokes: 0 };
 var shieldContext = {
   save: function () {},
   restore: function () {},
+  translate: function () {},
+  scale: function () {},
   beginPath: function () {},
   arc: function () { drawCalls.arcs += 1; },
   fill: function () {},

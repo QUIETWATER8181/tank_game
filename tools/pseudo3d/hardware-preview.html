@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>坦克遗骸 / 固定炮台 预览</title>
+<style>
+  html, body { margin: 0; background: #0d100b; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="scene" width="1440" height="1260"></canvas>
+<script src="../../js/config.js"></script>
+<script src="../../js/view.js"></script>
+<script src="../../js/map.js"></script>
+<script src="../../js/battlefield.js"></script>
+<script>
+  // 坦克遗骸 / 固定炮台 的美术预览板（2.5D 与 2D 对照）。
+  // 打开方式：起静态服务后访问 tools/pseudo3d/hardware-preview.html
+  // 注意：2D 与 2.5D 必须切 View 的俯仰角来画，只少乘一个 scale(1,k) 会把
+  // 内部那层 1/k 反拉伸留着，画出来是被拉长的假 2D。
+  var canvas = document.getElementById("scene");
+  var ctx = canvas.getContext("2d");
+  var View = TankGame.View;
+  var Battlefield = TankGame.Battlefield;
+  var PITCH = 48;
+
+  var previewMap = {
+    seed: 20261101,
+    isBossMap: false,
+    obstacles: [],
+    enemySpawns: [],
+    playerSpawn: { x: 720, y: 820 },
+    bossSpawn: { x: 720, y: 240 },
+    cells: []
+  };
+
+  // 按指定视角执行一段绘制，结束后恢复原视角
+  function withView(pitched, draw) {
+    var previous = View.pitchDeg;
+    View.setPitch(pitched ? PITCH : 0, false);
+    try {
+      draw(View.k);
+    } finally {
+      View.setPitch(previous, false);
+    }
+  }
+
+  View.setPitch(PITCH, false);
+  Battlefield.drawGround(ctx, previewMap, { left: 0, top: 0, right: 1440, bottom: 1260 });
+
+  function label(text, x, y, color, font) {
+    ctx.save();
+    ctx.font = font || "12px Consolas, 'Microsoft YaHei', monospace";
+    ctx.fillStyle = "rgba(6, 10, 7, 0.72)";
+    ctx.fillRect(x - 2, y - 12, ctx.measureText(text).width + 6, 16);
+    ctx.fillStyle = color || "#d7e2c8";
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
+  var ANGLE = -0.4;
+
+  function drawWreckAt(screenX, screenY, variant, pitched, options) {
+    var opts = options || {};
+    withView(pitched, function (k) {
+      var wreck = {
+        x: screenX,
+        y: pitched ? screenY / k : screenY,
+        bodyAngle: opts.angle === undefined ? ANGLE : opts.angle,
+        visualScale: 1
+      };
+      ctx.save();
+      if (pitched) { ctx.scale(1, k); }
+      Battlefield.drawWreck(ctx, wreck, {
+        life: opts.life === undefined ? 3 : opts.life,
+        burn: opts.burn === undefined ? 0 : opts.burn,   // 默认不画火，先看清残骸本身
+        variant: variant,
+        particles: opts.particles || null
+      });
+      ctx.restore();
+    });
+  }
+
+  function drawTurretAt(screenX, screenY, angle, pitched, damage) {
+    withView(pitched, function (k) {
+      var tank = {
+        x: screenX,
+        y: pitched ? screenY / k : screenY,
+        turretAngle: angle,
+        visualScale: 1,
+        isTurret: true,
+        health: damage ? 12 : 50,
+        maxHealth: 50,
+        burning: Boolean(damage)
+      };
+      var drawY = tank.y - (pitched ? View.lift : 0);
+      ctx.save();
+      if (pitched) { ctx.scale(1, k); }
+      Battlefield.drawFixedTurret(ctx, tank, drawY);
+      ctx.restore();
+    });
+  }
+
+  function drawTurretWreckAt(screenX, screenY, pitched, options) {
+    var opts = options || {};
+    withView(pitched, function (k) {
+      var wreck = {
+        x: screenX,
+        y: pitched ? screenY / k : screenY,
+        bodyAngle: 0,
+        visualScale: 1,
+        isTurret: true
+      };
+      ctx.save();
+      if (pitched) { ctx.scale(1, k); }
+      Battlefield.drawWreck(ctx, wreck, {
+        life: opts.life === undefined ? 3 : opts.life,
+        burn: opts.burn === undefined ? 0 : opts.burn,
+        particles: opts.particles || null
+      });
+      ctx.restore();
+    });
+  }
+
+  // ---- 第 1 排：2.5D 遗骸（3 个变体 + 一个还在烧的）
+  label("2.5D 坦克遗骸：3 个变体（左 3）+ 刚被击毁（最右，带火舌）", 24, 40, "#a9c08d", "13px Consolas, 'Microsoft YaHei', monospace");
+  [0, 1, 2].forEach(function (variant, index) {
+    drawWreckAt(150 + index * 200, 150, variant, true);
+    label("v" + variant, 138 + index * 200, 205, "#8fa377");
+  });
+  var fireParticles = [];
+  for (var p = 0; p < 30; p += 1) {
+    fireParticles.push({
+      x: (Math.random() - 0.5) * 66,
+      y: (Math.random() - 0.5) * 60,
+      rise: 10 + Math.random() * 30,
+      sway: 4 + Math.random() * 11,
+      size: 5 + Math.random() * 6,
+      speed: 0.72 + Math.random() * 0.68,
+      phase: Math.random() * Math.PI * 2,
+      color: ["#ffb347", "#ff4d24", "#ffd166"][Math.floor(Math.random() * 3)]
+    });
+  }
+  drawWreckAt(780, 150, 0, true, { particles: fireParticles, life: 2.6, burn: 1 });
+  label("燃烧中", 752, 205, "#ffb98a");
+  drawTurretWreckAt(1080, 150, true);
+  label("炮台遗骸（基座还在，炮楼掀翻在旁）", 990, 205, "#ffd08a");
+  drawTurretWreckAt(1300, 150, true, { life: 2.2, burn: 1 });
+  label("炮台遗骸 · 燃烧中", 1236, 205, "#ffb98a");
+
+  // ---- 第 2 排：同一批遗骸在平视投影下的样子（只做美术对照，游戏内 2D 走原版矢量）
+  label("平视投影下的同一张贴图（仅美术参考；游戏内 2D 已改回原版矢量画法）", 24, 268, "#a9c08d", "13px Consolas, 'Microsoft YaHei', monospace");
+  [0, 1, 2].forEach(function (variant, index) {
+    drawWreckAt(150 + index * 200, 380, variant, false);
+    label("v" + variant, 138 + index * 200, 435, "#8fa377");
+  });
+  drawWreckAt(780, 380, 0, false, { particles: fireParticles, life: 2.6, burn: 1 });
+  label("燃烧中", 752, 435, "#ffb98a");
+  drawTurretWreckAt(1080, 380, false);
+  label("炮台遗骸（平视）", 1024, 435, "#ffd08a");
+  drawTurretWreckAt(1300, 380, false, { life: 2.2, burn: 1 });
+  label("燃烧中", 1272, 435, "#ffb98a");
+
+  // ---- 第 3 排：固定炮台（2.5D），四个朝向
+  label("2.5D 固定炮台：0° / 90° / 180° / 270°（最右是残血燃烧）", 24, 500, "#a9c08d", "13px Consolas, 'Microsoft YaHei', monospace");
+  [0, Math.PI / 2, Math.PI, -Math.PI / 2].forEach(function (angle, index) {
+    drawTurretAt(150 + index * 190, 600, angle, true, false);
+    label(Math.round(angle * 180 / Math.PI) + "°", 136 + index * 190, 660, "#8fa377");
+  });
+  drawTurretAt(900, 600, 0.6, true, true);
+  label("燃烧中", 872, 660, "#ffb98a");
+
+  // ---- 第 4 排：固定炮台（平视投影，只做美术对照）
+  label("平视投影下的同一套贴图（仅美术参考；游戏内 2D 已改回原版矢量画法）", 24, 720, "#a9c08d", "13px Consolas, 'Microsoft YaHei', monospace");
+  [0, Math.PI / 2, Math.PI, -Math.PI / 2].forEach(function (angle, index) {
+    drawTurretAt(150 + index * 190, 820, angle, false, false);
+    label(Math.round(angle * 180 / Math.PI) + "°", 136 + index * 190, 880, "#8fa377");
+  });
+  drawTurretAt(900, 820, 0.6, false, true);
+  label("燃烧中", 872, 880, "#ffb98a");
+
+  // ---- 右下角：和敌方坦克贴图同框比大小
+  label("尺寸对照：坦克 / 遗骸 / 炮台", 1120, 720, "#a9c08d", "13px Consolas, 'Microsoft YaHei', monospace");
+  var tankImage = new Image();
+  tankImage.src = "../../assets/images/tanks/enemy-hull.png";
+  tankImage.onload = function () {
+    withView(true, function (k) {
+      ctx.save();
+      ctx.scale(1, k);
+      ctx.translate(1120, 800 / k);
+      View.billboard(ctx);
+      ctx.scale(0.34, 0.34);
+      ctx.drawImage(tankImage, -256, -256);
+      ctx.restore();
+    });
+  };
+  drawWreckAt(1200, 800, 0, true, { angle: 0 });
+  drawTurretAt(1300, 800, 0, true, false);
+  label("坦克", 1108, 860, "#9fb8d8");
+  label("遗骸", 1176, 860, "#9fb8d8");
+  label("炮台", 1284, 860, "#9fb8d8");
+
+  // ---- 第 5 排：火焰（同一处火的时间相位 + 强度衰减）
+  label("火焰：同一处火的 8 个时间相位（看抖动、窜火、烟柱和火星）", 24, 940, "#a9c08d", "13px Consolas, 'Microsoft YaHei', monospace");
+  var fireBase = 12.0;
+  for (var phase = 0; phase < 8; phase += 1) {
+    var fireX = 120 + phase * 155;
+    withView(true, function () {
+      Battlefield.drawFire(ctx, fireX, 1080, {
+        size: 34, intensity: 1, seed: 2.7, time: fireBase + phase * 0.13, smoke: 1
+      });
+    });
+    label("t+" + (phase * 0.13).toFixed(2) + "s", fireX - 30, 1105, "#8fa377");
+  }
+
+  label("火焰：遗骸从刚炸毁到烧尽（强度 1.0 → 0.2）", 24, 1150, "#a9c08d", "13px Consolas, 'Microsoft YaHei', monospace");
+  [1, 0.75, 0.5, 0.3, 0.15].forEach(function (intensity, index) {
+    var decayX = 120 + index * 175;
+    withView(true, function () {
+      Battlefield.drawFire(ctx, decayX, 1230, {
+        size: 34, intensity: intensity, seed: 2.7, time: 12.4, smoke: 1
+      });
+    });
+    label("intensity " + intensity, decayX - 42, 1250, "#8fa377");
+  });
+
+  // ---------------------------------------------------------------- 像素统计自检
+  function analyzePixels(data, width, height) {
+    var sumLuma = 0, sumSat = 0, hueSin = 0, hueCos = 0, hueCount = 0, count = 0;
+    var minLuma = 255, maxLuma = 0, sumR = 0, sumG = 0, sumB = 0;
+    for (var index = 0; index < data.length; index += 4) {
+      if (data[index + 3] < 140) { continue; }
+      var red = data[index], green = data[index + 1], blue = data[index + 2];
+      var luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+      var max = Math.max(red, green, blue), min = Math.min(red, green, blue);
+      var sat = max === 0 ? 0 : (max - min) / max;
+      sumR += red; sumG += green; sumB += blue;
+      sumLuma += luma;
+      sumSat += sat;
+      if (luma < minLuma) { minLuma = luma; }
+      if (luma > maxLuma) { maxLuma = luma; }
+      if (sat > 0.1 && max > 24) {
+        var hue;
+        if (max === red) { hue = ((green - blue) / (max - min)) % 6; }
+        else if (max === green) { hue = (blue - red) / (max - min) + 2; }
+        else { hue = (red - green) / (max - min) + 4; }
+        hue *= 60;
+        if (hue < 0) { hue += 360; }
+        var radians = hue * Math.PI / 180;
+        hueSin += Math.sin(radians);
+        hueCos += Math.cos(radians);
+        hueCount += 1;
+      }
+      count += 1;
+    }
+    if (!count) { return null; }
+    var hueDegrees = hueCount ? Math.atan2(hueSin / hueCount, hueCos / hueCount) * 180 / Math.PI : null;
+    if (hueDegrees !== null && hueDegrees < 0) { hueDegrees += 360; }
+    return {
+      coverage: Number((count / (width * height)).toFixed(3)),
+      meanColor: [Math.round(sumR / count), Math.round(sumG / count), Math.round(sumB / count)],
+      luma: Number((sumLuma / count).toFixed(1)),
+      lumaRange: [Math.round(minLuma), Math.round(maxLuma)],
+      sat: Number((sumSat / count).toFixed(3)),
+      hue: hueDegrees === null ? null : Number(hueDegrees.toFixed(1))
+    };
+  }
+
+  // 一张 512 贴图的占地、明度/饱和度，以及有没有被画布边缘裁掉
+  function spriteReport(source, data) {
+    var width = source.width;
+    var height = source.height;
+    var stats = analyzePixels(data, width, height);
+    var box = { left: width, top: height, right: -1, bottom: -1 };
+    var edgeAlpha = 0;
+    for (var y = 0; y < height; y += 1) {
+      for (var x = 0; x < width; x += 1) {
+        var alpha = data[(y * width + x) * 4 + 3];
+        if (alpha < 24) { continue; }
+        if (x < box.left) { box.left = x; }
+        if (x > box.right) { box.right = x; }
+        if (y < box.top) { box.top = y; }
+        if (y > box.bottom) { box.bottom = y; }
+        if ((x === 0 || y === 0 || x === width - 1 || y === height - 1) && alpha > edgeAlpha) {
+          edgeAlpha = alpha;
+        }
+      }
+    }
+    var touchesEdge = box.left <= 0 || box.top <= 0 || box.right >= width - 1 || box.bottom >= height - 1;
+    return {
+      stats: stats,
+      box: box,
+      width: box.right - box.left + 1,
+      height: box.bottom - box.top + 1,
+      edgeAlpha: edgeAlpha,
+      clipped: touchesEdge && edgeAlpha >= 100
+    };
+  }
+
+  // threshold 用来分开量「整体占地」（含地面焦土/投影，24）和「本体」（不透明核心，200）
+  function measureDraw(drawFn, threshold) {
+    var cutoff = threshold || 24;
+    var scratch = document.createElement("canvas");
+    scratch.width = 420;
+    scratch.height = 420;
+    var g = scratch.getContext("2d");
+    drawFn(g);
+    var data = g.getImageData(0, 0, 420, 420).data;
+    var left = 420, top = 420, right = -1, bottom = -1;
+    for (var y = 0; y < 420; y += 1) {
+      for (var x = 0; x < 420; x += 1) {
+        if (data[(y * 420 + x) * 4 + 3] < cutoff) { continue; }
+        if (x < left) { left = x; }
+        if (x > right) { right = x; }
+        if (y < top) { top = y; }
+        if (y > bottom) { bottom = y; }
+      }
+    }
+    return {
+      box: { left: left, top: top, right: right, bottom: bottom },
+      width: right - left + 1,
+      height: bottom - top + 1,
+      ratio: Number(((right - left + 1) / (bottom - top + 1)).toFixed(3))
+    };
+  }
+
+  function drawWreckOn(target, pitched, variant) {
+    withView(pitched, function (k) {
+      var wreck = { x: 210, y: pitched ? 210 / k : 210, bodyAngle: 0.3, visualScale: 1 };
+      target.save();
+      if (pitched) { target.scale(1, k); }
+      Battlefield.drawWreck(target, wreck, { life: 3, burn: 0, variant: variant });
+      target.restore();
+    });
+  }
+
+  function drawTurretWreckOn(target, pitched) {
+    withView(pitched, function (k) {
+      var wreck = { x: 210, y: pitched ? 210 / k : 210, bodyAngle: 0, visualScale: 1, isTurret: true };
+      target.save();
+      if (pitched) { target.scale(1, k); }
+      Battlefield.drawWreck(target, wreck, { life: 3, burn: 0 });
+      target.restore();
+    });
+  }
+
+  function drawTurretOn(target, pitched, angle) {
+    withView(pitched, function (k) {
+      var tank = { x: 210, y: pitched ? 210 / k : 210, turretAngle: angle, visualScale: 1, isTurret: true };
+      target.save();
+      if (pitched) { target.scale(1, k); }
+      Battlefield.drawFixedTurret(target, tank, tank.y - (pitched ? View.lift : 0));
+      target.restore();
+    });
+  }
+
+  var groundCanvas = document.createElement("canvas");
+  groundCanvas.width = 320;
+  groundCanvas.height = 320;
+  var groundContext = groundCanvas.getContext("2d");
+  Battlefield.drawGroundDirect(groundContext, previewMap, { left: 0, top: 0, right: 320, bottom: 320 });
+  var groundStats = analyzePixels(groundContext.getImageData(0, 0, 320, 320).data, 320, 320);
+
+  var wrecks = [];
+  for (var variant = 0; variant < Battlefield.wreckVariantCount; variant += 1) {
+    wrecks.push(measureDraw(function (g) { drawWreckOn(g, true, variant); }, 200));
+  }
+
+  // 贴图本身的自检
+  var spriteReports = { wrecks: {}, turret: {} };
+  var generated = Battlefield.hardwareSprites();
+  Object.keys(generated.wrecks).forEach(function (key) {
+    var sprite = generated.wrecks[key];
+    spriteReports.wrecks[key] = spriteReport(sprite.canvas, sprite.canvas.getContext("2d").getImageData(0, 0, 512, 512).data);
+  });
+  if (generated.turret) {
+    ["base", "gun"].forEach(function (key) {
+      var sprite = generated.turret[key];
+      spriteReports.turret[key] = spriteReport(sprite.canvas, sprite.canvas.getContext("2d").getImageData(0, 0, 512, 512).data);
+    });
+  }
+  if (generated.turretWreck) {
+    spriteReports.turretWreck = spriteReport(generated.turretWreck.canvas,
+      generated.turretWreck.canvas.getContext("2d").getImageData(0, 0, 512, 512).data);
+  }
+
+  window.__hardwareMetrics = {
+    ground: groundStats,
+    sprites: spriteReports,
+    wreck: {
+      onScreen25D: wrecks,
+      onScreen2D: measureDraw(function (g) { drawWreckOn(g, false, 0); }, 200),
+      footprint25D: measureDraw(function (g) { drawWreckOn(g, true, 0); }, 24),
+      footprint2D: measureDraw(function (g) { drawWreckOn(g, false, 0); }, 24),
+      turret25D: measureDraw(function (g) { drawTurretOn(g, true, 0); }, 200),
+      turret2D: measureDraw(function (g) { drawTurretOn(g, false, 0); }, 200),
+      turretWreck25D: measureDraw(function (g) { drawTurretWreckOn(g, true); }, 200),
+      turretWreck2D: measureDraw(function (g) { drawTurretWreckOn(g, false); }, 200)
+    },
+    error: Battlefield.lastHardwareError || null
+  };
+</script>
+</body>
+</html>

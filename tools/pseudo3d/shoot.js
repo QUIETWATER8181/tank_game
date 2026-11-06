@@ -172,14 +172,16 @@ async function main() {
     await client.send("Runtime.enable");
     await client.send("Page.enable");
     await client.send("Emulation.setDeviceMetricsOverride", {
-      width: 1440, height: 900, deviceScaleFactor: 1, mobile: false
+      width: Number(args.width || 1440), height: Number(args.height || 900), deviceScaleFactor: 1, mobile: false
     });
     await client.send("Page.navigate", { url: url });
     await delay(waitMs);
 
     // 给正式游戏用：先进战场再截图（--after 点击开始按钮，--afterWait 等战场加载）
-    if (args.after) {
-      await evaluate(client, args.after);
+    // 多行脚本用 --afterFile=path 传，省得和 shell 引号打架。
+    var afterScript = args.after || (args.afterFile ? fs.readFileSync(path.resolve(ROOT, args.afterFile), "utf8") : null);
+    if (afterScript) {
+      await evaluate(client, afterScript);
       await delay(Number(args.afterWait || 2000));
     }
 
@@ -190,7 +192,8 @@ async function main() {
     var stats = hasApi ? await evaluate(client, "window.__pseudo3d.getStats()") : null;
     var state = hasApi ? await evaluate(client, "window.__pseudo3d.getState()") : null;
     var extra = null;
-    if (args.eval) { extra = await evaluate(client, args.eval); }
+    var evalScript = args.eval || (args.evalFile ? fs.readFileSync(path.resolve(ROOT, args.evalFile), "utf8") : null);
+    if (evalScript) { extra = await evaluate(client, evalScript); }
 
     var screenshot = await client.send("Page.captureScreenshot", { format: "png", fromSurface: true });
     fs.mkdirSync(path.dirname(out), { recursive: true });

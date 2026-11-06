@@ -365,6 +365,11 @@ button:focus-visible {
   transition: opacity 180ms ease;
 }
 
+/* display:flex 会盖掉浏览器默认的 [hidden]{display:none}，所以显式写一条 */
+.hud[hidden] {
+  display: none;
+}
+
 .game-stage.is-cinematic .hud {
   opacity: 0;
 }

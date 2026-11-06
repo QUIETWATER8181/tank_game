@@ -529,60 +529,95 @@
     return true;
   };
 
+  var FIELD_SYMBOLS = {
+    mechanicalAscension: "⚙",
+    undyingTotem: "†",
+    trumpCard: "★",
+    voodooBullet: "☣",
+    bitterWinter: "❄"
+  };
+
+  // 站点插画在 2.5D 下是「立牌」：底边贴住站点南沿，纵向抵消相机压扁；
+  // 地面底座仍按地面画（该压扁），两者分开，画面比例才不怪。
+  function siteBillboardTransform(context, site) {
+    context.translate(site.centerX, site.top + site.height);
+    if (TankGame.View && TankGame.View.isPitched()) { TankGame.View.billboard(context); }
+    context.translate(-site.width / 2, -site.height);
+  }
+
   Game.prototype.drawFieldSite = function (context) {
     var site = this.fieldSite;
     var skill = this.getFieldSkill();
     if (!site || !skill) { return; }
+
+    // 1) 贴地底座
     context.save();
-    context.fillStyle = "rgba(2, 7, 11, 0.58)";
-    context.shadowColor = "rgba(0, 0, 0, 0.72)";
-    context.shadowBlur = 20;
-    context.fillRect(site.left + 7, site.top + 11, site.width, site.height);
+    context.fillStyle = "rgba(2, 7, 11, 0.46)";
+    context.fillRect(site.left, site.top, site.width, site.height);
+    context.strokeStyle = skill.color;
+    context.lineWidth = 3;
+    context.globalAlpha = 0.72;
+    context.shadowColor = skill.color;
+    context.shadowBlur = 14;
+    context.strokeRect(site.left + 2, site.top + 2, site.width - 4, site.height - 4);
     context.shadowBlur = 0;
-    context.fillStyle = "rgba(5, 11, 16, 0.88)";
-    context.fillRect(site.left - 6, site.top + site.height, site.width + 12, 10);
-    context.fillStyle = "rgba(255, 255, 255, 0.14)";
-    context.fillRect(site.left - 3, site.top - 3, site.width + 6, 5);
+    context.globalAlpha = 0.9;
+    context.lineWidth = 4;
+    var corner = 16;
+    [[site.left, site.top, 1, 1], [site.left + site.width, site.top, -1, 1],
+      [site.left, site.top + site.height, 1, -1], [site.left + site.width, site.top + site.height, -1, -1]]
+      .forEach(function (spec) {
+        context.beginPath();
+        context.moveTo(spec[0] + spec[2] * corner, spec[1]);
+        context.lineTo(spec[0], spec[1]);
+        context.lineTo(spec[0], spec[1] + spec[3] * corner);
+        context.stroke();
+      });
+    context.restore();
+
+    // 2) 立牌插画
     var icon = getFieldSkillIcon(skill);
-    if (icon && icon.complete && icon.naturalWidth > 0 && context.drawImage) {
-      context.globalAlpha = 0.94;
-      context.drawImage(icon, site.left, site.top, site.width, site.height);
+    var hasIcon = Boolean(icon && icon.complete && icon.naturalWidth > 0 && context.drawImage);
+    context.save();
+    siteBillboardTransform(context, site);
+    context.globalAlpha = 0.34;
+    context.fillStyle = "#03080c";
+    context.beginPath();
+    context.ellipse(site.width / 2, 0, site.width * 0.44, 12, 0, 0, Math.PI * 2);
+    context.fill();
+    context.globalAlpha = 1;
+    if (hasIcon) {
+      context.globalAlpha = 0.96;
+      context.drawImage(icon, 0, 0, site.width, site.height);
       context.globalAlpha = 1;
     } else {
       context.fillStyle = "rgba(18, 25, 37, 0.72)";
-      context.fillRect(site.left - 6, site.top - 6, site.width + 12, site.height + 12);
+      context.fillRect(0, 0, site.width, site.height);
+      context.globalAlpha = 0.46;
+      if (skill.id === "paradiseMade") {
+        drawParadiseTruckIcon(context, site.width / 2, site.height / 2, skill.color);
+      } else {
+        context.fillStyle = skill.color;
+        context.font = "900 66px Segoe UI Symbol, sans-serif";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText(FIELD_SYMBOLS[skill.id] || "◆", site.width / 2, site.height / 2);
+      }
+      context.globalAlpha = 1;
     }
-    context.fillStyle = "rgba(6, 12, 18, 0.22)";
-    context.fillRect(site.left, site.top, site.width, site.height);
     context.strokeStyle = skill.color;
-    context.lineWidth = 4;
+    context.lineWidth = 3;
+    context.globalAlpha = 0.82;
     context.shadowColor = skill.color;
-    context.shadowBlur = 18;
-    context.strokeRect(site.left - 5, site.top - 5, site.width + 10, site.height + 10);
+    context.shadowBlur = 16;
+    context.strokeRect(1.5, 1.5, site.width - 3, site.height - 3);
     context.shadowBlur = 0;
-    context.strokeStyle = "rgba(255, 255, 255, 0.34)";
-    context.lineWidth = 2;
-    context.beginPath();
-    context.moveTo(site.left - 3, site.top - 3);
-    context.lineTo(site.left + site.width + 3, site.top - 3);
-    context.moveTo(site.left - 3, site.top - 3);
-    context.lineTo(site.left - 3, site.top + site.height + 3);
-    context.stroke();
+    context.globalAlpha = 1;
     context.fillStyle = skill.color;
     context.font = "900 18px Microsoft YaHei, sans-serif";
     context.textAlign = "center";
-    context.fillText(skill.label, site.centerX, site.top - 14);
-    context.globalAlpha = icon && icon.complete && icon.naturalWidth > 0 ? 0.9 : 0.42;
-    context.font = "900 66px Segoe UI Symbol, sans-serif";
-    context.textBaseline = "middle";
-    if (!(icon && icon.complete && icon.naturalWidth > 0)) {
-      var symbols = { mechanicalAscension: "⚙", undyingTotem: "†", trumpCard: "★", voodooBullet: "☣", bitterWinter: "❄" };
-      if (skill.id === "paradiseMade") {
-        drawParadiseTruckIcon(context, site.centerX, site.centerY + 2, skill.color);
-      } else {
-        context.fillText(symbols[skill.id] || "◆", site.centerX, site.centerY + 2);
-      }
-    }
+    context.textBaseline = "alphabetic";
+    context.fillText(skill.label, site.width / 2, -16);
     context.restore();
   };
 
@@ -592,8 +627,9 @@
     var icon = getFieldSkillFrontIcon(skill);
     if (!site || !skill || !icon || !icon.complete || icon.naturalWidth <= 0 || !context.drawImage) { return; }
     context.save();
+    siteBillboardTransform(context, site);
     context.globalAlpha = 0.98;
-    context.drawImage(icon, site.left, site.top, site.width, site.height);
+    context.drawImage(icon, 0, 0, site.width, site.height);
     context.restore();
   };
 
@@ -643,12 +679,15 @@
   }
 
   Game.prototype.drawFieldCrystals = function (context) {
+    var pitched = Boolean(TankGame.View && TankGame.View.isPitched());
     this.fieldCrystals.forEach(function (crystal) {
       var pulse = 1 + Math.sin(crystal.pulse) * 0.08;
       var silver = context.createLinearGradient(-11, 0, 11, 0);
       var energy = context.createLinearGradient(0, -8, 0, 10);
       context.save();
       context.translate(crystal.x, crystal.y);
+      // 能量晶体是竖着的道具，2.5D 下不能跟着地面压扁
+      if (pitched) { TankGame.View.billboard(context); }
       context.scale(pulse, pulse);
       context.shadowColor = "rgba(67, 191, 255, 0.9)";
       context.shadowBlur = 18;
@@ -699,6 +738,13 @@
     var site = this.fieldSite;
     if (!this.fieldPopup || !site) { return; }
     var alpha = Math.min(1, this.fieldPopup.life / 0.35, (this.fieldPopup.maxLife - this.fieldPopup.life) / 0.35);
+    var view = TankGame.View;
+    var k = view && view.isPitched() ? view.k : 1;
+    var rise = (1 - this.fieldPopup.life / this.fieldPopup.maxLife) * 24;
+    var screenX = site.centerX - this.camera.x;
+    // 站点插画在 2.5D 下是立起来的，提示文字挂在插画顶部，
+    // 不再贴在那个已经被压扁的地面矩形上（旧算法还少乘了一次 k）。
+    var screenY = (site.top + site.height - this.camera.y) * k - site.height - 34 - rise;
     context.save();
     context.globalAlpha = Math.max(0, alpha);
     context.fillStyle = "#79e394";
@@ -706,7 +752,8 @@
     context.shadowBlur = 12;
     context.font = "900 22px Microsoft YaHei, sans-serif";
     context.textAlign = "center";
-    context.fillText(this.fieldPopup.text, site.centerX - this.camera.x, site.top - this.camera.y - 30 - (1 - this.fieldPopup.life / this.fieldPopup.maxLife) * 24);
+    context.textBaseline = "alphabetic";
+    context.fillText(this.fieldPopup.text, screenX, screenY);
     context.restore();
   };
 

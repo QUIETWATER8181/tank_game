@@ -317,6 +317,13 @@
   }
 
   function drawFixedTurret(context, tank, drawY) {
+    // 2.5D 用 battlefield.js 里的新炮台贴图（八边形装甲基座 + 可转炮塔 + 侧壁挤出）；
+    // 2D 保持原版那套纯矢量画法（用户要求：2D 一律回原样），拿不到贴图也退回矢量。
+    if (TankGame.View && TankGame.View.isPitched() &&
+        TankGame.Battlefield && TankGame.Battlefield.drawFixedTurret &&
+        TankGame.Battlefield.drawFixedTurret(context, tank, drawY)) {
+      return;
+    }
     var scale = (tank.visualScale || 1) * 1.12;
     var flash = tank.hitFlash > 0;
     var burning = tank.burning;
@@ -396,6 +403,19 @@
   }
   function drawBurningEffect(context, tank, drawY) {
     if (!tank.burning || !tank.alive) { return; }
+    // 新的分层火焰（火舌 + 炽光底焰 + 烟柱 + 火星，2.5D 下自动抵消压扁）
+    if (TankGame.Battlefield && TankGame.Battlefield.drawFire) {
+      var radius = tank.radius || 23;
+      TankGame.Battlefield.drawFire(context, tank.x, drawY + radius * 0.15, {
+        size: tank.isTurret ? 36 : radius * 1.05,
+        intensity: tank.isTurret ? 1 : 0.85,
+        seed: (tank.x * 0.017 + tank.y * 0.011) % 6.28,
+        alpha: 0.95,
+        smoke: 0.7
+      });
+      return;
+    }
+    // 兜底：旧的矢量火苗
     var now = performance.now();
     context.save();
     context.translate(tank.x, drawY);
@@ -548,10 +568,14 @@
       if (turret) {
         drawFixedTurret(context, tank, drawY);
         context.save();
+        context.translate(tank.x, drawY);
+        billboard(context);
+        // 新炮台贴图比原版矢量炮台高一截，血条要跟着抬；2D 保持原版的 -51
+        var barTop = (TankGame.View && TankGame.View.isPitched()) ? 66 : 51;
         context.fillStyle = "rgba(20, 18, 14, 0.86)";
-        context.fillRect(tank.x - 33 * scale, drawY - 51 * scale, 66 * scale, 6);
+        context.fillRect(-33 * scale, -barTop * scale, 66 * scale, 6);
         context.fillStyle = "#d3a448";
-        context.fillRect(tank.x - 32 * scale, drawY - 50 * scale, 64 * scale * Math.max(0, tank.health / (tank.maxHealth || 50)), 4);
+        context.fillRect(-32 * scale, -(barTop - 1) * scale, 64 * scale * Math.max(0, tank.health / (tank.maxHealth || 50)), 4);
         context.restore();
         drawBurningEffect(context, tank, drawY);
         return;
@@ -638,10 +662,13 @@
       if (tank.team === "enemy") {
         context.save();
         context.globalAlpha = shadow ? 0.52 : 1;
+        // 血条是竖直的 UI，跟着 2.5D 压扁会变成一条细线
+        context.translate(tank.x, drawY);
+        billboard(context);
         context.fillStyle = "rgba(4, 10, 8, 0.82)";
-        context.fillRect(tank.x - 25 * scale, drawY - 38 * scale, 50 * scale, 6);
+        context.fillRect(-25 * scale, -38 * scale, 50 * scale, 6);
         context.fillStyle = boss ? "#ffd700" : (elite ? "#e3b957" : (shadow ? "#c77dff" : "#ff8068"));
-        context.fillRect(tank.x - 24 * scale, drawY - 37 * scale, 48 * scale * Math.max(0, tank.health / (tank.maxHealth || 50)), 4);
+        context.fillRect(-24 * scale, -37 * scale, 48 * scale * Math.max(0, tank.health / (tank.maxHealth || 50)), 4);
         context.restore();
       }
       if (tank.team === "player" && tank.skin === "futureTech") { drawFutureTechEffects(context, tank, drawY, true); }
@@ -649,14 +676,17 @@
 
       if (tank.name && tank.alive) {
         context.save();
+        // 联机昵称是竖直文字：不抵消 2.5D 的纵向压扁就会被压成扁条，几乎没法读
+        context.translate(tank.x, drawY);
+        billboard(context);
         context.font = "700 13px Consolas, monospace";
         context.textAlign = "center";
         context.textBaseline = "bottom";
         context.fillStyle = tank.team === "player" ? "#d9f4ff" : "#ffd166";
         context.strokeStyle = "rgba(3, 8, 6, 0.9)";
         context.lineWidth = 4;
-        context.strokeText(tank.name, tank.x, drawY - 45 * scale);
-        context.fillText(tank.name, tank.x, drawY - 45 * scale);
+        context.strokeText(tank.name, 0, -45 * scale);
+        context.fillText(tank.name, 0, -45 * scale);
         context.restore();
       }
 
@@ -715,23 +745,41 @@
 
       if (tank.team === "player" && tank.shieldCharges > 0 && (tank.levelShield || tank.shieldTimer > 0)) {
         context.save();
+        context.translate(tank.x, drawY);
+        billboard(context);
         context.strokeStyle = "rgba(114, 207, 255, 0.85)";
         context.lineWidth = 2 + Math.min(3, tank.shieldCharges);
         context.shadowColor = "#72cfff";
         context.shadowBlur = 16;
         context.beginPath();
-        context.arc(tank.x, tank.y, 35 + Math.sin(performance.now() / 110) * 2, 0, Math.PI * 2);
+        context.arc(0, 0, 35 + Math.sin(performance.now() / 110) * 2, 0, Math.PI * 2);
         context.stroke();
         context.restore();
       }
     },
 
     getMuzzleDistance: function (tank) {
+      // 炮台的炮管长度按模式不同：2.5D 是新贴图的炮管口（182/512），
+      // 2D 仍是原版那套短炮管。用错的话炮弹会从炮管中段冒出来。
+      if (tank.isTurret) {
+        var pitched = TankGame.View && TankGame.View.isPitched();
+        return (pitched ? 62 : 46) * (tank.visualScale || 1);
+      }
       var definition = tankSpriteDefinitions[getTankSpriteKey(tank)];
       return (definition ? definition.muzzleDistance : 49) * (tank.visualScale || 1);
     },
 
     drawWreck: function (context, wreck) {
+      // 2.5D 用 battlefield.js 里的新遗骸贴图；2D 保持原版的「矩形 + 交叉线」。
+      if (TankGame.View && TankGame.View.isPitched() &&
+          TankGame.Battlefield && TankGame.Battlefield.drawWreck &&
+          TankGame.Battlefield.drawWreck(context, wreck, {
+            life: typeof wreck.wreckLife === "number" ? wreck.wreckLife : 3,
+            fadeTime: 0.6,
+            scale: (wreck.visualScale || 1) * 0.34
+          })) {
+        return;
+      }
       context.save();
       context.translate(wreck.x, wreck.y);
       context.rotate(wreck.bodyAngle);

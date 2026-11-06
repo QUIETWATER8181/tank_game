@@ -1204,13 +1204,14 @@
 
   Game.prototype.createWreckParticles = function (enemy) {
     var scale = enemy.visualScale || 1;
-    return Array.from({ length: 84 }, function () {
+    // 原来 84 个硬方块火星太密，压成一团糊；改成少而软的火舌/余烬
+    return Array.from({ length: 30 }, function () {
       return {
-        x: (Math.random() - 0.5) * 64 * scale,
-        y: (Math.random() - 0.5) * 58 * scale,
-        rise: (12 + Math.random() * 27) * scale,
-        sway: (5 + Math.random() * 12) * scale,
-        size: (7 + Math.random() * 7) * scale,
+        x: (Math.random() - 0.5) * 66 * scale,
+        y: (Math.random() - 0.5) * 60 * scale,
+        rise: (10 + Math.random() * 30) * scale,
+        sway: (4 + Math.random() * 11) * scale,
+        size: (5 + Math.random() * 6) * scale,
         speed: 0.72 + Math.random() * 0.68,
         phase: Math.random() * Math.PI * 2,
         color: ["#ffb347", "#ff4d24", "#ffd166"][Math.floor(Math.random() * 3)]
@@ -3238,6 +3239,8 @@
     var visibleObstacles = null;
     if (pitchedView && TankGame.Battlefield) {
       TankGame.Battlefield.drawGround(context, this.worldMap, bounds);
+      // 中央石台画在地面之后、墙根阴影之前：墙的影子才能落在石板上。
+      if (TankGame.Battlefield.drawStonePlatform) { TankGame.Battlefield.drawStonePlatform(context, this.worldMap); }
       visibleObstacles = TankGame.Map.queryObstacles(this.worldMap, bounds.left, bounds.top, bounds.right, bounds.bottom);
       TankGame.Battlefield.drawGroundShadows(context, this.worldMap, visibleObstacles);
     } else {
@@ -3532,18 +3535,20 @@
     var width = 56 * scale;
     var height = 50 * scale;
     context.save();
+    context.translate(target.x, drawY);
+    if (TankGame.View && TankGame.View.isPitched()) { TankGame.View.billboard(context); }
     context.strokeStyle = "rgba(0, 150, 255, 0.98)";
     context.fillStyle = "rgba(0, 150, 255, 0.08)";
     context.lineWidth = 3;
-    context.fillRect(target.x - width / 2, drawY - height / 2, width, height);
-    context.strokeRect(target.x - width / 2, drawY - height / 2, width, height);
+    context.fillRect(-width / 2, -height / 2, width, height);
+    context.strokeRect(-width / 2, -height / 2, width, height);
     context.fillStyle = "#ffe66d";
     context.shadowColor = "#ffe66d";
     context.shadowBlur = 10;
     context.font = "700 32px Consolas, monospace";
     context.textAlign = "center";
     context.textBaseline = "bottom";
-    context.fillText("+", target.x, drawY - height / 2 - 7);
+    context.fillText("+", 0, -height / 2 - 7);
     context.restore();
   };
 
@@ -3583,8 +3588,11 @@
         context.lineWidth = 5;
         context.shadowColor = context.strokeStyle;
         context.shadowBlur = 18;
+        context.translate(enemy.x, enemy.y - (enemy.leapHeight || 0) - (TankGame.View && TankGame.View.isPitched() ? TankGame.View.lift : 0));
+        // 蓄力环是竖直的指示环，不能被地面压扁
+        if (TankGame.View && TankGame.View.isPitched()) { TankGame.View.billboard(context); }
         context.beginPath();
-        context.arc(enemy.x, enemy.y - (enemy.leapHeight || 0), 42, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * chargeProgress);
+        context.arc(0, 0, 42, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * chargeProgress);
         context.stroke();
         context.restore();
       }
@@ -3816,14 +3824,18 @@
     if (["brave", "endless"].indexOf(this.selectedMode) === -1 || !player || !player.alive || player.reviveShieldTimer <= 0) { return; }
     var remaining = Math.min(1, player.reviveShieldTimer / 3);
     var pulse = Math.sin(this.elapsed * 11) * 2;
+    var drawY = player.y - (TankGame.View && TankGame.View.isPitched() ? TankGame.View.lift : 0);
     context.save();
+    context.translate(player.x, drawY);
+    // 护盾是罩在车体上的球，不是地面上的圈：必须抵消纵向压扁，否则变成扁椭圆
+    if (TankGame.View && TankGame.View.isPitched()) { TankGame.View.billboard(context); }
     context.fillStyle = "rgba(66, 165, 255, " + (0.1 + remaining * 0.08) + ")";
     context.strokeStyle = "rgba(80, 180, 255, " + (0.55 + remaining * 0.35) + ")";
     context.lineWidth = 4;
     context.shadowColor = "#42a5ff";
     context.shadowBlur = 22;
     context.beginPath();
-    context.arc(player.x, player.y, 43 + pulse, 0, Math.PI * 2);
+    context.arc(0, 0, 43 + pulse, 0, Math.PI * 2);
     context.fill();
     context.stroke();
     this.braveReviveParticles.forEach(function (particle, index) {
@@ -3833,7 +3845,7 @@
       context.globalAlpha = Math.max(0.12, alpha);
       context.fillStyle = "#7cc7ff";
       context.beginPath();
-      context.arc(player.x + Math.cos(angle) * radius, player.y + Math.sin(angle) * radius, particle.size, 0, Math.PI * 2);
+      context.arc(Math.cos(angle) * radius, Math.sin(angle) * radius, particle.size, 0, Math.PI * 2);
       context.fill();
     }, this);
     context.restore();
@@ -3893,7 +3905,14 @@
   };
 
   Game.prototype.drawWrecks = function (context) {
+    var battlefield = TankGame.Battlefield;
+    // 2.5D 才用新遗骸贴图；2D 保持原版的矩形 + 交叉线
+    var pitched = Boolean(TankGame.View && TankGame.View.isPitched());
     this.wrecks.forEach(function (wreck) {
+      if (pitched && battlefield && battlefield.drawWreck &&
+          battlefield.drawWreck(context, wreck, { life: wreck.life, fadeTime: 2.2, alpha: 0.82, scale: 0.31 })) {
+        return;
+      }
       context.save();
       context.globalAlpha = Math.min(0.55, wreck.life / 3);
       context.translate(wreck.x, wreck.y);
@@ -3948,6 +3967,8 @@
     this.supportAircraft.forEach(function (aircraft) {
       context.save();
       context.translate(aircraft.x, aircraft.y);
+      // 飞机在天上：按立牌画，别跟着地面压扁
+      if (TankGame.View && TankGame.View.isPitched()) { TankGame.View.billboard(context); }
       context.globalAlpha = 0.82;
       if (this.supportAircraftImage && this.supportAircraftImage.complete && this.supportAircraftImage.naturalWidth > 0) {
         context.drawImage(this.supportAircraftImage, -110, -80, 220, 160);
@@ -3977,6 +3998,8 @@
     this.rearGuards.forEach(function (guard) {
       context.save();
       context.translate(guard.x, guard.y);
+      // 顺序必须是 translate → billboard → rotate：压扁补偿和旋转都在屏幕等比空间里做，方块才不会变成菱形
+      if (TankGame.View && TankGame.View.isPitched()) { TankGame.View.billboard(context); }
       context.rotate(guard.angle);
       context.globalAlpha = guard.moving ? 0.82 : 0.65;
       context.shadowColor = "#72cfff";
@@ -4002,19 +4025,21 @@
       var scale = 1 + Math.sin(supply.pulse) * 0.08;
       var drawY = supply.y - (supply.dropHeight || 0);
       context.save();
+      context.translate(supply.x, drawY);
+      // 补给箱是竖直的箱子 + 文字，2.5D 下要抵消纵向压扁
+      if (TankGame.View && TankGame.View.isPitched()) { TankGame.View.billboard(context); }
       if (supply.airborne) {
         context.strokeStyle = "rgba(235, 246, 240, 0.75)";
         context.lineWidth = 2;
         context.beginPath();
-        context.moveTo(supply.x - 18, drawY - 18); context.lineTo(supply.x - 28, drawY - 48);
-        context.moveTo(supply.x + 18, drawY - 18); context.lineTo(supply.x + 28, drawY - 48);
+        context.moveTo(-18, -18); context.lineTo(-28, -48);
+        context.moveTo(18, -18); context.lineTo(28, -48);
         context.stroke();
         context.strokeStyle = "#d9eee4";
         context.beginPath();
-        context.arc(supply.x, drawY - 50, 30, Math.PI, Math.PI * 2);
+        context.arc(0, -50, 30, Math.PI, Math.PI * 2);
         context.stroke();
       }
-      context.translate(supply.x, drawY);
       context.scale(scale, scale);
       context.shadowColor = colors[supply.type];
       context.shadowBlur = 18;

@@ -30,7 +30,13 @@
     deadGrass: 16,
     scorchedRoot: 18,
     crate: 16,
-    barrel: 12
+    barrel: 12,
+    sandbag: 10,
+    ammoBox: 12,
+    drum: 10,
+    tire: 7,
+    barbedWire: 6,
+    rubble: 6
   };
 
   function rect(context, x, y, width, height, color) {
@@ -294,8 +300,12 @@
       }
 
       var decorations = [];
-      var decorationDensity = bossMap ? 0.029 : 0.012;
-      var decorationKinds = bossMap ? ["deadGrass", "deadGrass", "scorchedRoot", "rock", "crate", "sandbag"] : ["rock", "bush", "crate", "sandbag"];
+      // 2.5D 的装饰物是立牌，比旧的平铺色块更“有东西”，所以密度略降一点，
+      // 免得地图上到处是道具、看着乱。种类里自然物占多数，军事道具只是点缀。
+      var decorationDensity = bossMap ? 0.025 : 0.010;
+      var decorationKinds = bossMap ?
+        ["deadGrass", "deadGrass", "scorchedRoot", "scorchedRoot", "rock", "crate", "sandbag", "ammoBox", "rubble", "drum"] :
+        ["rock", "rock", "bush", "bush", "deadGrass", "crate", "sandbag", "ammoBox", "drum", "tire", "rubble"];
       for (var decorationIndex = 0; decorationIndex < Math.floor(columns * rows * decorationDensity); decorationIndex += 1) {
         var decorationColumn = 2 + Math.floor(random() * (columns - 4));
         var decorationRow = 3 + Math.floor(random() * (rows - 6));
@@ -490,7 +500,8 @@
       this.drawWater(context, worldMap, bounds);
       this.drawDriedGround(context, worldMap, bounds);
       if (!skipObstacles) { this.drawDecorations(context, worldMap, bounds); }
-      this.drawStonePlatform(context, worldMap);
+      // 2.5D 的石台由 js/battlefield.js 画（石板路 + 台基 + 投影），这里只管平铺。
+      if (!skipObstacles) { this.drawStonePlatform(context, worldMap); }
       if (!skipObstacles) {
         var obstacles = bounds ? this.queryObstacles(worldMap, bounds.left, bounds.top, bounds.right, bounds.bottom) : worldMap.obstacles;
         obstacles.forEach(function (obstacle) {
@@ -939,6 +950,13 @@
     },
 
     drawDecoration: function (context, decoration, worldMap, billboard) {
+      // 2.5D 用 battlefield.js 的写实立牌（有材质、有体积、接地阴影在正确位置）；
+      // 2D 平铺继续用下面的旧矢量装饰，两边互不影响。
+      if (billboard && TankGame.Battlefield && TankGame.Battlefield.drawDecoration &&
+          TankGame.Battlefield.hasDecorationArt(decoration.kind) &&
+          TankGame.Battlefield.drawDecoration(context, decoration)) {
+        return;
+      }
       var scale = decoration.scale || 1;
       var base = DECOR_BASE[decoration.kind] || 14;
       var k = billboard && TankGame.View && TankGame.View.isPitched() ? TankGame.View.k : 1;
@@ -1036,6 +1054,80 @@
         context.strokeStyle = "rgba(48, 30, 23, 0.8)"; context.lineWidth = 4;
         context.beginPath(); context.moveTo(-12, -12); context.lineTo(12, 12); context.moveTo(12, -12); context.lineTo(-12, 12); context.stroke();
         context.fillStyle = "rgba(245, 183, 104, 0.4)"; context.fillRect(-11, -11, 7, 3); context.fillRect(5, 5, 6, 3);
+      } else if (kind === "sandbag") {
+        context.fillStyle = "#4b4128";
+        context.beginPath();
+        context.ellipse(-9, 4, 10, 7, 0, 0, Math.PI * 2);
+        context.ellipse(9, 4, 10, 7, 0, 0, Math.PI * 2);
+        context.ellipse(0, -5, 10, 7, 0, 0, Math.PI * 2);
+        context.fill();
+        context.fillStyle = "#8d7d51";
+        context.beginPath();
+        context.ellipse(-9, 3, 8, 5, 0, 0, Math.PI * 2);
+        context.ellipse(9, 3, 8, 5, 0, 0, Math.PI * 2);
+        context.ellipse(0, -6, 8, 5, 0, 0, Math.PI * 2);
+        context.fill();
+        context.fillStyle = "rgba(214, 200, 152, 0.28)";
+        context.fillRect(-13, -8, 9, 2);
+        context.fillRect(4, -8, 9, 2);
+      } else if (kind === "ammoBox") {
+        context.fillStyle = "#2c3323";
+        context.fillRect(-15, -11, 30, 22);
+        context.fillStyle = "#4d5636";
+        context.fillRect(-13, -9, 26, 18);
+        context.strokeStyle = "#7d8660";
+        context.lineWidth = 2;
+        context.strokeRect(-13, -9, 26, 18);
+        context.fillStyle = "#9aa07a";
+        context.fillRect(-9, -5, 18, 2);
+        context.fillRect(-9, -1, 12, 1.5);
+      } else if (kind === "drum") {
+        context.fillStyle = "#241f18";
+        context.beginPath();
+        context.arc(0, 0, 12, 0, Math.PI * 2);
+        context.fill();
+        context.fillStyle = "#6b5a42";
+        context.beginPath();
+        context.arc(0, 0, 10, 0, Math.PI * 2);
+        context.fill();
+        context.strokeStyle = "#3a3026";
+        context.lineWidth = 2;
+        context.beginPath();
+        context.arc(0, 0, 6, 0, Math.PI * 2);
+        context.stroke();
+        context.fillStyle = "rgba(226, 220, 186, 0.18)";
+        context.fillRect(-9, -6, 4, 12);
+      } else if (kind === "tire") {
+        context.fillStyle = "#171a14";
+        context.beginPath();
+        context.ellipse(0, 0, 15, 11, 0, 0, Math.PI * 2);
+        context.fill();
+        context.fillStyle = "#2e312a";
+        context.beginPath();
+        context.ellipse(0, 0, 10, 7, 0, 0, Math.PI * 2);
+        context.fill();
+        context.fillStyle = "#101208";
+        context.beginPath();
+        context.ellipse(0, 0, 5, 3.5, 0, 0, Math.PI * 2);
+        context.fill();
+      } else if (kind === "rubble") {
+        context.fillStyle = "rgba(40, 36, 26, 0.34)";
+        context.beginPath();
+        context.ellipse(0, 4, 17, 8, 0, 0, Math.PI * 2);
+        context.fill();
+        context.fillStyle = "#4a4d41";
+        context.beginPath();
+        context.moveTo(-14, 6); context.lineTo(-9, -5); context.lineTo(0, -2); context.lineTo(3, 7);
+        context.closePath();
+        context.fill();
+        context.fillStyle = "#6e7260";
+        context.beginPath();
+        context.moveTo(0, 8); context.lineTo(5, -7); context.lineTo(14, -3); context.lineTo(15, 8);
+        context.closePath();
+        context.fill();
+        context.fillStyle = "rgba(214, 210, 184, 0.26)";
+        context.fillRect(-7, -4, 6, 2);
+        context.fillRect(6, -6, 6, 2);
       } else {
         context.fillStyle = "#5a3829"; context.fillRect(-17, -12, 34, 24);
         context.fillStyle = "#9b6546"; context.fillRect(-15, -10, 30, 20);

@@ -121,6 +121,9 @@
   var giftStatus = document.getElementById("giftStatus");
   var giftPanelOpen = false;
   var statusText = document.getElementById("statusText");
+  // 左上角那排战斗数值（命数/生命/敌军/得分…）。主菜单里它正好压在「零件 + 商店」那一行上，
+  // 所以 MENU / SHOP 状态直接整排隐藏，只在战斗相关状态显示。
+  var hud = document.querySelector(".hud");
   var healthValue = document.getElementById("healthValue");
   var healthHud = healthValue.parentElement;
   var modeValue = document.getElementById("modeValue");
@@ -162,6 +165,7 @@
     onlinePanel.hidden = state !== Config.states.MENU || onlineView !== "modes";
     roomPanel.hidden = state !== Config.states.MENU || onlineView !== "room";
     shopPanel.hidden = state !== Config.states.SHOP;
+    if (hud) { hud.hidden = state === Config.states.MENU || state === Config.states.SHOP; }
     pausePanel.hidden = state !== Config.states.PAUSED;
     giftPanel.hidden = !giftPanelOpen || state !== Config.states.PAUSED;
     countdownPanel.hidden = state !== Config.states.COUNTDOWN;

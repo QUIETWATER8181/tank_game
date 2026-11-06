@@ -107,10 +107,10 @@ combat.updateBullet(lethalBullet, 0.1);
 assert.strictEqual(target.alive, false);
 assert.strictEqual(target.wreck, true);
 assert.strictEqual(target.wreckLife, 3);
-assert.strictEqual(target.wreckParticles.length, 84);
+assert.strictEqual(target.wreckParticles.length, 30);
 assert.ok(target.wreckParticles.every(function (particle) {
-  return particle.x >= -32 && particle.x <= 32 && particle.y >= -29 && particle.y <= 29 &&
-    particle.size >= 7 && particle.size <= 14;
+  return particle.x >= -33 && particle.x <= 33 && particle.y >= -30 && particle.y <= 30 &&
+    particle.size >= 5 && particle.size <= 11;
 }));
 assert.deepStrictEqual(playedSounds.slice(-2), ["explode", "burn"]);
 assert.strictEqual(combat.enemies.length, 1);

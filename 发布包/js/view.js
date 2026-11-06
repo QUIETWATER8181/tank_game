@@ -69,6 +69,14 @@
       return !this.suppressPitch && this.k < 0.999;
     },
 
+    // 竖直物体（立牌/精灵/文字/护盾环）的去压扁：抵消相机俯仰造成的纵向压缩，
+    // 让贴在某个世界坐标上的东西保持原比例。地面贴花（阴影/弹坑/预警圈）不要用它，
+    // 那些本来就该跟着地面一起压扁。
+    billboard: function (context) {
+      if (this.isPitched()) { context.scale(1, 1 / this.k); }
+      return this.k;
+    },
+
     // 在 2.5D 与原版平铺之间切换；返回切换后是否处于 2.5D。
     toggle: function () {
       this.setPitch(this.k < 0.999 ? 0 : DEFAULT_PITCH);

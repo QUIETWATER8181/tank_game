@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>2.5D 装饰物 / 中央石台 预览</title>
+<style>
+  html, body { margin: 0; background: #0d100b; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="scene" width="1440" height="900"></canvas>
+<script src="../../js/config.js"></script>
+<script src="../../js/view.js"></script>
+<script src="../../js/map.js"></script>
+<script src="../../js/battlefield.js"></script>
+<script>
+  // 2.5D 装饰物与中央石台的美术预览板。
+  // 打开方式：起静态服务后访问 tools/pseudo3d/decor-preview.html
+  // 三排分别是：新立牌 / 新立牌变体 / 旧的 2D 矢量装饰（对照）；下面是普通图与 BOSS 图的石台。
+  var canvas = document.getElementById("scene");
+  var ctx = canvas.getContext("2d");
+  var View = TankGame.View;
+  var Battlefield = TankGame.Battlefield;
+  var Map = TankGame.Map;
+  var KINDS = ["rock", "bush", "deadGrass", "scorchedRoot", "crate", "sandbag",
+    "ammoBox", "drum", "tire", "barbedWire", "rubble", "barrel"];
+
+  View.setPitch(48, false);
+  var k = View.k;
+
+  var previewMap = {
+    seed: 20261101,
+    isBossMap: false,
+    obstacles: [],
+    enemySpawns: [{ x: 300, y: 300 }],
+    playerSpawn: { x: 720, y: 820 },
+    bossSpawn: { x: 720, y: 240 },
+    cells: []
+  };
+
+  // 1) 真实地面当背景
+  Battlefield.drawGround(ctx, previewMap, { left: 0, top: 0, right: 1440, bottom: 900 });
+
+  function label(text, x, y, color, font) {
+    ctx.save();
+    ctx.font = font || "12px Consolas, 'Microsoft YaHei', monospace";
+    ctx.fillStyle = "rgba(6, 10, 7, 0.72)";
+    ctx.fillRect(x - 2, y - 12, ctx.measureText(text).width + 6, 16);
+    ctx.fillStyle = color || "#d7e2c8";
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
+  // 2) 三排装饰物
+  var rowSpecs = [
+    { screenY: 130, variant: 0, mode: "pitch", title: "2.5D 新立牌（v1）" },
+    { screenY: 225, variant: 1, mode: "pitch", title: "2.5D 新立牌（v2）" },
+    { screenY: 320, variant: 0, mode: "flat", title: "2D 旧装饰（对照，未改动）" }
+  ];
+
+  rowSpecs.forEach(function (row) {
+    label(row.title, 24, row.screenY - 52, "#a9c08d", "13px Consolas, 'Microsoft YaHei', monospace");
+    KINDS.forEach(function (kind, index) {
+      var screenX = 70 + index * 108;
+      var worldY = row.screenY / k;
+      ctx.save();
+      if (row.mode === "pitch") {
+        ctx.scale(1, k);
+        Battlefield.drawDecoration(ctx, {
+          x: screenX, y: worldY, kind: kind, scale: 1, variant: row.variant
+        });
+      } else {
+        Map.drawDecoration(ctx, { x: screenX, y: row.screenY, kind: kind, scale: 1 }, previewMap, false);
+      }
+      ctx.restore();
+      label(kind, screenX - 30, row.screenY + 22, "#8fa377");
+    });
+  });
+
+  // 3) 中央石台：普通图 / BOSS 图
+  var arenaNormal = { x: 60, y: 400, width: 640, height: 340 };
+  var arenaBoss = { x: 740, y: 400, width: 640, height: 340 };
+
+  ctx.save();
+  ctx.scale(1, k);
+  Battlefield.drawStonePlatform(ctx, {
+    isBossMap: false,
+    bossArena: {
+      x: arenaNormal.x, y: arenaNormal.y / k, width: arenaNormal.width, height: arenaNormal.height / k,
+      centerX: arenaNormal.x + arenaNormal.width / 2, centerY: (arenaNormal.y + arenaNormal.height / 2) / k
+    }
+  });
+  // BOSS 图：先把地面压暗成灰烬色，再铺石板
+  ctx.save();
+  ctx.fillStyle = "rgba(36, 28, 22, 0.62)";
+  ctx.fillRect(arenaBoss.x - 20, arenaBoss.y / k - 20, arenaBoss.width + 40, arenaBoss.height / k + 60);
+  ctx.restore();
+  Battlefield.drawStonePlatform(ctx, {
+    isBossMap: true,
+    bossArena: {
+      x: arenaBoss.x, y: arenaBoss.y / k, width: arenaBoss.width, height: arenaBoss.height / k,
+      centerX: arenaBoss.x + arenaBoss.width / 2, centerY: (arenaBoss.y + arenaBoss.height / 2) / k
+    }
+  });
+  ctx.restore();
+
+  label("中央石台 · 普通图（石板 + 压边石 + 台基）", 60, 392, "#a9c08d", "13px Consolas, 'Microsoft YaHei', monospace");
+  label("中央石台 · BOSS 图（灰烬配色）", 740, 392, "#c0a98d", "13px Consolas, 'Microsoft YaHei', monospace");
+
+  // 4) 密度对照：一格 60px，看地图上会不会太乱
+  var densityKinds = ["rock", "deadGrass", "crate", "sandbag", "tire", "ammoBox", "bush", "drum", "rubble", "barbedWire"];
+  label("密度对照：60px 一格，10 个装饰物", 60, 772, "#a9c08d", "13px Consolas, 'Microsoft YaHei', monospace");
+  ctx.save();
+  ctx.scale(1, k);
+  densityKinds.forEach(function (kind, index) {
+    var column = index % 5;
+    var row = Math.floor(index / 5);
+    Battlefield.drawDecoration(ctx, {
+      x: 90 + column * 120,
+      y: (800 + row * 52) / k,
+      kind: kind,
+      scale: 0.9
+    });
+  });
+  ctx.restore();
+
+  // 5) 比例标尺：三个 40×40 品红方块，用来端到端验证「立牌不被压扁」
+  //    A = 立牌（应 40×40）  B = 未补偿的世界绘制（应 40×26.8）  C = 屏幕空间（应 40×40）
+  label("比例标尺：40×40 品红方块", 900, 772, "#ff9ee0", "13px Consolas, 'Microsoft YaHei', monospace");
+  ctx.save();
+  ctx.scale(1, k);
+  ctx.fillStyle = "#ff00ff";
+  // A：立牌
+  ctx.save();
+  ctx.translate(940, 820 / k);
+  View.billboard(ctx);
+  ctx.fillRect(-20, -20, 40, 40);
+  ctx.restore();
+  // B：只有世界压扁，没有补偿
+  ctx.save();
+  ctx.translate(1040, 820 / k);
+  ctx.fillRect(-20, -20, 40, 40);
+  ctx.restore();
+  ctx.restore();
+  // C：屏幕空间
+  ctx.save();
+  ctx.fillStyle = "#ff00ff";
+  ctx.fillRect(1120, 800, 40, 40);
+  ctx.restore();
+
+  window.__decorPreview = {
+    k: k,
+    kinds: KINDS,
+    decorKinds: Battlefield.decorationKinds(),
+    error: Battlefield.lastDecorationError || null
+  };
+
+  // ---------------------------------------------------------------- 像素统计自检
+  // 目标：装饰物/石台的色相、明度、饱和度要落在环境的同一区间里，
+  // 也就是「画风不脱离」的可量化版本。没有看图能力时靠这组数字把关。
+  function analyzePixels(data, width, height) {
+    var sumR = 0, sumG = 0, sumB = 0, count = 0;
+    var sumLuma = 0, sumSat = 0, hueSin = 0, hueCos = 0, hueCount = 0;
+    var minLuma = 255, maxLuma = 0;
+    for (var index = 0; index < data.length; index += 4) {
+      if (data[index + 3] < 140) { continue; }
+      var red = data[index], green = data[index + 1], blue = data[index + 2];
+      var luma = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+      var max = Math.max(red, green, blue), min = Math.min(red, green, blue);
+      var sat = max === 0 ? 0 : (max - min) / max;
+      sumR += red; sumG += green; sumB += blue;
+      sumLuma += luma;
+      sumSat += sat;
+      if (luma < minLuma) { minLuma = luma; }
+      if (luma > maxLuma) { maxLuma = luma; }
+      if (sat > 0.1 && max > 24) {
+        var hue;
+        if (max === red) { hue = ((green - blue) / (max - min)) % 6; }
+        else if (max === green) { hue = (blue - red) / (max - min) + 2; }
+        else { hue = (red - green) / (max - min) + 4; }
+        hue *= 60;
+        if (hue < 0) { hue += 360; }
+        var radians = hue * Math.PI / 180;
+        hueSin += Math.sin(radians);
+        hueCos += Math.cos(radians);
+        hueCount += 1;
+      }
+      count += 1;
+    }
+    if (!count) { return null; }
+    var hueDegrees = hueCount ? Math.atan2(hueSin / hueCount, hueCos / hueCount) * 180 / Math.PI : null;
+    if (hueDegrees !== null && hueDegrees < 0) { hueDegrees += 360; }
+    return {
+      coverage: Number((count / (width * height)).toFixed(3)),
+      meanColor: [Math.round(sumR / count), Math.round(sumG / count), Math.round(sumB / count)],
+      luma: Number((sumLuma / count).toFixed(1)),
+      lumaRange: [Math.round(minLuma), Math.round(maxLuma)],
+      sat: Number((sumSat / count).toFixed(3)),
+      hue: hueDegrees === null ? null : Number(hueDegrees.toFixed(1))
+    };
+  }
+
+  function hueDistance(a, b) {
+    if (a === null || b === null) { return null; }
+    var delta = Math.abs(a - b) % 360;
+    return Number((delta > 180 ? 360 - delta : delta).toFixed(1));
+  }
+
+  function sampleCanvas(source, x, y, width, height) {
+    var scratch = document.createElement("canvas");
+    scratch.width = width;
+    scratch.height = height;
+    var scratchContext = scratch.getContext("2d");
+    scratchContext.drawImage(source, x, y, width, height, 0, 0, width, height);
+    return analyzePixels(scratchContext.getImageData(0, 0, width, height).data, width, height);
+  }
+
+  // 地面基准色：单独画一块干净地面来采样，不受预览排版影响
+  var groundCanvas = document.createElement("canvas");
+  groundCanvas.width = 320;
+  groundCanvas.height = 320;
+  var groundContext = groundCanvas.getContext("2d");
+  Battlefield.drawGroundDirect(groundContext, previewMap, { left: 0, top: 0, right: 320, bottom: 320 });
+  var groundStats = analyzePixels(groundContext.getImageData(0, 0, 320, 320).data, 320, 320);
+
+  var items = [];
+  var cache = Battlefield.decorSprites || {};
+  Object.keys(cache).forEach(function (key) {
+    var sprite = cache[key];
+    var width = sprite.canvas.width;
+    var height = sprite.canvas.height;
+    var data = sprite.canvas.getContext("2d").getImageData(0, 0, width, height).data;
+    var stats = analyzePixels(data, width, height);
+    if (!stats) { return; }
+    // 贴图有没有被画布边缘裁掉：bbox 碰到最外圈、且边缘像素已经比较实（alpha ≥ 100）
+    // 才算真裁切；渐变尾巴贴着最后一行只是留边不够，看不出来。
+    var box = { left: width, top: height, right: -1, bottom: -1 };
+    var edgeAlpha = 0;
+    for (var y = 0; y < height; y += 1) {
+      for (var x = 0; x < width; x += 1) {
+        var alpha = data[(y * width + x) * 4 + 3];
+        if (alpha < 20) { continue; }
+        if (x < box.left) { box.left = x; }
+        if (x > box.right) { box.right = x; }
+        if (y < box.top) { box.top = y; }
+        if (y > box.bottom) { box.bottom = y; }
+        if ((x === 0 || y === 0 || x === width - 1 || y === height - 1) && alpha > edgeAlpha) {
+          edgeAlpha = alpha;
+        }
+      }
+    }
+    var touchesEdge = box.left <= 0 || box.top <= 0 || box.right >= width - 1 || box.bottom >= height - 1;
+    items.push({
+      sprite: key,
+      luma: stats.luma,
+      sat: stats.sat,
+      hue: stats.hue,
+      fill: stats.coverage,
+      lumaRange: stats.lumaRange,
+      hueDelta: hueDistance(stats.hue, groundStats.hue),
+      lumaDelta: Number(Math.abs(stats.luma - groundStats.luma).toFixed(1)),
+      box: box,
+      edgeAlpha: edgeAlpha,
+      clipped: touchesEdge && edgeAlpha >= 100
+    });
+  });
+
+  var platformNormal = sampleCanvas(canvas, 120, 430, 520, 260);
+  var platformBoss = sampleCanvas(canvas, 800, 430, 520, 260);
+
+  window.__decorMetrics = {
+    ground: groundStats,
+    items: items,
+    platform: {
+      normal: platformNormal,
+      boss: platformBoss,
+      normalHueDelta: hueDistance(platformNormal.hue, groundStats.hue),
+      normalLumaDelta: Number(Math.abs(platformNormal.luma - groundStats.luma).toFixed(1))
+    }
+  };
+</script>
+</body>
+</html>
