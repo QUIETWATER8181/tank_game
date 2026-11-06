@@ -139,12 +139,16 @@ async function main() {
   var out = path.resolve(ROOT, args.out || ("tools/pseudo3d/shots/" + mode + ".png"));
   var extraQuery = args.query ? "&" + args.query : "";
   var camQuery = args.cam ? "&cam=" + args.cam : "";
-  var url = args.page
-    ? "http://127.0.0.1:" + port + "/" + args.page + (args.query ? "?" + args.query : "")
-    : "http://127.0.0.1:" + port + "/tools/pseudo3d/prototype.html?mode=" + mode +
-      "&shot=1" + camQuery + extraQuery;
+  // --page 也可以直接给完整 URL（例如线上 Pages 地址），这时不再起本地静态服务
+  var remote = args.page && /^https?:\/\//.test(args.page);
+  var url = remote
+    ? args.page + (args.query ? (args.page.indexOf("?") === -1 ? "?" : "&") + args.query : "")
+    : (args.page
+      ? "http://127.0.0.1:" + port + "/" + args.page + (args.query ? "?" + args.query : "")
+      : "http://127.0.0.1:" + port + "/tools/pseudo3d/prototype.html?mode=" + mode +
+        "&shot=1" + camQuery + extraQuery);
 
-  var server = await startServer(port);
+  var server = remote ? null : await startServer(port);
   var profile = fs.mkdtempSync(path.join(os.tmpdir(), "pseudo3d-chrome-"));
   var chrome = spawn(findChrome(), [
     "--headless=new",
@@ -222,7 +226,7 @@ async function main() {
       if (client) { await Promise.race([client.send("Browser.close"), delay(800)]); }
     } catch (error) { /* ignore */ }
     chrome.kill();
-    server.close();
+    if (server) { server.close(); }
     try { fs.rmSync(profile, { recursive: true, force: true }); } catch (error) { /* ignore */ }
   }
 }
