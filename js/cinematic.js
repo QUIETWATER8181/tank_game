@@ -28,14 +28,15 @@
     tailRotorX: 543,
     tailRotorY: 158
   };
+  var escortImage = new Image();
+  escortImage.src = "assets/images/cinematic/helicopter-body.png?v=20261107-escort";
 
   function BossCinematic(game, boss) {
     this.game = game;
     this.boss = boss;
     this.time = 0;
     this.duration = 16.9;
-    this.helicopterImage = new Image();
-    this.helicopterImage.src = "assets/images/cinematic/helicopter-body.png";
+    this.helicopterImage = escortImage;
     this.leaderImage = new Image();
     this.leaderImage.src = "assets/images/cinematic/helicopter-leader-body-symmetric.png";
   }
