@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>钢铁征途 坦克大战</title>
-  <link rel="stylesheet" href="css/style.css?v=20261106-wall-fix">
+  <link rel="stylesheet" href="css/style.css?v=20261107-menu-modes">
   <link rel="preload" as="image" href="assets/images/cinematic/helicopter-body.png?v=20261107-escort" fetchpriority="high">
   <link rel="preload" as="image" href="assets/images/tanks/player-hull.png" fetchpriority="high">
   <link rel="preload" as="image" href="assets/images/tanks/player-turret.png" fetchpriority="high">
@@ -180,8 +180,42 @@
         <p class="eyebrow">超级大运坦克</p>
         <h1>钢铁征途 坦克大战</h1>
         <p class="menu-copy">化身大运，向敌人发起冲锋！</p>
-        <button id="onlineButton" class="online-entry-button" type="button" title="打开联机模式" aria-label="打开联机模式">➡ 联机模式</button>
-        <div class="mode-selector" role="radiogroup" aria-label="游戏模式">
+        <div class="mode-section" aria-labelledby="modeSectionTitle">
+          <p id="modeSectionTitle" class="mode-section-title">选择模式</p>
+          <div class="mode-entry-selector" role="group" aria-label="选择模式">
+            <button id="onlineButton" class="mode-entry online-entry" type="button" title="打开联机模式" aria-label="打开联机模式">
+              <span class="mode-entry-copy">
+                <strong>联机模式</strong>
+                <span>跨网联机 · 快速匹配或好友房</span>
+              </span>
+              <span class="mode-entry-arrow" aria-hidden="true">➡</span>
+            </button>
+            <button id="singlePlayerButton" class="mode-entry single-entry" type="button" title="打开单打模式" aria-label="打开单打模式" aria-controls="singleModePanel">
+              <span class="mode-entry-copy">
+                <strong>单打模式</strong>
+                <span>普通 / 挑战 / 无尽 / 勇者行动</span>
+              </span>
+              <span class="mode-entry-arrow" aria-hidden="true">➡</span>
+            </button>
+          </div>
+        </div>
+        <div class="controls" aria-label="操作方式">
+          <span><kbd>WASD</kbd> 移动</span>
+          <span><kbd>鼠标</kbd> 瞄准</span>
+          <span><kbd>左键</kbd> 开火</span>
+          <span><kbd>V</kbd> 2.5D / 2D</span>
+          <span><kbd>Esc</kbd> 暂停</span>
+        </div>
+        <p id="recordSummary" class="record-summary">本机纪录：暂无</p>
+        <p class="identity">by 一杯静水 &amp; 徐同学infinity</p>
+      </section>
+
+      <section id="singleModePanel" class="overlay-panel single-panel" hidden aria-label="单打模式">
+        <button id="singleBackButton" class="online-back-button" type="button" title="返回主菜单" aria-label="返回主菜单">←</button>
+        <p class="eyebrow">选择玩法</p>
+        <h2>单打模式</h2>
+        <p class="single-copy">四种单打玩法，共用零件与商店进度。</p>
+        <div id="singleModeSelector" class="mode-selector single-mode-selector" role="radiogroup" aria-label="单打玩法">
           <button class="mode-option is-selected" type="button" data-mode="normal" role="radio" aria-checked="true">
             <strong>普通模式</strong>
             <span>2 条命 · 敌军反应较慢</span>
@@ -200,15 +234,6 @@
           </button>
         </div>
         <button id="startButton" class="primary-button" type="button">进入战场</button>
-        <div class="controls" aria-label="操作方式">
-          <span><kbd>WASD</kbd> 移动</span>
-          <span><kbd>鼠标</kbd> 瞄准</span>
-          <span><kbd>左键</kbd> 开火</span>
-          <span><kbd>V</kbd> 2.5D / 2D</span>
-          <span><kbd>Esc</kbd> 暂停</span>
-        </div>
-        <p id="recordSummary" class="record-summary">本机纪录：暂无</p>
-        <p class="identity">by 一杯静水 &amp; 徐同学infinity</p>
       </section>
 
       <section id="onlineModePanel" class="overlay-panel online-panel" hidden aria-label="联机模式">
@@ -408,6 +433,6 @@
   <script defer src="js/game.js?v=20261106-wall-fix"></script>
   <script defer src="js/multiplayer.js?v=20261106-wall-fix"></script>
   <script defer src="js/field-skills.js?v=20261106-wall-fix"></script>
-  <script defer src="js/main.js?v=20261106-wall-fix"></script>
+  <script defer src="js/main.js?v=20261107-menu-modes"></script>
 </body>
 </html>

@@ -35,9 +35,13 @@
     });
   }
   var menuPanel = document.getElementById("menuPanel");
+  var singlePanel = document.getElementById("singleModePanel");
   var onlinePanel = document.getElementById("onlineModePanel");
   var roomPanel = document.getElementById("roomPanel");
   var onlineButton = document.getElementById("onlineButton");
+  var singlePlayerButton = document.getElementById("singlePlayerButton");
+  var singleBackButton = document.getElementById("singleBackButton");
+  var singleModeSelector = document.getElementById("singleModeSelector");
   var onlineBackButton = document.getElementById("onlineBackButton");
   var fieldModeButton = document.getElementById("fieldModeButton");
   var roomBackButton = document.getElementById("roomBackButton");
@@ -55,6 +59,7 @@
   var roomMembersList = document.getElementById("roomMembersList");
   var startRoomButton = document.getElementById("startRoomButton");
   var onlineView = null;
+  var singleView = false;
   var pausePanel = document.getElementById("pausePanel");
   var countdownPanel = document.getElementById("countdownPanel");
   var countdownValue = document.getElementById("countdownValue");
@@ -92,7 +97,7 @@
   var muteButton = document.getElementById("muteButton");
   var fullscreenButton = document.getElementById("fullscreenButton");
   var viewButton = document.getElementById("viewButton");
-  var modeOptions = document.querySelectorAll(".mode-option");
+  var modeOptions = singleModeSelector.querySelectorAll(".mode-option");
   var pauseButton = document.getElementById("pauseButton");
   var pauseGiftButton = document.getElementById("pauseGiftButton");
   var resetButton = document.getElementById("resetButton");
@@ -161,7 +166,8 @@
     document.getElementById("gameStage").classList.toggle("is-cinematic", state === Config.states.CINEMATIC);
     mobileControls.classList.toggle("is-active", mobileDevice &&
       [Config.states.PLAYING, Config.states.COUNTDOWN].indexOf(state) !== -1);
-    menuPanel.hidden = state !== Config.states.MENU || Boolean(onlineView);
+    menuPanel.hidden = state !== Config.states.MENU || Boolean(onlineView) || singleView;
+    singlePanel.hidden = state !== Config.states.MENU || !singleView;
     onlinePanel.hidden = state !== Config.states.MENU || onlineView !== "modes";
     roomPanel.hidden = state !== Config.states.MENU || onlineView !== "room";
     shopPanel.hidden = state !== Config.states.SHOP;
@@ -550,6 +556,7 @@
   startButton.addEventListener("click", function () {
     if (TankGame.Audio.startMusicFromGesture) { TankGame.Audio.startMusicFromGesture(); }
     else { TankGame.Audio.initialize(); }
+    singleView = false;
     game.start();
     syncInterface();
     canvas.focus();
@@ -675,7 +682,11 @@
     });
   });
 
-  function showOnlineView(view) { onlineView = view; syncInterface(); }
+  function showOnlineView(view) {
+    onlineView = view;
+    if (view) { singleView = false; }
+    syncInterface();
+  }
   var peerLoadPromise = null;
   var PEER_SOURCES = [
     "js/vendor/peerjs.min.js?v=20261031-merge-scan",
@@ -751,6 +762,17 @@
     startRoomButton.textContent = room.host && room.phase === "lobby" && room.result ? "房主开启下一局" : "房主开启战场";
   }
   onlineButton.addEventListener("click", function () { showOnlineView("modes"); });
+  singlePlayerButton.addEventListener("click", function () {
+    singleView = true;
+    onlineView = null;
+    syncInterface();
+    singleBackButton.focus();
+  });
+  singleBackButton.addEventListener("click", function () {
+    singleView = false;
+    syncInterface();
+    singlePlayerButton.focus();
+  });
   onlineBackButton.addEventListener("click", function () { showOnlineView(null); });
   fieldModeButton.addEventListener("click", function () { showOnlineView("room"); });
   roomBackButton.addEventListener("click", function () {
@@ -808,6 +830,7 @@
     else if (TankGame.Multiplayer.leave) { TankGame.Multiplayer.leave(); }
     game.reset();
     onlineView = null;
+    singleView = false;
     syncInterface();
   }
   function continueOnlineGame() {
@@ -949,12 +972,14 @@
   pauseMenuButton.addEventListener("click", function () {
     game.reset();
     onlineView = null;
+    singleView = false;
     syncInterface();
   });
 
   resetButton.addEventListener("click", function () {
     game.reset();
     onlineView = null;
+    singleView = false;
     syncInterface();
   });
 
@@ -1005,6 +1030,7 @@
     button.addEventListener("click", function () {
       game.reset();
       onlineView = null;
+      singleView = false;
       syncInterface();
     });
   });
@@ -1036,6 +1062,13 @@
     }
     if (event.code === "Escape" && giftPanelOpen) {
       closeGiftPanel();
+      event.preventDefault();
+      return;
+    }
+    if (event.code === "Escape" && singleView) {
+      singleView = false;
+      syncInterface();
+      singlePlayerButton.focus();
       event.preventDefault();
       return;
     }
