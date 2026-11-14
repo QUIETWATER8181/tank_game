@@ -41,6 +41,6 @@ export function blueprintScene(blueprint, selectedId) {
   return group;
 }
 
-export function missionScene(run) {
-  return buildLevelScene(run);
+export function missionScene(run, { combat = false } = {}) {
+  return buildLevelScene(run, { combat });
 }

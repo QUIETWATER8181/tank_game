@@ -4,7 +4,7 @@
   "scripts": {
     "build:3d": "node tools/build-3d.js",
     "serve": "node tools/pseudo3d/serve.js",
-    "test:3d": "node --test tests/three-runtime.test.mjs tests/mode-core.test.mjs tests/tank-model.test.mjs tests/level-scene.test.mjs",
+    "test:3d": "node --test tests/three-runtime.test.mjs tests/mode-core.test.mjs tests/tank-model.test.mjs tests/level-scene.test.mjs tests/combat.test.mjs tests/placement-snap.test.mjs",
     "test": "node tools/run-tests.js"
   },
   "dependencies": { "three": "0.187.0" },

@@ -79,7 +79,7 @@ function skyTexture() {
     context.fillRect(0, 0, size, size);
   });
 }
-function smokeTexture() {
+export function smokeTexture() {
   return canvasTexture(128, (context, size) => {
     const gradient = context.createRadialGradient(size / 2, size / 2, 2, size / 2, size / 2, size / 2);
     gradient.addColorStop(0, 'rgba(230,230,225,.9)');
@@ -211,7 +211,7 @@ function addGround(group) {
 
 function addProps(group) {
   const next = random(97);
-  const rocks = [], shrubs = [], sandbags = [], barriers = [], crates = [];
+  const rocks = [], shrubs = [], crates = [];
   for (let index = 0; index < 70; index++) {
     const side = next() < .5 ? -1 : 1;
     const x = side * (8 + next() * 22), z = CORRIDOR_START + next() * (CORRIDOR_END - CORRIDOR_START);
@@ -222,24 +222,13 @@ function addProps(group) {
     const side = next() < .5 ? -1 : 1;
     shrubs.push({ position: [side * (7.6 + next() * 12), .3, CORRIDOR_START + next() * (CORRIDOR_END - CORRIDOR_START)], rotation: [0, next() * 3, 0], scale: [.5 + next(), .6 + next() * .8, .5 + next()] });
   }
-  // Sandbag walls guard the checkpoints.
-  for (const z of [24, 64, 99, 134]) {
-    for (const side of [-1, 1]) {
-      for (let row = 0; row < 3; row++) for (let column = 0; column < 5; column++) {
-        sandbags.push({ position: [side * (7.6 + column * .66), .22 + row * .3, z + (row % 2) * .18 + (next() - .5) * .06], rotation: [0, (next() - .5) * .3, 0], scale: [1, 1, 1] });
-      }
-    }
-    // Concrete lane barriers.
-    for (const side of [-1, 1]) barriers.push({ position: [side * 5.9, .4, z + 1.4], rotation: [0, side * .1, 0], scale: [1, 1, 1] });
-  }
+  // Cover is authored in campaign.mjs (`map.cover`) so scenery and collision agree.
   for (let index = 0; index < 26; index++) {
     const side = next() < .5 ? -1 : 1;
     crates.push({ position: [side * (7.5 + next() * 2.5), .35, 120 + next() * 55], rotation: [0, next() * 1.6, 0], scale: [.8 + next() * .5, .7 + next() * .5, .8 + next() * .5] });
   }
   instanced(group, new THREE.DodecahedronGeometry(.5, 0), new THREE.MeshStandardMaterial({ color: '#6b6656', roughness: .95, flatShading: true }), rocks);
   instanced(group, new THREE.IcosahedronGeometry(.45, 0), new THREE.MeshStandardMaterial({ color: '#4f5b3c', roughness: 1, flatShading: true }), shrubs);
-  instanced(group, new THREE.BoxGeometry(.64, .3, .38), new THREE.MeshStandardMaterial({ color: '#8b7f5c', roughness: 1 }), sandbags);
-  instanced(group, new THREE.BoxGeometry(2.2, .8, .6), new THREE.MeshStandardMaterial({ color: '#9a9a8d', roughness: .9 }), barriers);
   instanced(group, new THREE.BoxGeometry(.9, .7, .9), new THREE.MeshStandardMaterial({ color: '#7c6a45', roughness: .9 }), crates);
   // Segment posts with reflective caps.
   const posts = [], caps = [];
@@ -272,8 +261,70 @@ function addProps(group) {
   }
 }
 
-function addBase(group, run) {
-  const base = run.level.base;
+// ---------------------------------------------------------------- cover & terrain zones
+// Cover comes from `level.map.cover`, so the mesh the player sees is exactly the shape
+// the combat layer collides against. One InstancedMesh per kind keeps the draw count low.
+const COVER_COLORS = { wreck: '#5a5044', sandbag: '#8b7f5c', berm: '#6d6247', ammo: '#6b5a3a', crate: '#7c6a45', rock: '#6b6656' };
+function coverTransforms(cover) {
+  const [w, h, d] = cover.size, [x, y, z] = cover.position;
+  const list = [];
+  const push = (position, scale, rotation = [0, 0, 0]) => list.push({ position, scale, rotation });
+  if (cover.kind === 'sandbag') {
+    const columns = Math.max(2, Math.round(w / .66));
+    const rows = Math.max(1, Math.round(h / .3));
+    const layers = Math.max(1, Math.round(d / .4));
+    const cw = w / columns, ch = h / rows, cd = d / layers;
+    for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) for (let layer = 0; layer < layers; layer++) {
+      push([x - w / 2 + cw * (column + .5) + (row % 2 ? cw * .16 : 0), y - h / 2 + ch * (row + .5), z - d / 2 + cd * (layer + .5)],
+        [cw * .92, ch * .86, cd * .9], [0, (row + column) % 2 ? .16 : -.12, 0]);
+    }
+  } else if (cover.kind === 'berm') {
+    push([x, y - h * .12, z], [w, h * .76, d]);
+    push([x, y + h * .34, z], [w * .98, h * .3, d * .66], [.05, 0, 0]);
+    const lumps = Math.max(3, Math.round(w / 1.6));
+    for (let index = 0; index < lumps; index++) {
+      push([x - w / 2 + (index + .5) * (w / lumps), y + h * .46, z + (index % 2 ? .45 : -.45)], [(w / lumps) * .9, h * .16, d * .3], [0, index * .6, 0]);
+    }
+  } else if (cover.kind === 'wreck') {
+    push([x, y, z], [w * .72, h, d * .8], [.04, .12, .05]);
+    push([x + w * .22, y * .55, z + d * .18], [w * .5, h * .9, d * .55], [0, -.5, .12]);
+    push([x - w * .24, y * .5, z - d * .2], [w * .4, h * .85, d * .5], [0, .4, -.08]);
+  } else if (cover.kind === 'ammo') {
+    for (let index = 0; index < 3; index++) push([x - .5 + index * .5, y - h * .28, z], [.62, .34, .62], [0, index * .3, 0]);
+    push([x, y + h * .18, z], [w * .8, h * .3, d * .8], [0, .2, 0]);
+  } else {
+    push([x, y, z], [w, h, d], [0, .08, 0]);
+  }
+  return list;
+}
+function addCover(group, level) {
+  const buckets = new Map();
+  for (const cover of level.map?.cover || []) {
+    if (!Array.isArray(cover.size) || !Array.isArray(cover.position)) continue;
+    const list = buckets.get(cover.kind) || [];
+    list.push(...coverTransforms(cover));
+    buckets.set(cover.kind, list);
+  }
+  for (const [kind, transforms] of buckets) {
+    if (!transforms.length) continue;
+    const material = new THREE.MeshStandardMaterial({ color: COVER_COLORS[kind] || '#6b6656', roughness: .96, metalness: .05, flatShading: true });
+    instanced(group, new THREE.BoxGeometry(1, 1, 1), material, transforms).name = `cover-${kind}`;
+  }
+}
+function addZones(group, level) {
+  const colors = { mud: '#463b28', rubble: '#7b776b' };
+  for (const zone of level.map?.zones || []) {
+    const [x, y, z] = zone.position, [w, d] = zone.size;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ color: colors[zone.kind] || '#5f5a41', roughness: 1, transparent: true, opacity: .72 }));
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, y + .025, z);
+    mesh.receiveShadow = true;
+    mesh.name = `zone-${zone.id}`;
+    group.add(mesh);
+  }
+}
+
+function addBase(group, run) {  const base = run.level.base;
   const destroyed = run.baseDestroyed;
   const [x, , z] = base.position;
   const compound = new THREE.Group();
@@ -294,20 +345,20 @@ function addBase(group, run) {
     compound.add(mesh);
     return mesh;
   };
-  wall([12, 2.6, .8], [-10, 1.3, -6]);
-  wall([12, 2.6, .8], [10, 1.3, -6]);
+  wall([10, 2.6, .8], [-11, 1.3, -6]);
+  wall([10, 2.6, .8], [11, 1.3, -6]);
   wall([.8, 2.6, 20], [-16, 1.3, 4]);
   wall([.8, 2.6, 20], [16, 1.3, 4]);
   wall([33, 2.6, .8], [0, 1.3, 14]);
   for (const side of [-1, 1]) {
-    const pillar = wall([1.4, 4.2, 1.4], [side * 4.4, 2.1, -6]);
+    const pillar = wall([1.4, 4.2, 1.4], [side * 6.4, 2.1, -6]);
     pillar.material = trimMaterial;
   }
   // Gate lintel and warning stripes.
-  wall([10.2, .7, 1.2], [0, 4.4, -6]).material = trimMaterial;
-  for (let index = 0; index < 7; index++) {
+  wall([14.2, .7, 1.2], [0, 4.4, -6]).material = trimMaterial;
+  for (let index = 0; index < 13; index++) {
     const stripe = new THREE.Mesh(new THREE.BoxGeometry(.6, .34, .06), new THREE.MeshStandardMaterial({ color: index % 2 ? '#d8c07a' : '#2b2b26', roughness: .7 }));
-    stripe.position.set(-3 + index * 1, 3.5, -5.36);
+    stripe.position.set(-6 + index * 1, 3.5, -5.36);
     compound.add(stripe);
   }
   // Command bunker with a sloped roof.
@@ -354,7 +405,7 @@ function addBase(group, run) {
   return { compound, flag, radar, destroyed };
 }
 
-function smokeColumn(group, position, { color = '#8f8a80', count = 26, size = 3.2, speed = 1.6, map = null } = {}) {
+export function smokeColumn(group, position, { color = '#8f8a80', count = 26, size = 3.2, speed = 1.6, map = null } = {}) {
   const geometry = new THREE.BufferGeometry();
   const positions = new Float32Array(count * 3), seeds = new Float32Array(count);
   const next = random(Math.round(position[0] * 13 + position[2] * 7) + 3);
@@ -403,13 +454,32 @@ function dustMotes(group) {
   };
 }
 
-function addTanks(group, run, focus, updates, smokeMap) {
+// The player keeps one group per part so the turret can rotate independently; the gun is
+// re-parented onto a pitch pivot inside the turret so the barrel follows the aim.
+function rigPlayerTank(player) {
+  const turret = player.userData.byRole.get('turret') || null;
+  const weapon = player.userData.byRole.get('weapon') || null;
+  const pivot = new THREE.Group();
+  pivot.name = 'gun-pivot';
+  if (weapon) {
+    if (turret) { pivot.position.set(0, .05, 1.45); turret.add(pivot); }
+    else { pivot.position.copy(weapon.position); player.add(pivot); }
+    player.updateMatrixWorld(true);
+    pivot.attach(weapon);
+    player.updateMatrixWorld(true);
+  }
+  return { turret, weapon, pivot, hasTurret: Boolean(turret) };
+}
+
+function addTanks(group, run, focus, updates, smokeMap, { combat = false } = {}) {
   const level = run.level;
   const templates = level.enemyTemplates || {};
-  const player = buildTankModel(run.tank.blueprint, { faction: 'player', merged: true, whole: true });
+  const units = { player: null, enemies: new Map() };
+  const player = buildTankModel(run.tank.blueprint, { faction: 'player', merged: true, whole: !combat });
   player.position.set(level.playerSpawn[0], 0, level.playerSpawn[2]);
   player.name = 'player-tank';
   group.add(player);
+  if (combat) units.player = { object: player, ...rigPlayerTank(player) };
   ring(group, level.playerSpawn, 2.4, '#b9d38f', .5);
   focus.set('player', { position: new THREE.Vector3(level.playerSpawn[0], 1.6, level.playerSpawn[2]), radius: 4.2, label: '玩家坦克', view: { distance: 13.5, height: 3.4 } });
 
@@ -439,13 +509,16 @@ function addTanks(group, run, focus, updates, smokeMap) {
       tank.rotation.y = yaw;
       tank.name = `enemy-${enemy.id}`;
       group.add(tank);
+      if (combat) units.enemies.set(enemy.id, tank);
       ring(group, enemy.position, 3, guard ? '#c24a32' : '#b4543a', .5);
       const roles = ['正面对抗', '左侧偷袭', '右侧偷袭', '基地守卫'];
       const label = labelSprite(index === 3 ? '终点守卫' : `途中敌坦 ${index + 1}`, guard ? '#e0896f' : '#e2a184', roles[index]);
       if (label) { label.scale.set(4.4, 1.1, 1); label.position.set(enemy.position[0], 5.2, enemy.position[2]); group.add(label); }
-      // Idle scan: a small, deterministic yaw sway so the scene is not frozen.
-      const baseYaw = tank.rotation.y;
-      updates.push(() => { tank.rotation.y = baseYaw + Math.sin(performance.now() * .00035 + index) * .04; });
+      // Idle scan: a small, deterministic yaw sway so the static scene is not frozen.
+      if (!combat) {
+        const baseYaw = tank.rotation.y;
+        updates.push(() => { tank.rotation.y = baseYaw + Math.sin(performance.now() * .00035 + index) * .04; });
+      }
       focus.set(enemy.id, { position: new THREE.Vector3(enemy.position[0], 1.6, enemy.position[2]), radius: 4.5, label: roles[index], view: { distance: 11, height: 4.2 } });
     }
   });
@@ -453,6 +526,7 @@ function addTanks(group, run, focus, updates, smokeMap) {
   focus.set('overview', { position: new THREE.Vector3(0, 6, 82), radius: 105, label: '第一关全景', view: { distance: 215, height: 145, azimuth: -1.0 } });
   const baseLabel = labelSprite('敌方基地', '#e8d08a', '需摧毁');
   if (baseLabel) { baseLabel.scale.set(5, 1.25, 1); baseLabel.position.set(level.base.position[0] + 9, 10, level.base.position[2]); group.add(baseLabel); }
+  return units;
 }
 
 function addTriggers(group, level) {
@@ -466,7 +540,7 @@ function addTriggers(group, level) {
   }
 }
 
-export function buildLevelScene(run, { showLabels = true } = {}) {
+export function buildLevelScene(run, { showLabels = true, combat = false } = {}) {
   const group = new THREE.Group();
   group.name = 'level-01';
   const updates = [];
@@ -475,6 +549,8 @@ export function buildLevelScene(run, { showLabels = true } = {}) {
   addSky(group);
   addGround(group);
   addProps(group);
+  addCover(group, run.level);
+  addZones(group, run.level);
   const base = addBase(group, run);
   if (!base.destroyed) {
     const baseYaw = base.radar.rotation.y;
@@ -494,14 +570,17 @@ export function buildLevelScene(run, { showLabels = true } = {}) {
   } else {
     updates.push(smokeColumn(group, [0, 2, 174], { color: '#6b625a', count: 40, size: 5, speed: 2.2, map: smokeMap }));
   }
-  addTanks(group, run, focus, updates, smokeMap);
+  const units = addTanks(group, run, focus, updates, smokeMap, { combat });
+  units.base = base.compound;
   addTriggers(group, run.level);
   updates.push(dustMotes(group));
   if (!showLabels) group.traverse(object => { if (object.isSprite) object.visible = false; });
   group.userData.focus = focus;
+  group.userData.units = units;
   return {
     group,
     focus,
+    units,
     update(delta) { for (const update of updates) update(delta); }
   };
 }

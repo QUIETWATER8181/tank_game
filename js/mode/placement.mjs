@@ -109,5 +109,46 @@ export function moveCandidate(blueprint, itemId, position, { grid = BALANCE.snap
   const snapped = grid ? snapPosition(position, grid) : position.slice(0, 3);
   const limited = snapped.map(value => Math.max(-BALANCE.maxExtent, Math.min(BALANCE.maxExtent, value)));
   const attachment = attach ? nearestAttachment(blueprint, itemId, limited) : null;
-  return { position: limited, parentId: attachment ? attachment.id : item.parentId, gap: attachment?.gap ?? null };
+  let parentId = attachment ? attachment.id : item.parentId;
+  // Touching two parts at once is normal (a gun resting on the turret ring); keep the
+  // parent the player already had instead of silently re-homing the part.
+  if (attachment && item.parentId && attachment.id !== item.parentId) {
+    const current = findPart(blueprint, item.parentId);
+    if (current && boxGap(boundsOf({ ...item, position: limited }), boundsOf(current)) <= attachment.gap + 1e-6) parentId = item.parentId;
+  }
+  return { position: limited, parentId, gap: attachment?.gap ?? null };
+}
+// Drop-time snap: land on the grid, then slide along the dominant axis until the part
+// touches its nearest attachable neighbour. Dragging itself stays free.
+export function snapPlacement(blueprint, itemId, position, grid = BALANCE.snapGrid) {
+  const item = findPart(blueprint, itemId);
+  if (!item) return null;
+  const base = position.slice(0, 3).map(value => {
+    const limited = Math.max(-BALANCE.maxExtent, Math.min(BALANCE.maxExtent, value));
+    return grid ? snapValue(limited, grid) : Number(limited.toFixed(3));
+  });
+  const attachment = (() => {
+    // Keep the part on the parent it already hangs from whenever that parent is in reach;
+    // otherwise a gun dragged near the turret ring would snap onto the hull roof instead.
+    const current = item.parentId ? findPart(blueprint, item.parentId) : null;
+    if (current) {
+      const gap = boxGap(boundsOf({ ...item, position: base }), boundsOf(current));
+      if (gap <= .7) return { id: current.id, gap };
+    }
+    return nearestAttachment(blueprint, itemId, base, .7);
+  })();
+  const parent = attachment ? findPart(blueprint, attachment.id) : null;
+  if (!parent) return base;
+  const box = boundsOf({ ...item, position: base });
+  const other = boundsOf(parent);
+  let axis = 1, best = -Infinity;
+  for (let index = 0; index < 3; index++) {
+    const gap = Math.max(box.min[index] - other.max[index], other.min[index] - box.max[index]);
+    if (gap > best) { best = gap; axis = index; }
+  }
+  if (!(best > 0 && best <= .7)) return base;
+  const direction = box.min[axis] > other.max[axis] ? 1 : -1;
+  const next = [...base];
+  next[axis] = Number((next[axis] - direction * best).toFixed(3));
+  return next;
 }

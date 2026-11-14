@@ -1,8 +1,10 @@
-import { createApplication, openRepository, createStarterBlueprint, evaluateTank, PARTS, TYPES, transitionRun, suggestPlacement, moveCandidate, BALANCE } from '../mode/index.mjs';
+import * as THREE from 'three';
+import { createApplication, openRepository, createStarterBlueprint, evaluateTank, PARTS, TYPES, transitionRun, suggestPlacement, moveCandidate, snapPlacement, validateBlueprint, BALANCE } from '../mode/index.mjs';
 import { blueprintScene, missionScene } from './workbench-scene.mjs';
 import { loadLocalModel } from './assets.mjs';
 import { disposeObject } from './resources.mjs';
 import { createBuildInteraction } from './build-interaction.mjs';
+import { createCombat } from './combat.mjs';
 
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const uid = prefix => `${prefix}-${crypto.randomUUID()}`;
@@ -35,6 +37,7 @@ export async function mountWorkbench(runtime) {
   let blueprint = createStarterBlueprint('infantry', uid('draft')), selected = 'weapon', dirty = true;
   let run = null, selectedTank = null, pendingFile = null, modelCategory = 'player-tank', modelFilter = '', boundModel = null;
   let history = [], future = [], snap = BALANCE.snapGrid, interaction = null, levelScene = null, levelSystem = null;
+  let combat = null, combatHud = null;
   let sceneKind = null, sceneKey = '', garageKey = '', saveTimer = 0, saving = false, saveQueued = false, dragSnapshot = false, focusEnemyCursor = -1;
   const notify = (text, error = false) => { message.textContent = text; message.classList.toggle('error', error); };
   const assessment = () => evaluateTank(blueprint, profile.unlockedParts);
@@ -42,6 +45,7 @@ export async function mountWorkbench(runtime) {
 
   // ---------------------------------------------------------------- scenes
   function clearLevelSystem() {
+    combat?.stop(); combat = null; combatHud = null;
     levelSystem?.(); levelSystem = null; levelScene = null;
   }
   function showTankScene(value, kind, { reset = false, pickable = true, hudValue = null } = {}) {
@@ -60,11 +64,11 @@ export async function mountWorkbench(runtime) {
     caption.textContent = kind === 'garage' ? '成品坦克 · 写实代理模型 · 单位：米' : '部件代理预览 · 点击选中 · 拖动移动 · 拖动空白旋转视角';
     updateHud(hudValue);
   }
-  function showLevelScene({ reset = false } = {}) {
-    if (!run) return;
+  function showLevelScene({ reset = false, combatMode = false } = {}) {
+    if (!run) return null;
     sceneKind = 'level';
     clearLevelSystem();
-    const scene = missionScene(run);
+    const scene = missionScene(run, { combat: combatMode });
     levelScene = scene;
     if (runtime && !runtime.disposed) {
       const changed = runtime.setEnvironment('level');
@@ -72,11 +76,14 @@ export async function mountWorkbench(runtime) {
       interaction?.setEnabled(false);
       interaction?.setRoot(null);
       levelSystem = runtime.addSystem({ update: delta => scene.update(delta) });
-      if (changed || reset) focusCamera('player', { duration: reset ? 0.001 : 0.9 });
+      if (!combatMode && (changed || reset)) focusCamera('player', { duration: reset ? 0.001 : 0.9 });
     } else disposeObject(scene.group);
     sceneKey = levelStateKey();
-    caption.textContent = '第一关 · 24 × 180 米 · 拖动旋转，右键平移，滚轮缩放';
+    caption.textContent = combatMode
+      ? '第一关 · W/A/S/D 驾驶 · 鼠标瞄准 · 左键或空格开火'
+      : '第一关 · 36 × 180 米 · 拖动旋转，右键平移，滚轮缩放';
     updateHud();
+    return scene;
   }
   function levelStateKey() {
     if (!run) return '';
@@ -84,6 +91,8 @@ export async function mountWorkbench(runtime) {
   }
   function syncLevelScene(force = false) {
     if (!run) return;
+    // Never rebuild the scene mid-battle: it would reset the live simulation.
+    if (combat?.state.active) { updateHud(); return; }
     if (!force && sceneKind === 'level' && sceneKey === levelStateKey()) { updateHud(); return; }
     showLevelScene({ reset: force });
   }
@@ -104,7 +113,9 @@ export async function mountWorkbench(runtime) {
   }
   function updateHud(hudValue = null) {
     if (!hud) return;
+    hud.classList.toggle('battle', Boolean(combatHud));
     if (tab === 'mission' && run) {
+      if (combatHud) { renderCombatHud(); return; }
       const labels = { ready: '准备就绪', running: '检验进行中', victory: '胜利条件达成', defeat: '失败条件达成' };
       hud.innerHTML = `<strong>${escape(run.tank.blueprint.name)}</strong> · ${labels[run.status]} · 敌坦 ${run.defeatedEnemies.length}/${run.level.enemies.length} · 基地${run.baseDestroyed ? '已摧毁' : '存活'}`;
       return;
@@ -115,6 +126,82 @@ export async function mountWorkbench(runtime) {
     if (!result.valid) { hud.innerHTML = `<strong>结构待修正</strong> · 3D 拖动仍可使用`; return; }
     const size = result.metrics.size.map(v => v.toFixed(1)).join(' × ');
     hud.innerHTML = `<strong>${escape(name)}</strong> · 质量 ${result.metrics.mass} t · 尺寸 ${size} m · ${partCount} 部件 · ${result.weapons.length} 武器${result.metrics.hasTurret ? ' · 炮塔' : ''}`;
+  }
+
+  // ---------------------------------------------------------------- combat
+  function renderCombatHud() {
+    if (!hud || !combatHud || !run) return;
+    const state = combatHud;
+    const health = Math.max(0, Math.round(state.health));
+    const reload = state.reloadMax ? Math.min(1, Math.max(0, 1 - state.reload / state.reloadMax)) : 1;
+    hud.innerHTML = `<strong>${escape(run.tank.blueprint.name)}</strong> · 生命 <b>${health}</b>/${Math.round(state.maxHealth)} · 装填 ${Math.round(reload * 100)}% · 敌坦 ${state.enemies}/${state.totalEnemies} · 基地 ${Math.max(0, Math.round(state.baseHealth))}/${Math.round(state.baseMax)}`;
+  }
+  function startCombat() {
+    if (!run || run.status !== 'ready' || !runtime || runtime.disposed) return false;
+    run = transitionRun(run, { type: 'start' });
+    const scene = showLevelScene({ combatMode: true });
+    if (!scene) return false;
+    runtime.cancelCameraTween?.();
+    combat = createCombat({
+      runtime, run, scene,
+      onEvent: handleCombatEvent,
+      onHud: snapshot => { combatHud = snapshot; if (tab === 'mission') renderCombatHud(); }
+    });
+    render();
+    notify('战斗开始：W/A/S/D 驾驶，鼠标瞄准，左键或空格开火。');
+    return true;
+  }
+  function endCombat() {
+    combat?.stop(); combat = null; combatHud = null;
+    if (!run) return;
+    showLevelScene({ reset: false });
+    render();
+  }
+  // Single entry point for every rule event, so manual dev buttons and the simulation
+  // cannot disagree about when a level ends.
+  function applyRunEvent(event) {
+    if (!run || run.status !== 'running') return false;
+    try { run = transitionRun(run, event); } catch (error) { notify(error.message, true); return false; }
+    if (run.status === 'running') render();
+    else endCombat();
+    return true;
+  }
+  function handleCombatEvent(event) {
+    if (event.type === 'combat-end') {
+      // The rule events arrive first and may already have torn the battle down.
+      if (combat && run && run.status !== 'running') endCombat();
+      return;
+    }
+    applyRunEvent(event);
+  }
+  // Read-only battle snapshot for the browser probes and manual debugging.
+  function publishBattleState() {
+    if (!window.__steel3d) return;
+    window.__steel3d.battle = () => {
+      if (!combat) return null;
+      const sim = combat.state;
+      return {
+        active: sim.active, outcome: sim.outcome,
+        health: Math.round(sim.player.health), maxHealth: sim.player.maxHealth,
+        position: [Number(sim.player.position.x.toFixed(2)), Number(sim.player.position.z.toFixed(2))],
+        yaw: Number(sim.player.yaw.toFixed(3)),
+        turretYaw: Number(sim.player.turretYaw.toFixed(3)),
+        pitch: Number(sim.player.pitch.toFixed(3)),
+        enemies: sim.aliveEnemies, total: sim.totalEnemies,
+        enemyHealth: sim.enemies.map(enemy => Math.round(enemy.health)),
+        base: Math.round(sim.base.health), projectiles: sim.projectiles.length,
+        shots: sim.shots, hits: sim.hits, status: run?.status || null
+      };
+    };
+    // Normalised screen position of an enemy, so probes can aim at what the player sees.
+    window.__steel3d.enemyScreen = index => {
+      if (!runtime || runtime.disposed || !levelScene?.units) return null;
+      const enemy = run?.level.enemies?.[index];
+      const object = enemy ? levelScene.units.enemies.get(enemy.id) : null;
+      if (!object || !object.visible) return null;
+      const point = new THREE.Vector3(object.position.x, 1.4, object.position.z).project(runtime.camera);
+      return { x: (point.x + 1) / 2, y: (1 - point.y) / 2, depth: Number(point.z.toFixed(3)) };
+    };
   }
 
   // ---------------------------------------------------------------- report
@@ -160,28 +247,34 @@ export async function mountWorkbench(runtime) {
     const item = blueprint.parts.find(p => p.id === selected);
     const available = Object.entries(PARTS).filter(([, p]) => p.types.includes(blueprint.type));
     const status = dirty ? '有未保存修改' : '草稿已保存';
-    workspace.innerHTML = `<p class="eyebrow">BUILD / DRAG / EVALUATE</p><h1>制造你的坦克</h1>
-      <p class="subtle">从目录安装部件，在 3D 中拖动摆位。松开鼠标会自动吸附网格并重新连接。</p>
-      <div class="row"><select id="tankType" aria-label="新建坦克类型">${Object.entries(TYPES).map(([id, t]) => option(id, t.name, blueprint.type)).join('')}</select>${button('new', '新建蓝图')}</div>
+    const value = assessment();
+    workspace.innerHTML = `<p class="eyebrow">BUILD / DRAG / EVALUATE</p><h1>造一辆坦克</h1>
+      <p class="subtle">① 点目录装部件　② 在 3D 里拖动摆位　③ 数值合格后制造入库。</p>
       <label class="field">蓝图名称<input id="blueprintName" maxlength="60" value="${escape(blueprint.name)}"></label>
       <div class="row"><span class="pill">${TYPES[blueprint.type].name}</span><span class="subtle" id="draftState">${status} · ${blueprint.parts.length} 部件</span></div>
-      <div class="row">${button('save', '保存草稿')}${button('manufacture', '制造并入库', `class="primary" ${assessment().valid ? '' : 'disabled'}`)}</div>
-      <h3>部件目录 <span class="subtle">零件：${profile.currency.parts}</span></h3>
+      <div class="row">${button('save', '保存草稿')}${button('manufacture', '制造并入库', `class="primary" ${value.valid ? '' : 'disabled'}`)}</div>
+      <h3>① 部件目录 <span class="subtle">零件：${profile.currency.parts}</span></h3>
       <div class="palette">${available.map(([id, p]) => partCard(id, p)).join('')}</div>
       ${!profile.inspectionGrantClaimed ? `<div class="row">${button('grant', '领取 100 测试零件')}</div>` : '<p class="subtle">测试零件已领取 · 与旧模式钱包独立</p>'}
-      <h3>当前部件</h3>
+      <h3>② 当前部件</h3>
       <div class="selection-card">
         <div class="title"><strong>${item ? escape(PARTS[item.partId].name) : '未选中'}</strong><span class="pill">${item ? roleLabels[PARTS[item.partId].role] : '点击 3D 部件'}</span></div>
         ${item ? `
-          <label class="field">选择部件<select id="selectedPart">${blueprint.parts.map(p => option(p.id, `${PARTS[p.partId].name} · ${p.id.slice(0, 8)}`, selected)).join('')}</select></label>
-          <div class="coordinates">${['X', 'Y', 'Z'].map((axis, i) => `<label>${axis}<input type="number" step="0.1" min="-30" max="30" data-coordinate="${i}" value="${item.position[i]}"></label>`).join('')}</div>
-          <div class="field"><span>朝向</span><div class="yaw-row"><input id="partYaw" type="range" min="-180" max="180" step="5" value="${Math.round(item.yaw * 180 / Math.PI)}"><output id="yawOutput">${Math.round(item.yaw * 180 / Math.PI)}°</output></div></div>
-          <label class="field">连接到<select id="partParent">${option('', '无（车体根节点）', item.parentId || '')}${blueprint.parts.filter(p => p.id !== item.id).map(p => option(p.id, PARTS[p.partId].name + ' · ' + p.id.slice(0, 8), item.parentId)).join('')}</select></label>
           <div class="row">${button('duplicate', '复制')}${button('remove', '移除')}${PARTS[item.partId].role === 'weapon' ? button('primary', blueprint.primaryWeaponId === item.id ? '当前主武器' : '设为主武器', blueprint.primaryWeaponId === item.id ? 'disabled' : '') : ''}</div>
+          <details class="dev-tools"><summary>精确调整（坐标 / 朝向 / 连接）</summary>
+            <label class="field">选择部件<select id="selectedPart">${blueprint.parts.map(p => option(p.id, `${PARTS[p.partId].name} · ${p.id.slice(0, 8)}`, selected)).join('')}</select></label>
+            <div class="coordinates">${['X', 'Y', 'Z'].map((axis, i) => `<label>${axis}<input type="number" step="0.1" min="-30" max="30" data-coordinate="${i}" value="${item.position[i]}"></label>`).join('')}</div>
+            <div class="field"><span>朝向</span><div class="yaw-row"><input id="partYaw" type="range" min="-180" max="180" step="5" value="${Math.round(item.yaw * 180 / Math.PI)}"><output id="yawOutput">${Math.round(item.yaw * 180 / Math.PI)}°</output></div></div>
+            <label class="field">连接到<select id="partParent">${option('', '无（车体根节点）', item.parentId || '')}${blueprint.parts.filter(p => p.id !== item.id).map(p => option(p.id, PARTS[p.partId].name + ' · ' + p.id.slice(0, 8), item.parentId)).join('')}</select></label>
+          </details>
         ` : '<p class="subtle">在左侧目录安装部件，或在 3D 中点击一个部件。</p>'}
       </div>
-      <label class="field">成品外观模型（可选）<select id="boundModel">${option('', '使用部件结构预览', boundModel || '')}${assets.filter(a => a.category === 'player-tank').map(a => option(a.id, a.name, boundModel)).join('')}</select></label>
-      <h3>已保存草稿</h3>${profile.blueprints.length ? `<div class="row"><select id="savedDraft" aria-label="已保存草稿">${profile.blueprints.map(b => option(b.id, `${b.name} · ${b.parts.length} 部件`, blueprint.id)).join('')}</select>${button('load', '载入')}</div>` : '<p class="subtle">尚无草稿，点击“保存草稿”保留当前搭建。</p>'}`;
+      <details class="dev-tools"><summary>高级：外观模型 / 草稿 / 模型仓库</summary>
+        <div class="row"><select id="tankType" aria-label="新建坦克类型">${Object.entries(TYPES).map(([id, t]) => option(id, t.name, blueprint.type)).join('')}</select>${button('new', '新建蓝图')}</div>
+        <label class="field">成品外观模型（可选）<select id="boundModel">${option('', '使用部件结构预览', boundModel || '')}${assets.filter(a => a.category === 'player-tank').map(a => option(a.id, a.name, boundModel)).join('')}</select></label>
+        <h3>已保存草稿</h3>${profile.blueprints.length ? `<div class="row"><select id="savedDraft" aria-label="已保存草稿">${profile.blueprints.map(b => option(b.id, `${b.name} · ${b.parts.length} 部件`, blueprint.id)).join('')}</select>${button('load', '载入')}</div>` : '<p class="subtle">尚无草稿，点击“保存草稿”保留当前搭建。</p>'}
+        <div class="row">${button('openModels', '打开模型仓库')}</div>
+      </details>`;
     renderReport();
     updateHud();
   }
@@ -203,9 +296,33 @@ export async function mountWorkbench(runtime) {
     updateDock();
   }
 
+  // ---------------------------------------------------------------- first-run guide
+  const GUIDE_KEY = 'steel3d.guide.v1';
+  const GUIDE_STEPS = [
+    '点一下左侧的部件，它就会装到车上。',
+    '在 3D 里拖动它。松手会自动吸附到最近的连接点。',
+    '数值合格后点「制造并入库」，然后就能开战。'
+  ];
+  let guideIndex = 0;
+  function guideDone() { try { return localStorage.getItem(GUIDE_KEY) === 'done'; } catch { return true; } }
+  function showGuide(step = 0) {
+    const box = document.querySelector('#guide');
+    if (!box) return;
+    guideIndex = step;
+    const label = document.querySelector('#guideStep'), text = document.querySelector('#guideText');
+    if (label) label.textContent = `第 ${step + 1} 步 / 共 3 步`;
+    if (text) text.textContent = GUIDE_STEPS[step];
+    box.hidden = false;
+  }
+  function hideGuide(persist = true) {
+    const box = document.querySelector('#guide');
+    if (box) box.hidden = true;
+    if (persist) { try { localStorage.setItem(GUIDE_KEY, 'done'); } catch { /* storage unavailable */ } }
+  }
+
   // ---------------------------------------------------------------- models / garage
   function renderModels() {
-    workspace.innerHTML = `<p class="eyebrow">LOCAL ASSET LIBRARY</p><h1>模型仓库</h1><p class="subtle">内嵌贴图的 GLB，最大 64 MB。先预览，再分类入库；文件仅保存在本机。</p>
+    workspace.innerHTML = `<div class="row">${button('backWorkshop', '← 返回车间')}</div><p class="eyebrow">LOCAL ASSET LIBRARY</p><h1>模型仓库</h1><p class="subtle">内嵌贴图的 GLB，最大 64 MB。先预览，再分类入库；文件仅保存在本机。</p>
       <label class="field">导入分类<select id="modelCategory">${Object.entries(categories).map(([id, n]) => option(id, n, modelCategory)).join('')}</select></label>
       <label class="field">选择 GLB<input id="modelFile" type="file" accept=".glb"></label>
       <p id="pendingName" class="subtle">${pendingFile ? escape(pendingFile.name) : '尚未选择文件'}</p>
@@ -231,29 +348,34 @@ export async function mountWorkbench(runtime) {
   // ---------------------------------------------------------------- mission
   function renderMission() {
     if (!run) {
-      workspace.innerHTML = '<p class="eyebrow">STEEL JOURNEY / 01</p><h1>第一关</h1><p>24 × 180 米走廊，途中 3 辆敌坦，终点 1 辆守卫和基地。</p><p class="subtle">先在坦克仓库选择成品，准备第一关。</p>' + button('goGarage', '选择坦克', 'class="primary"');
-      report.innerHTML = '<h2>胜利条件</h2><p>摧毁基地，并消灭全部 4 辆敌坦。</p><p class="subtle">此处将手动发送测试事件，不运行真实战斗，也不发放奖励。</p><div class="legend"><span style="--dot:#b9d38f">玩家坦克</span><span style="--dot:#b4543a">途中敌坦</span><span style="--dot:#c24a32">终点守卫</span><span style="--dot:#c9a873">敌方基地</span></div>';
+      workspace.innerHTML = '<p class="eyebrow">STEEL JOURNEY / 01</p><h1>第一关</h1><p>36 × 180 米三段式走廊：接敌区、侧翼区、基地攻坚。</p><p class="subtle">先在坦克仓库选择成品，准备第一关。</p>' + button('goGarage', '选择坦克', 'class="primary"');
+      report.innerHTML = '<h2>胜利条件</h2><p>摧毁基地，并消灭全部 4 辆敌坦。</p><p class="subtle">进入第一关后点「开战」即可驾驶坦克；规则自检按钮收在「规则自检（开发者）」里。</p><div class="legend"><span style="--dot:#b9d38f">玩家坦克</span><span style="--dot:#b4543a">途中敌坦</span><span style="--dot:#c24a32">终点守卫</span><span style="--dot:#c9a873">敌方基地</span></div>';
       return;
     }
     const labels = { ready: '准备就绪', running: '检验进行中', victory: '胜利条件达成', defeat: '失败条件达成' };
     const running = run.status === 'running';
-    workspace.innerHTML = `<p class="eyebrow">STEEL JOURNEY / 01</p><h1>第一关 · 场景检验</h1><p class="subtle">拖动旋转视角，点击下方按钮把镜头对准玩家、敌坦或基地。手动事件只检验胜负规则。</p>
+    const inCombat = Boolean(combat?.state.active);
+    workspace.innerHTML = `<p class="eyebrow">STEEL JOURNEY / 01</p><h1>第一关 · 突破走廊</h1>
+      <p class="subtle">${inCombat ? 'W/A/S/D 驾驶 · 鼠标瞄准 · 左键或空格开火。' : '三段式场地：接敌区 → 侧翼区 → 基地攻坚。点「开战」直接驾驶坦克。'}</p>
       <div class="level-status"><span class="pill">${labels[run.status]}</span><span class="subtle">出战：${escape(run.tank.blueprint.name)}</span></div>
-      <div class="mini-actions">${button('camPlayer', '看玩家')}${button('camOverview', '看全景')}${button('camBase', '看基地')}${button('camEnemy', '看敌坦')}</div>
-      ${run.status === 'ready' ? button('startTest', '开始规则测试', 'class="primary"') : ''}
-      ${run.level.enemies.map((enemy, i) => `<article class="card"><strong>${i === 3 ? '终点守卫' : `途中敌坦 ${i + 1}`}</strong><small>${['正面对抗', '左侧偷袭', '右侧偷袭', '基地守卫'][i]} · Z = ${enemy.position[2]} m · 触发 ${enemy.triggerZ} m</small><div class="row">${button('destroyEnemy', run.defeatedEnemies.includes(enemy.id) ? '已消灭' : '模拟消灭', `data-id="${enemy.id}" ${!running || run.defeatedEnemies.includes(enemy.id) ? 'disabled' : ''}`)}${button('camEnemyId', '视角', `data-id="${enemy.id}" ${run.defeatedEnemies.includes(enemy.id) ? 'disabled' : ''}`)}</div></article>`).join('')}
-      <div class="row">${button('destroyBase', run.baseDestroyed ? '基地已摧毁' : '模拟摧毁基地', !running || run.baseDestroyed ? 'disabled' : '')}${button('destroyPlayer', '模拟玩家阵亡', !running ? 'disabled' : '')}</div>
-      <div class="row">${button('resetTest', '重新准备')}${button('goGarage', '返回坦克仓库')}</div>${run.status === 'victory' ? button('next', '后续关卡待开发', 'disabled') : ''}`;
-    report.innerHTML = `<p class="eyebrow">MISSION VALIDATION</p><h2>${labels[run.status]}</h2><dl class="metrics"><div><dt>敌坦消灭</dt><dd>${run.defeatedEnemies.length} / 4</dd></div><div><dt>敌方基地</dt><dd>${run.baseDestroyed ? '已摧毁' : '存活'}</dd></div></dl><p>${run.status === 'victory' ? '两个胜利条件均已满足。' : run.status === 'defeat' ? '玩家阵亡，关卡失败。' : '消灭全部敌坦且摧毁基地后才能胜利。'}</p><div class="legend"><span style="--dot:#b9d38f">玩家坦克</span><span style="--dot:#b4543a">途中敌坦</span><span style="--dot:#c24a32">终点守卫</span><span style="--dot:#c9a873">敌方基地</span></div><p class="subtle">场景包含道路、路障、瞭望塔、基地与敌我坦克；被摧毁的目标会变成残骸并冒烟。无 AI、弹道或物理运行。</p>`;
+      ${run.status === 'ready' ? button('startTest', '开战', 'class="primary" id="startBattle"') : ''}
+      <div class="row">${button('resetTest', '重新准备')}${button('goGarage', '返回坦克仓库')}</div>
+      ${run.status === 'victory' ? button('next', '后续关卡待开发', 'disabled') : ''}
+      <details class="dev-tools"><summary>规则自检（开发者）</summary>
+        <p class="subtle">直接向状态机发送事件，不经过战斗模拟。</p>
+        ${run.level.enemies.map((enemy, i) => `<article class="card"><strong>${i === 3 ? '终点守卫' : `途中敌坦 ${i + 1}`}</strong><small>${['正面对抗', '左侧偷袭', '右侧偷袭', '基地守卫'][i]} · Z = ${enemy.position[2]} m · 触发 ${enemy.triggerZ} m</small><div class="row">${button('destroyEnemy', run.defeatedEnemies.includes(enemy.id) ? '已消灭' : '模拟消灭', `data-id="${enemy.id}" ${!running || run.defeatedEnemies.includes(enemy.id) ? 'disabled' : ''}`)}</div></article>`).join('')}
+        <div class="row">${button('destroyBase', run.baseDestroyed ? '基地已摧毁' : '模拟摧毁基地', !running || run.baseDestroyed ? 'disabled' : '')}${button('destroyPlayer', '模拟玩家阵亡', !running ? 'disabled' : '')}</div>
+      </details>`;
+    report.innerHTML = `<p class="eyebrow">MISSION VALIDATION</p><h2>${labels[run.status]}</h2><dl class="metrics"><div><dt>敌坦消灭</dt><dd>${run.defeatedEnemies.length} / 4</dd></div><div><dt>敌方基地</dt><dd>${run.baseDestroyed ? '已摧毁' : '存活'}</dd></div></dl><p>${run.status === 'victory' ? '两个胜利条件均已满足。' : run.status === 'defeat' ? '玩家阵亡，关卡失败。' : '消灭全部敌坦且摧毁基地后才能胜利。'}</p><div class="legend"><span style="--dot:#b9d38f">玩家坦克</span><span style="--dot:#b4543a">途中敌坦</span><span style="--dot:#c24a32">终点守卫</span><span style="--dot:#c9a873">敌方基地</span></div><p class="subtle">${inCombat ? '战斗进行中：驾驶、瞄准与开火由 combat.mjs 实时模拟。' : '场景包含三段式场地、可碰撞掩体、泥地/碎石区与 5 辆坦克；点「开战」运行真实战斗。'}</p>`;
     syncLevelScene();
   }
   function render() {
     if (disposed) return;
     document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
-    for (const buttonElement of cameraTools) {
-      const missionOnly = ['player', 'overview', 'base', 'enemy'].includes(buttonElement.dataset.camera);
-      buttonElement.hidden = missionOnly && tab !== 'mission';
-    }
+    const capsule = document.querySelector('#cameraCapsule');
+    if (capsule) capsule.hidden = !(tab === 'mission' && run && !combat?.state.active);
+    const crosshair = document.querySelector('#crosshair');
+    if (crosshair) crosshair.hidden = !(tab === 'mission' && combat?.state.active);
     if (tab === 'workshop') {
       renderWorkshopPanel();
       if (sceneKind !== 'workshop') showTankScene(blueprint, 'workshop', { reset: true });
@@ -261,7 +383,7 @@ export async function mountWorkbench(runtime) {
     } else if (tab === 'models') renderModels();
     else if (tab === 'garage') renderGarage();
     else renderMission();
-    runtime?.setKeyboardPan(tab === 'mission');
+    runtime?.setKeyboardPan(tab === 'mission' && !combat?.state.active);
     interaction?.setEnabled(tab === 'workshop' && sceneKind === 'workshop');
     updateDock();
   }
@@ -381,12 +503,14 @@ export async function mountWorkbench(runtime) {
     item.position[axis] = Math.max(-BALANCE.maxExtent, Math.min(BALANCE.maxExtent, Number((item.position[axis] + amount).toFixed(3))));
     commit();
   }
-  function applyDrag(id, position) {
+  function applyDrag(id, position, yaw) {
     const item = blueprint.parts.find(p => p.id === id);
     if (!item) return;
-    const result = moveCandidate(blueprint, id, position, { grid: null });
+    const snapped = snapPlacement(blueprint, id, position, snap) || position;
+    const result = moveCandidate(blueprint, id, snapped, { grid: null });
     if (!result) return;
     item.position = result.position;
+    if (Number.isFinite(yaw)) item.yaw = yaw;
     if (result.parentId && result.parentId !== item.parentId) item.parentId = result.parentId;
     dirty = true;
     showTankScene(blueprint, 'workshop');
@@ -395,6 +519,17 @@ export async function mountWorkbench(runtime) {
     scheduleSave();
     const attached = result.gap !== null && result.gap !== undefined ? ` · 已连接 ${PARTS[blueprint.parts.find(p => p.id === item.parentId)?.partId]?.name || ''}` : '';
     notify(`${PARTS[item.partId].name} 移动到 ${result.position.map(v => v.toFixed(2)).join(' / ')}${attached}`);
+  }
+  // Live placement feedback while dragging: where it would land and whether that is legal.
+  function previewDrag(id, position, yaw) {
+    const item = blueprint.parts.find(p => p.id === id);
+    if (!item) return null;
+    const result = moveCandidate(blueprint, id, position, { grid: null });
+    if (!result) return null;
+    const probe = { ...blueprint, parts: blueprint.parts.map(part => part.id === id ? { ...part, position: result.position, yaw } : part) };
+    const errors = validateBlueprint(probe, profile.unlockedParts);
+    const status = errors.length === 0 ? 'ok' : errors.some(text => text.includes('重叠')) ? 'overlap' : 'invalid';
+    return { position: result.position, parentId: result.parentId, status };
   }
 
   // ---------------------------------------------------------------- model preview
@@ -469,6 +604,8 @@ export async function mountWorkbench(runtime) {
       pendingFile = null; await refresh(); renderModels(); notify('模型已保存到本机仓库。');
     },
     clearModel() { pendingFile = null; renderModels(); showTankScene(blueprint, 'workshop', { reset: true }); notify('已恢复部件预览。'); },
+    openModels() { tab = 'models'; sceneKind = null; render(); notify('模型仓库：选择 GLB 预览，再按分类保存到本机。'); },
+    backWorkshop() { tab = 'workshop'; sceneKind = null; render(); notify('已返回车间。'); },
     async previewAsset(target) { await previewModelId(target.dataset.id); },
     inspectTank(target) { selectedTank = target.dataset.id; sceneKind = null; render(); },
     async prepare(target) {
@@ -476,17 +613,20 @@ export async function mountWorkbench(runtime) {
       tab = 'mission'; sceneKind = null; garageKey = ''; render();
       notify('第一关已准备。镜头可自由旋转，下方可对准目标。');
     },
-    startTest() { run = transitionRun(run, { type: 'start' }); render(); },
-    destroyEnemy(target) { run = transitionRun(run, { type: 'enemy-destroyed', id: target.dataset.id }); render(); },
-    destroyBase() { run = transitionRun(run, { type: 'base-destroyed' }); render(); },
-    destroyPlayer() { run = transitionRun(run, { type: 'player-destroyed' }); render(); },
-    async resetTest() { run = await app.prepareFirstLevel(run.tank.id); render(); },
-    goGarage() { tab = 'garage'; sceneKind = null; garageKey = ''; render(); },
-    camPlayer() { focusCamera('player'); },
-    camOverview() { focusCamera('overview', { duration: 1 }); },
-    camBase() { focusCamera('base'); },
-    camEnemy() { focusEnemy(); },
-    camEnemyId(target) { focusCamera(target.dataset.id); }
+    startTest() { startCombat(); },
+    destroyEnemy(target) { applyRunEvent({ type: 'enemy-destroyed', id: target.dataset.id }); },
+    destroyBase() { applyRunEvent({ type: 'base-destroyed' }); },
+    destroyPlayer() { applyRunEvent({ type: 'player-destroyed' }); },
+    async resetTest() {
+      combat?.stop(); combat = null; combatHud = null;
+      run = await app.prepareFirstLevel(run.tank.id); render();
+    },
+    goGarage() { combat?.stop(); combat = null; combatHud = null; tab = 'garage'; sceneKind = null; garageKey = ''; render(); },
+    camPlayer() { if (combat?.state.active) return notify('战斗中镜头跟随车体。'); focusCamera('player'); },
+    camOverview() { if (combat?.state.active) return notify('战斗中镜头跟随车体。'); focusCamera('overview', { duration: 1 }); },
+    camBase() { if (combat?.state.active) return notify('战斗中镜头跟随车体。'); focusCamera('base'); },
+    camEnemy() { if (combat?.state.active) return notify('战斗中镜头跟随车体。'); focusEnemy(); },
+    camEnemyId(target) { if (combat?.state.active) return; focusCamera(target.dataset.id); }
   };
   const setCameraPressed = name => {
     for (const buttonElement of cameraTools) {
@@ -517,6 +657,8 @@ export async function mountWorkbench(runtime) {
   const onClick = event => {
     const target = event.target.closest('button');
     if (!target || target.disabled) return;
+    if (target.id === 'guideNext') { if (guideIndex >= GUIDE_STEPS.length - 1) hideGuide(); else showGuide(guideIndex + 1); return; }
+    if (target.id === 'guideSkip') { hideGuide(); return; }
     if (target.dataset.camera) {
       const action = cameraActions[target.dataset.camera];
       if (action) safely(() => action());
@@ -602,13 +744,14 @@ export async function mountWorkbench(runtime) {
         getGrid: () => snap,
         onSelect: id => { selected = id; interaction.setSelected(id); renderWorkshopPanel(); },
         onDragMove: () => { if (!dragSnapshot) { pushHistory(); dragSnapshot = true; } },
-        onDragEnd: (id, position) => { dragSnapshot = false; applyDrag(id, position); },
+        onDragEnd: (id, position, yaw) => { dragSnapshot = false; applyDrag(id, position, yaw); },
+        onPreview: (id, position, yaw) => previewDrag(id, position, yaw),
         onHover: id => {
           const hint = document.querySelector('#controlHint');
           if (!hint) return;
           const item = id ? blueprint.parts.find(p => p.id === id) : null;
           hint.innerHTML = item
-            ? `悬停：<strong>${escape(PARTS[item.partId].name)}</strong> · 拖动移动 · Shift+拖动调整高度<br>Q/E 旋转 · Delete 删除 · Ctrl+Z 撤销`
+            ? `悬停：<strong>${escape(PARTS[item.partId].name)}</strong> · 拖动移动 · Shift+拖动调整高度<br>拖动中滚轮旋转 15°（Shift 5°） · Q/E 旋转 · Delete 删除 · Ctrl+Z 撤销`
             : '拖动旋转 · 右键平移 · 滚轮缩放<br>点击部件选中并拖动摆位';
         }
       });
@@ -618,7 +761,9 @@ export async function mountWorkbench(runtime) {
     workspace.addEventListener('input', onInput);
     window.addEventListener('keydown', onKeyDown);
     render();
-    notify('从车间开始：安装部件 → 拖动摆位 → 查看评估 → 制造入库 → 第一关场景检验。');
+    publishBattleState();
+    notify('从车间开始：安装部件 → 拖动摆位 → 查看评估 → 制造入库 → 第一关开战。');
+    if (tab === 'workshop' && !guideDone() && !location.search.includes('noguide')) showGuide(0);
   } catch (error) {
     repo?.close(); document.querySelector('#storageStatus').textContent = '存储不可用';
     workspace.innerHTML = '<h2>无法打开本机仓库</h2><p>请检查浏览器存储权限，或通过本地 HTTP 服务打开后刷新重试。</p>';

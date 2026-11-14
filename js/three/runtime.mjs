@@ -169,6 +169,11 @@ export class SceneRuntime {
     this.controls.autoRotateSpeed = 0.7;
     this.invalidate();
   }
+  // The combat camera owns the view; stop any focus tween that would fight it.
+  cancelCameraTween() {
+    this.tween = null;
+    this.invalidate();
+  }
   setKeyboardPan(enabled) {
     this.keyboardPan = Boolean(enabled);
     if (!enabled) this.keys.clear();
