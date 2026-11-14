@@ -78,3 +78,45 @@ test('blueprints with four weapons and no turret still produce a model', () => {
   const { triangles } = measure(model);
   assert.ok(triangles > 3000);
 });
+
+// Every bolt, handle and weld bead must be attached to something. A detail that is
+// offset into empty space still renders, so only an AABB contact check catches it.
+test('no detail floats free of the part it belongs to', () => {
+  const model = buildTankModel(createStarterBlueprint('infantry'), { merged: false });
+  model.updateMatrixWorld(true);
+  const isolated = [];
+  for (const [id, group] of model.userData.parts) {
+    const meshes = [];
+    group.traverse(object => { if (object.isMesh) meshes.push({ object, box: new THREE.Box3().setFromObject(object) }); });
+    if (meshes.length < 2) continue;
+    for (const entry of meshes) {
+      const touching = meshes.some(other => other !== entry && entry.box.clone().expandByScalar(0.015).intersectsBox(other.box));
+      if (!touching) isolated.push(`${id} @ ${entry.box.getCenter(new THREE.Vector3()).toArray().map(value => value.toFixed(2)).join(',')}`);
+    }
+  }
+  assert.deepEqual(isolated, [], `floating detail: ${isolated.join('; ')}`);
+});
+
+// Guards the M2 detail pass: the extra bolts, welds and stowage must stay inside the
+// near-view triangle budget, must not bury the running gear, and must not push the
+// turret bustle into the engine deck when the turret sits in its default pose.
+test('detail pass stays inside the near-view budget and keeps parts clear', () => {
+  const blueprint = createStarterBlueprint('infantry');
+  const model = buildTankModel(blueprint, { merged: true });
+  const { triangles, meshes, box } = measure(model);
+  assert.ok(triangles > 8000 && triangles < 20000, `detail budget ${triangles}`);
+  assert.ok(meshes >= 15 && meshes <= 60, `merged meshes ${meshes}`);
+  const role = name => new THREE.Box3().setFromObject(model.userData.byRole.get(name));
+  const hull = role('hull'), turret = role('turret'), engine = role('engine'), tracks = role('mobility');
+  assert.ok(turret.min.z > engine.max.z + 0.1, `turret bustle must clear the engine deck (${turret.min.z.toFixed(2)} vs ${engine.max.z.toFixed(2)})`);
+  assert.ok(turret.min.y <= hull.max.y + 0.02, 'turret ring should meet the hull roof');
+  assert.ok(turret.max.y > hull.max.y + 0.5, 'turret should stand above the hull');
+  assert.ok(tracks.min.y > -0.02 && tracks.min.y < 0.02, `running gear should rest on y = 0 (${tracks.min.y.toFixed(3)})`);
+  assert.ok(tracks.max.x > hull.max.x - 0.15, 'tracks should reach the sponson line');
+  assert.ok(box.min.y > -0.1, 'nothing may sink into the ground');
+  for (const [id, group] of model.userData.parts) {
+    let partTriangles = 0;
+    group.traverse(object => { if (object.isMesh) partTriangles += (object.geometry.index ? object.geometry.index.count : object.geometry.attributes.position.count) / 3; });
+    assert.ok(partTriangles < 9000, `${id} spends ${Math.round(partTriangles)} triangles`);
+  }
+});
