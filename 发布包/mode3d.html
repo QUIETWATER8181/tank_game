@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>钢铁征途 · 3D 车间</title>
+  <link rel="stylesheet" href="css/mode3d.css?v=4">
+  <script defer src="js/mode/core.bundle.js?v=3"></script>
+  <script defer src="js/three/scene.bundle.js?v=4"></script>
+</head>
+<body>
+  <main id="viewport" aria-label="3D 场景"></main>
+  <div class="scene-hud" id="sceneHud"></div>
+  <div class="scene-caption" id="sceneCaption">部件结构预览</div>
+  <header class="toolbar">
+    <a href="index.html">← 返回主页</a>
+    <div class="brand">钢铁征途 <span>3D 车间 · 第一关</span></div>
+    <div class="camera-tools" aria-label="视角控制">
+      <button type="button" data-camera="orbit" aria-pressed="true">自由视角</button>
+      <button type="button" data-camera="auto" aria-pressed="false">自动环绕</button>
+      <button type="button" data-camera="player" hidden>跟随玩家</button>
+      <button type="button" data-camera="overview" hidden>全景</button>
+      <button type="button" data-camera="base" hidden>基地</button>
+      <button type="button" id="resetCamera">复位</button>
+    </div>
+    <label>画质 <select id="quality"><option value="low">节能</option><option value="balanced" selected>均衡</option><option value="high">精细</option></select></label>
+  </header>
+  <nav class="mode-tabs" aria-label="工作区">
+    <button type="button" data-tab="workshop" aria-pressed="true">01 车间</button>
+    <button type="button" data-tab="models" aria-pressed="false">02 模型仓库</button>
+    <button type="button" data-tab="garage" aria-pressed="false">03 坦克仓库</button>
+    <button type="button" data-tab="mission" aria-pressed="false">04 第一关</button>
+    <span id="storageStatus">正在打开本机仓库…</span>
+  </nav>
+  <aside class="workbench">
+    <div class="notice" id="message" role="status">正在准备 3D 空间…</div>
+    <div id="workspace"><p>正在加载工作区…</p></div>
+  </aside>
+  <aside class="report-panel" aria-label="评估与检验结果"><div id="report"></div></aside>
+  <div class="build-dock" id="buildDock" hidden>
+    <button type="button" data-action="undo" title="撤销 Ctrl+Z">↶ 撤销</button>
+    <button type="button" data-action="redo" title="重做 Ctrl+Y">↷ 重做</button>
+    <span class="dock-sep"></span>
+    <button type="button" data-action="rotateLeft" title="逆时针 15° Q">⟲ 15°</button>
+    <button type="button" data-action="rotateRight" title="顺时针 15° E">⟳ 15°</button>
+    <button type="button" data-action="raise" title="升高 0.1 m">↑ 升高</button>
+    <button type="button" data-action="lower" title="降低 0.1 m">↓ 降低</button>
+    <span class="dock-sep"></span>
+    <button type="button" data-action="snap" title="切换吸附网格" id="snapButton">吸附 0.1 m</button>
+    <button type="button" data-action="duplicate" title="复制 Ctrl+D">复制</button>
+    <button type="button" data-action="remove" title="删除 Delete">删除</button>
+  </div>
+  <footer><span id="controlHint">拖动旋转 · 右键平移 · 滚轮缩放<br>触屏：单指旋转，双指缩放 / 平移</span><output id="stats" aria-label="渲染统计"></output></footer>
+  <noscript>请启用 JavaScript 后使用 3D 空间。<a href="index.html">返回主页</a></noscript>
+</body>
+</html>

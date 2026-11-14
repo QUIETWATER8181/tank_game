@@ -1,2 +1,3 @@
 # 原型截图：每张 ~1.4MB，可随时用 tools/pseudo3d/shoot.js 重新生成
 tools/pseudo3d/shots/
+node_modules/

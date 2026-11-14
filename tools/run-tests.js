@@ -1,4 +1,4 @@
-// 跑 tests/*.test.js：每个文件一个独立 node 进程，超时就杀掉并记 FAIL。
+// 跑 tests/*.test.js / *.test.mjs：每个文件一个独立 node 进程，超时就杀掉并记 FAIL。
 //
 // 为什么需要超时：有几个用例会碰 Audio / 音轨，那里面用 setInterval 做循环音效，
 // 在 node 里没人 stop 就会一直挂着（浏览器里是正常的）。表现是「已经打印了 PASS，
@@ -24,7 +24,7 @@ process.argv.slice(2).forEach(function (arg) {
 });
 
 var files = fs.readdirSync(testsDir)
-  .filter(function (name) { return /\.test\.js$/.test(name); })
+  .filter(function (name) { return /\.test\.(?:js|mjs)$/.test(name); })
   .filter(function (name) { return !filter || name.indexOf(filter) !== -1; })
   .sort();
 

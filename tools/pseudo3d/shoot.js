@@ -139,8 +139,8 @@ async function main() {
   var out = path.resolve(ROOT, args.out || ("tools/pseudo3d/shots/" + mode + ".png"));
   var extraQuery = args.query ? "&" + args.query : "";
   var camQuery = args.cam ? "&cam=" + args.cam : "";
-  // --page 也可以直接给完整 URL（例如线上 Pages 地址），这时不再起本地静态服务
-  var remote = args.page && /^https?:\/\//.test(args.page);
+  // 完整 HTTP / file URL 无需静态服务；file 用于验证双击启动兼容性。
+  var remote = args.page && /^(?:https?|file):\/\//.test(args.page);
   var url = remote
     ? args.page + (args.query ? (args.page.indexOf("?") === -1 ? "?" : "&") + args.query : "")
     : (args.page
