@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { BALANCE } from '../mode/catalog.mjs';
 
-const MARKER_COLOR = '#d7ee9a';
-const HOVER_COLOR = '#8fc7d8';
+const MARKER_COLOR = '#e0a13a';
+const HOVER_COLOR = '#8fb0c8';
 const GHOST_COLORS = { ok: '#9fd66b', overlap: '#e8b23c', invalid: '#e05c4a' };
 const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
 const UNIT_EDGES = new THREE.EdgesGeometry(UNIT_BOX);

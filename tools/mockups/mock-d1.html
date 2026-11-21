@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>样张 D1 · 纸面车间</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { width: 1440px; height: 900px; margin: 0; overflow: hidden; background: #0a0b0c; }
+  body { position: relative; font-family: "FangSong", "STFangsong", "SimSun", serif; color: #241f17; }
+
+  /* ── 场景 ─────────────────────────────── */
+  .scene { position: absolute; inset: 0; }
+  .scene img {
+    width: 100%; height: 100%; object-fit: cover;
+    transform: scale(1.1);
+    filter: sepia(.13) saturate(1.05) brightness(.9) contrast(1.04);
+  }
+  .lamps {
+    position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen;
+    background:
+      radial-gradient(20% 12% at 25% -5%, rgba(255,210,150,.3), rgba(255,210,150,0) 72%),
+      radial-gradient(14% 9% at 71% -6%, rgba(255,190,120,.18), rgba(255,190,120,0) 74%);
+  }
+  .vignette {
+    position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(118% 98% at 50% 48%, rgba(0,0,0,0) 46%, rgba(6,5,4,.6) 100%),
+      linear-gradient(180deg, rgba(6,6,7,.55) 0%, rgba(6,6,7,0) 15%);
+  }
+
+  /* ── 挂杆 ─────────────────────────────── */
+  .rail {
+    position: absolute; left: 0; right: 0; top: 0; height: 15px; z-index: 6;
+    background: linear-gradient(180deg, #454b4f 0%, #30353a 46%, #1d2124 100%);
+    border-bottom: 1px solid #0a0c0d;
+    box-shadow: 0 4px 10px rgba(0,0,0,.65), 0 1px 0 rgba(255,255,255,.16) inset;
+  }
+  .bolt {
+    position: absolute; top: 3px; width: 7px; height: 7px; border-radius: 50%;
+    background: radial-gradient(circle at 34% 30%, #7d848a, #23272a 72%);
+    box-shadow: 0 1px 1px rgba(0,0,0,.7);
+  }
+  .hook {
+    position: absolute; width: 36px; height: 19px; z-index: 9;
+    background: linear-gradient(180deg, #c2c9ce, #737a80 56%, #474d51);
+    border: 1px solid #14171a; border-radius: 3px 3px 4px 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,.7), 0 1px 0 rgba(255,255,255,.6) inset;
+  }
+  .hook::before {
+    content: ""; position: absolute; left: 50%; top: -10px; width: 9px; height: 13px; margin-left: -4.5px;
+    border: 2px solid #9aa1a6; border-bottom: 0; border-radius: 5px 5px 0 0;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.3);
+  }
+  .hook::after {
+    content: ""; position: absolute; left: 50%; top: 4px; width: 10px; height: 1px; margin-left: -5px;
+    background: rgba(0,0,0,.45);
+  }
+  .hook.h1 { left: 162px; top: 6px; }
+  .hook.h2 { left: 1242px; top: 6px; }
+
+  /* ── 纸 ───────────────────────────────── */
+  .paper {
+    position: absolute; z-index: 5;
+    background:
+      linear-gradient(184deg, rgba(255,246,220,.9) 0%, rgba(255,246,220,0) 30%),
+      linear-gradient(178deg, #f2e7c9 0%, #ecdfbd 46%, #e2d2ab 100%);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.85) inset,
+      0 1px 0 rgba(255,255,255,.5),
+      0 0 0 1px rgba(255,214,160,.16) inset,
+      0 30px 56px rgba(8,5,2,.6),
+      0 8px 16px rgba(8,5,2,.34);
+  }
+  .paper::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .42; mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.3'/%3E%3C/svg%3E");
+  }
+
+  .list { left: 26px; top: 16px; width: 308px; height: 562px; padding: 16px 18px; transform: rotate(-.5deg); }
+  .verify { right: 26px; top: 16px; width: 308px; height: 548px; padding: 16px 18px; transform: rotate(.45deg); }
+
+  /* ── 抬头 ─────────────────────────────── */
+  .kicker { margin: 0; font-size: 9.5px; letter-spacing: .42em; color: #6e6455; }
+  .paper h1 { margin: 5px 0 0; font-family: "SimHei", sans-serif; font-size: 22px; font-weight: 400; letter-spacing: .13em; }
+  .paper h1 small { font-family: "KaiTi", serif; font-size: 11.5px; color: #6e6455; letter-spacing: .05em; margin-left: 7px; }
+  .tabs { display: flex; gap: 15px; margin-top: 7px; font-family: "Consolas", monospace; font-size: 10px; letter-spacing: .1em; color: #6e6455; }
+  .tabs b { font-weight: 400; color: #241f17; border-bottom: 1.5px solid #a5332a; padding-bottom: 1px; }
+
+  .paper h2 {
+    margin: 0 0 5px; display: flex; justify-content: space-between; align-items: baseline;
+    font-family: "SimHei", sans-serif; font-size: 12.5px; font-weight: 400; letter-spacing: .2em; color: #3a3225;
+  }
+  .paper h2 em { font-family: "Consolas", monospace; font-style: normal; font-size: 9px; letter-spacing: .05em; color: #8b7d5f; }
+  .rule { height: 1px; margin: 0 0 7px; background: linear-gradient(90deg, #8b7d5f, rgba(139,125,95,.1)); }
+  .head-rule { height: 3px; margin: 9px 0 10px; border-top: 1px solid #8b7d5f; border-bottom: 1px solid #8b7d5f; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th {
+    font-family: "SimHei", sans-serif; font-weight: 400; font-size: 9px; letter-spacing: .14em;
+    color: #6e6455; text-align: left; padding: 3px 2px 4px; border-bottom: 1px solid #b9a986;
+  }
+  td { padding: 5.5px 2px; border-bottom: 1px dotted #c2b394; vertical-align: baseline; }
+  td.num, th.num { text-align: right; font-family: Georgia, serif; font-size: 11.5px; }
+  td.idx { width: 17px; color: #8b7d5f; font-family: Georgia, serif; font-size: 10px; }
+  td.state { width: 36px; text-align: right; font-size: 10px; color: #4c5f3e; letter-spacing: .06em; }
+  td.state.wait { color: #a5332a; }
+  tr.total td { border-bottom: none; padding-top: 7px; font-family: "SimHei", sans-serif; font-size: 11px; letter-spacing: .06em; }
+
+  .note-hand { margin: 11px 0 0; font-family: "KaiTi", serif; font-size: 12.5px; line-height: 1.65; color: #3f3626; }
+  .note-hand u { text-decoration: none; border-bottom: 1px solid #a5332a; }
+
+  .ops { margin-top: 11px; padding-top: 9px; border-top: 1px solid #b9a986; }
+  .ops p { margin: 0 0 6px; font-family: "SimHei", sans-serif; font-size: 9px; letter-spacing: .2em; color: #6e6455; }
+  .ops .row { display: flex; flex-wrap: wrap; gap: 3px 11px; font-family: "Consolas", monospace; font-size: 10.5px; color: #3a3225; }
+  .ops .row span { border-bottom: 1px dotted #a2937a; padding-bottom: 1px; }
+  .ops .check { margin-top: 8px; display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: #4b4234; }
+  .ops .check i { width: 10px; height: 10px; border: 1px solid #6e6455; display: inline-block; position: relative; }
+  .ops .check i::after { content: "✓"; position: absolute; left: 0; top: -4px; font-size: 12px; color: #a5332a; }
+
+  .mint {
+    margin-top: 13px; display: inline-block; padding: 9px 20px 8px;
+    border: 2px solid #8e2f24; color: #8e2f24; background: rgba(142,47,36,.05);
+    font-family: "SimHei", sans-serif; font-size: 12.5px; letter-spacing: .24em;
+    box-shadow: 0 0 0 1px #8e2f24 inset; transform: rotate(-.5deg);
+  }
+
+  .foot-line {
+    position: absolute; left: 18px; right: 18px; bottom: 13px; display: flex; justify-content: space-between;
+    font-family: "Consolas", monospace; font-size: 9.5px; letter-spacing: .06em; color: #6e6455;
+  }
+  .foot-line u { text-decoration: none; display: inline-block; width: 84px; border-bottom: 1px solid #a2937a; }
+
+  /* 验收单 */
+  .vrow { display: flex; justify-content: space-between; align-items: baseline; padding: 5.5px 1px; border-bottom: 1px dotted #c2b394; font-size: 12px; }
+  .vrow span { color: #4b4234; letter-spacing: .05em; }
+  .vrow b { font-family: Georgia, serif; font-weight: 400; font-size: 13.5px; }
+  .vrow b.ok { font-family: "SimHei", sans-serif; font-size: 11.5px; color: #3f5a35; letter-spacing: .1em; }
+  .vrow b.warn { position: relative; color: #a5332a; }
+  .vrow b.warn::after {
+    content: ""; position: absolute; inset: -4px -8px -5px -6px; border: 1.4px solid #a5332a;
+    border-radius: 50%; transform: rotate(-7deg); opacity: .72;
+  }
+  .vrow em { font-style: normal; font-size: 9px; color: #8b7d5f; margin-left: 3px; }
+  .review { margin: 10px 0 0; font-family: "KaiTi", serif; font-size: 12px; line-height: 1.6; color: #3f3626; }
+  .seal {
+    position: absolute; right: 20px; top: 420px; padding: 8px 13px 6px;
+    border: 2px solid #a5332a; border-radius: 3px; color: #a5332a; opacity: .76;
+    font-family: "KaiTi", serif; font-size: 22px; line-height: 1; letter-spacing: .12em;
+    transform: rotate(-12deg); box-shadow: 0 0 0 1px #a5332a inset; mix-blend-mode: multiply;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='130' height='64'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.5' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .6 .4'/%3E%3C/filter%3E%3Crect width='130' height='64' filter='url(%23m)'/%3E%3C/svg%3E");
+  }
+  .seal small { display: block; margin-top: 4px; font-size: 8.5px; letter-spacing: .3em; }
+
+  /* ── 便签 ─────────────────────────────── */
+  .sticky {
+    position: absolute; left: 692px; top: 28px; width: 196px; padding: 14px 14px 13px; z-index: 8;
+    background: #efe19a; transform: rotate(-2.2deg);
+    box-shadow: 0 16px 28px rgba(8,5,2,.55), 0 1px 0 #fff inset;
+    font-family: "KaiTi", serif; font-size: 12.5px; line-height: 1.6; color: #3a3225;
+  }
+  .sticky::before {
+    content: ""; position: absolute; left: 50%; top: -8px; width: 74px; height: 18px; margin-left: -37px;
+    background: rgba(255,255,255,.52); transform: rotate(1.6deg); box-shadow: 0 1px 2px rgba(8,5,2,.2);
+  }
+  .sticky b { font-weight: 400; border-bottom: 1px solid #a5332a; color: #a5332a; }
+
+  /* ── 粉笔标注 ─────────────────────────── */
+  .chalk { position: absolute; pointer-events: none; font-family: "KaiTi", serif; }
+  .dim { left: 452px; top: 736px; width: 486px; height: 24px; }
+  .dim .line { position: absolute; left: 0; right: 0; top: 11px; border-top: 1px dashed rgba(240,234,218,.5); }
+  .dim .tick { position: absolute; top: 3px; width: 1px; height: 17px; background: rgba(240,234,218,.5); }
+  .dim .tick.l { left: 0; } .dim .tick.r { right: 0; }
+  .dim .val {
+    position: absolute; left: 50%; top: -3px; transform: translateX(-50%);
+    padding: 2px 9px; background: rgba(14,12,9,.82); border: 1px solid rgba(240,234,218,.2);
+    font-family: "Consolas", monospace; font-size: 10.5px; letter-spacing: .08em; color: #f0e9d6;
+  }
+  .dim .note { position: absolute; left: 1px; top: 24px; font-size: 11px; letter-spacing: .06em; color: rgba(240,234,218,.36); }
+
+  .mark { left: 632px; top: 296px; padding-left: 12px; border-left: 1px dashed rgba(240,234,218,.38); }
+  .mark b { display: block; font-size: 14px; font-weight: 400; letter-spacing: .1em; color: rgba(246,240,224,.92); text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+  .mark span { display: block; margin-top: 3px; font-size: 10px; letter-spacing: .12em; color: rgba(240,234,218,.42); }
+  .mark::after {
+    content: ""; position: absolute; left: -3px; bottom: -58px; width: 5px; height: 5px; border-radius: 50%;
+    background: rgba(246,240,224,.6); box-shadow: 0 0 9px rgba(246,240,224,.4);
+  }
+</style>
+</head>
+<body>
+  <div class="scene"><img src="scene-clean.png" alt=""></div>
+  <div class="lamps"></div>
+  <div class="vignette"></div>
+
+  <div class="chalk dim">
+    <span class="tick l"></span><span class="tick r"></span>
+    <span class="line"></span>
+    <span class="val">7.50 m</span>
+    <span class="note">车体全长 · 含炮口不计</span>
+  </div>
+  <div class="chalk mark"><b>炮塔 6 t</b><span>正在装 · 已吸附 3 个挂点</span></div>
+
+  <div class="rail">
+    <span class="bolt" style="left:120px"></span><span class="bolt" style="left:360px"></span>
+    <span class="bolt" style="left:600px"></span><span class="bolt" style="left:840px"></span>
+    <span class="bolt" style="left:1080px"></span><span class="bolt" style="left:1320px"></span>
+  </div>
+  <span class="hook h1"></span>
+  <span class="hook h2"></span>
+
+  <aside class="paper list">
+    <p class="kicker">第 三 车 间 · 装 配 记 录</p>
+    <h1>钢铁征途<small>步坦原型 · 第三稿</small></h1>
+    <div class="tabs"><b>车间</b><span>坦克仓库</span><span>第一关</span></div>
+    <div class="head-rule"></div>
+
+    <h2>部件清单 <em>06 件 / 34 t</em></h2>
+    <div class="rule"></div>
+    <table>
+      <thead><tr><th class="idx"></th><th>名称</th><th>规格</th><th class="num">重量</th><th class="num">状态</th></tr></thead>
+      <tbody>
+        <tr><td class="idx">01</td><td>基础车体</td><td>3.9 × 2.9</td><td class="num">10 t</td><td class="state">已装</td></tr>
+        <tr><td class="idx">02</td><td>履带组</td><td>500 mm</td><td class="num">5 t</td><td class="state">已装</td></tr>
+        <tr><td class="idx">03</td><td>基础引擎</td><td>320 hp</td><td class="num">3 t</td><td class="state">已装</td></tr>
+        <tr><td class="idx">04</td><td>炮塔</td><td>环形座</td><td class="num">6 t</td><td class="state">已装</td></tr>
+        <tr><td class="idx">05</td><td>基础火炮</td><td>76 mm</td><td class="num">4 t</td><td class="state">已装</td></tr>
+        <tr><td class="idx">06</td><td>硬基装甲</td><td>附加</td><td class="num">6 t</td><td class="state wait">待装</td></tr>
+        <tr class="total"><td></td><td colspan="2">合计　六件</td><td class="num">34 t</td><td></td></tr>
+      </tbody>
+    </table>
+
+    <p class="note-hand">座圈沿用旧件，<u>转速偏高</u>，出厂前复校；硬基装甲待装，重心后移 0.12 m。</p>
+
+    <div class="ops">
+      <p>操作</p>
+      <div class="row"><span>撤销</span><span>重做</span><span>旋转 15°</span><span>升高</span><span>复制</span><span>删除</span></div>
+      <div class="check"><i></i>吸附 0.25 m</div>
+    </div>
+    <div class="mint">制造并入库</div>
+
+    <div class="foot-line"><span>记录人 <u></u></span><span>GT-03-0117 · 第 12 页</span></div>
+  </aside>
+
+  <aside class="paper verify">
+    <h2>验收单 <em>GT-03-0117</em></h2>
+    <div class="rule"></div>
+    <div class="vrow"><span>结构校验</span><b class="ok">通过</b></div>
+    <div class="vrow"><span>连接完整性</span><b>6 / 6</b></div>
+    <div class="vrow"><span>整车质量</span><b>34.0<em>t</em></b></div>
+    <div class="vrow"><span>最大外形</span><b>7.50<em>m</em></b></div>
+    <div class="vrow"><span>武器挂载</span><b>1<em>/ 4</em></b></div>
+    <div class="vrow"><span>稳定性</span><b class="warn">88<em>%</em></b></div>
+    <div class="vrow"><span>类型适配</span><b>73<em>%</em></b></div>
+    <div class="vrow"><span>生命 / 移速</span><b>175<em>· 30 km/h</em></b></div>
+    <p class="review">结构可交付。稳定性略低于新件标准，随炮塔复校一并复核。</p>
+    <div class="seal">结构合格<small>三 车 间</small></div>
+    <div class="foot-line"><span>零件余量 70</span><span>日期 11.21</span></div>
+  </aside>
+
+  <div class="sticky">炮塔转速 <b>133°/s</b><br>比旧图纸快近两成，<br>后坐要重新算。</div>
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>样张 A · 军械档案</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { width: 1440px; height: 900px; margin: 0; overflow: hidden; }
+  body {
+    position: relative;
+    font-family: "FangSong", "STFangsong", "SimSun", serif;
+    color: #241f17;
+    background:
+      radial-gradient(80% 60% at 14% 0%, #f6f0e1 0%, rgba(246,240,225,0) 60%),
+      radial-gradient(110% 90% at 86% 108%, #d3c5a2 0%, rgba(211,197,162,0) 56%),
+      #e7dfc9;
+  }
+  body::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='0.3'/%3E%3C/svg%3E");
+  }
+  .crease {
+    position: absolute; left: 0; right: 0; top: 316px; height: 3px; pointer-events: none; z-index: 0;
+    background: linear-gradient(180deg, rgba(86,74,50,.16), rgba(255,252,240,.55) 55%, rgba(86,74,50,.07));
+  }
+
+  /* ── 页眉 ─────────────────────────────── */
+  .head {
+    position: absolute; left: 40px; right: 40px; top: 28px; z-index: 3;
+    display: flex; justify-content: space-between; align-items: flex-end;
+    padding-bottom: 8px; border-bottom: 3px double #8b7d5f;
+  }
+  .kicker { margin: 0; font-size: 11px; letter-spacing: .46em; color: #6e6455; }
+  h1 { margin: 6px 0 0; font-family: "SimHei", sans-serif; font-size: 28px; font-weight: 400; letter-spacing: .1em; }
+  h1 small { font-family: "KaiTi", serif; font-size: 14px; letter-spacing: .08em; color: #6e6455; margin-left: 14px; }
+  .head-r { text-align: right; font-size: 12px; line-height: 1.75; color: #5c5344; }
+  .head-r b { font-family: Georgia, serif; font-weight: 400; letter-spacing: .05em; color: #3a3225; }
+
+  /* ── 通用小标题 ───────────────────────── */
+  .sheet { position: absolute; z-index: 2; }
+  .sheet h2, .memo h2 {
+    margin: 0 0 7px; font-family: "SimHei", sans-serif; font-size: 13.5px; font-weight: 400;
+    letter-spacing: .24em; color: #3a3225; display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .sheet h2 em, .memo h2 em { font-family: "Consolas", monospace; font-style: normal; font-size: 10px; letter-spacing: .1em; color: #8b7d5f; }
+  .sheet h2::after, .memo h2::after {
+    content: ""; position: absolute; left: 0; right: 0; height: 1px; margin-top: 28px;
+    background: linear-gradient(90deg, #8b7d5f, rgba(139,125,95,.12));
+  }
+
+  /* ── 左侧零件清单 ─────────────────────── */
+  .list { left: 40px; top: 110px; width: 318px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 4px; }
+  th {
+    font-family: "SimHei", sans-serif; font-weight: 400; font-size: 10px; letter-spacing: .16em;
+    color: #6e6455; text-align: left; padding: 4px 3px 5px; border-bottom: 1px solid #b9ab8d;
+  }
+  td { padding: 6px 3px; border-bottom: 1px dotted #bfb193; vertical-align: baseline; }
+  td.num, th.num { text-align: right; font-family: Georgia, serif; font-size: 12px; }
+  td.idx { width: 19px; color: #8b7d5f; font-family: Georgia, serif; font-size: 10.5px; }
+  td.state { width: 40px; text-align: right; font-size: 10.5px; color: #4c5f3e; letter-spacing: .08em; }
+  td.state.wait { color: #a5332a; }
+  tr.total td { border-bottom: none; padding-top: 8px; color: #3a3225; font-family: "SimHei", sans-serif; font-size: 11.5px; letter-spacing: .08em; }
+
+  /* ── 备注（手写） ─────────────────────── */
+  .memo { position: absolute; left: 40px; top: 436px; width: 318px; z-index: 2; }
+  .memo p { margin: 12px 0 0; font-family: "KaiTi", "STKaiti", serif; font-size: 14.5px; line-height: 1.85; color: #3f3626; }
+  .memo p u { text-decoration: none; border-bottom: 1px solid #a5332a; padding-bottom: 1px; }
+  .memo .sig { margin-top: 16px; font-family: "KaiTi", serif; font-size: 13px; color: #6e6455; letter-spacing: .1em; }
+  .memo .sig b { font-family: "KaiTi", serif; font-weight: 400; font-size: 17px; color: #2f2a1e; margin-left: 8px; }
+
+  /* ── 便签 ─────────────────────────────── */
+  .sticky {
+    position: absolute; left: 52px; top: 646px; width: 214px; padding: 16px 15px 15px; z-index: 3;
+    background: #efe19a; transform: rotate(-2.4deg);
+    box-shadow: 0 12px 24px rgba(58,47,26,.3), 0 1px 0 #fff inset;
+    font-family: "KaiTi", "STKaiti", serif; font-size: 14px; line-height: 1.6; color: #3a3225;
+  }
+  .sticky::before {
+    content: ""; position: absolute; left: 50%; top: -10px; width: 86px; height: 21px;
+    margin-left: -43px; background: rgba(255,255,255,.48); transform: rotate(1.6deg);
+    box-shadow: 0 1px 2px rgba(58,47,26,.14);
+  }
+  .sticky b { font-weight: 400; border-bottom: 1px solid #a5332a; color: #a5332a; }
+
+  /* ── 中间照片 ─────────────────────────── */
+  .plate {
+    position: absolute; left: 400px; top: 102px; width: 640px; height: 604px; z-index: 2;
+    margin: 0; padding: 13px 13px 38px; background: #f8f4e8;
+    transform: rotate(-.6deg);
+    box-shadow: 0 1px 0 #fff inset, 0 24px 46px rgba(58,47,26,.32), 0 4px 10px rgba(58,47,26,.16);
+  }
+  .plate .shot { position: absolute; inset: 13px 13px 38px; overflow: hidden; outline: 1px solid rgba(58,47,26,.4); }
+  .plate .shot img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+    transform: scale(1.42); transform-origin: 50% 56%;
+    filter: sepia(.2) saturate(.72) contrast(1.04) brightness(.98);
+  }
+  .plate .shot::after {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(120% 100% at 50% 42%, rgba(0,0,0,0) 46%, rgba(46,32,10,.42) 100%);
+    mix-blend-mode: multiply;
+  }
+  .plate figcaption {
+    position: absolute; left: 14px; right: 14px; bottom: 10px;
+    display: flex; justify-content: space-between; font-size: 11.5px; letter-spacing: .1em; color: #4b4234;
+  }
+  .plate figcaption span:last-child { font-family: Georgia, serif; letter-spacing: .06em; }
+  .tape {
+    position: absolute; width: 92px; height: 24px; background: rgba(250,246,232,.66);
+    border-left: 1px solid rgba(255,255,255,.55); border-right: 1px solid rgba(255,255,255,.55);
+    box-shadow: 0 1px 3px rgba(58,47,26,.18);
+  }
+  .tape.t1 { left: -30px; top: -11px; transform: rotate(-29deg); }
+  .tape.t2 { right: -26px; bottom: -10px; transform: rotate(-22deg); }
+
+  /* ── 右侧验收单 ───────────────────────── */
+  .verify { left: 1072px; top: 110px; width: 328px; }
+  .vrow {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 6.5px 2px; border-bottom: 1px dotted #bfb193; font-size: 12.5px;
+  }
+  .vrow span { color: #4b4234; letter-spacing: .06em; }
+  .vrow b { font-family: Georgia, serif; font-weight: 400; font-size: 14.5px; letter-spacing: .02em; }
+  .vrow b.ok { font-family: "SimHei", sans-serif; font-size: 12.5px; color: #3f5a35; letter-spacing: .1em; }
+  .vrow b.warn { position: relative; color: #a5332a; }
+  .vrow b.warn::after {
+    content: ""; position: absolute; inset: -5px -9px -6px -7px; border: 1.5px solid #a5332a;
+    border-radius: 50%; transform: rotate(-7deg); opacity: .75;
+  }
+  .vrow em { font-style: normal; font-size: 10px; color: #8b7d5f; margin-left: 4px; }
+  .stamp {
+    position: absolute; right: 26px; top: 398px;
+    padding: 10px 15px 8px; border: 2px solid #a5332a; border-radius: 3px;
+    font-family: "KaiTi", "STKaiti", serif; font-size: 27px; line-height: 1; letter-spacing: .14em;
+    color: #a5332a; opacity: .8; transform: rotate(-12deg);
+    box-shadow: 0 0 0 1px #a5332a inset;
+    mix-blend-mode: multiply;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='70'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.5' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .6 .4'/%3E%3C/filter%3E%3Crect width='140' height='70' filter='url(%23m)'/%3E%3C/svg%3E");
+  }
+  .stamp small { display: block; margin-top: 5px; font-size: 10px; letter-spacing: .34em; }
+  .review { margin-top: 24px; }
+  .review p { margin: 9px 0 0; font-family: "KaiTi", serif; font-size: 13.5px; line-height: 1.8; color: #3f3626; }
+  .review .line { margin-top: 30px; display: flex; justify-content: space-between; font-size: 11.5px; color: #6e6455; }
+  .review .line u { text-decoration: none; display: inline-block; width: 104px; border-bottom: 1px solid #8b7d5f; }
+
+  .coffee {
+    position: absolute; left: 1042px; top: 748px; width: 122px; height: 108px; z-index: 1;
+    border: 7px solid rgba(120,86,44,.13); border-radius: 50%;
+    transform: rotate(-12deg) scaleY(.86);
+    box-shadow: 0 0 0 2px rgba(120,86,44,.05) inset, 0 0 14px rgba(120,86,44,.06);
+  }
+
+  /* ── 页脚 ─────────────────────────────── */
+  .foot {
+    position: absolute; left: 40px; right: 40px; bottom: 22px; display: flex; justify-content: space-between;
+    padding-top: 8px; border-top: 1px solid #b9ab8d;
+    font-family: "Consolas", monospace; font-size: 10.5px; letter-spacing: .12em; color: #6e6455;
+  }
+</style>
+</head>
+<body>
+  <div class="crease"></div>
+
+  <header class="head">
+    <div>
+      <p class="kicker">第 三 车 间 · 装 配 记 录</p>
+      <h1>步坦原型　改装方案<small>草案 · 第三稿</small></h1>
+    </div>
+    <div class="head-r">
+      编号　<b>GT-03-0117</b><br>
+      日期　<b>2026.11.21</b>
+    </div>
+  </header>
+
+  <section class="sheet list">
+    <h2>部件清单 <em>06 件 / 34 t</em></h2>
+    <table>
+      <thead>
+        <tr><th class="idx"></th><th>名称</th><th>规格</th><th class="num">重量</th><th class="num">状态</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="idx">01</td><td>基础车体</td><td>3.9 × 2.9</td><td class="num">10 t</td><td class="state">已装</td></tr>
+        <tr><td class="idx">02</td><td>履带组</td><td>500 mm</td><td class="num">5 t</td><td class="state">已装</td></tr>
+        <tr><td class="idx">03</td><td>基础引擎</td><td>320 hp</td><td class="num">3 t</td><td class="state">已装</td></tr>
+        <tr><td class="idx">04</td><td>炮塔</td><td>环形座</td><td class="num">6 t</td><td class="state">已装</td></tr>
+        <tr><td class="idx">05</td><td>基础火炮</td><td>76 mm</td><td class="num">4 t</td><td class="state">已装</td></tr>
+        <tr><td class="idx">06</td><td>硬基装甲</td><td>附加</td><td class="num">6 t</td><td class="state wait">待装</td></tr>
+        <tr class="total"><td></td><td colspan="2">合计　六件</td><td class="num">34 t</td><td></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="memo">
+    <h2>备注</h2>
+    <p>① 炮塔座圈沿用旧件，<u>转速偏高</u>，出厂前复校。<br>
+       ② 硬基装甲待装，重心后移约 0.12 m。<br>
+       ③ 履带张力按 500 mm 标准，勿再上调。</p>
+    <p class="sig">记录人　<u style="display:inline-block;width:96px;border-bottom:1px solid #8b7d5f"></u></p>
+  </section>
+
+  <figure class="plate">
+    <span class="tape t1"></span><span class="tape t2"></span>
+    <div class="shot"><img src="scene-clean.png" alt="步坦原型侧前视"></div>
+    <figcaption><span>图 3-2　步坦原型 · 侧前视</span><span>1 : 24</span></figcaption>
+  </figure>
+
+  <section class="sheet verify">
+    <h2>验收单 <em>GT-03-0117</em></h2>
+    <div class="vrow"><span>结构校验</span><b class="ok">通过</b></div>
+    <div class="vrow"><span>连接完整性</span><b>6 / 6</b></div>
+    <div class="vrow"><span>整车质量</span><b>34.0<em>t</em></b></div>
+    <div class="vrow"><span>最大外形</span><b>7.50<em>m</em></b></div>
+    <div class="vrow"><span>武器挂载</span><b>1<em>/ 4</em></b></div>
+    <div class="vrow"><span>稳定性</span><b class="warn">88<em>%</em></b></div>
+    <div class="vrow"><span>类型适配</span><b>73<em>%</em></b></div>
+    <div class="vrow"><span>生命 / 移速</span><b>175<em>· 30 km/h</em></b></div>
+    <div class="stamp">结构合格<small>三 车 间</small></div>
+    <div class="review">
+      <p>结构可交付。稳定性 88% 略低于<br>新件标准，随炮塔复校一并复核。</p>
+      <div class="line"><span>复核 <u></u></span><span>日期 11.21</span></div>
+    </div>
+  </section>
+
+  <div class="sticky">
+    炮塔转速 <b>133°/s</b><br>比旧图纸快了近两成，<br>后坐要重新算。
+  </div>
+
+  <div class="coffee"></div>
+
+  <footer class="foot">
+    <span>零件余量 70 · 草稿已存 · 自动保存 00:09</span>
+    <span>— 12 —</span>
+  </footer>
+</body>
+</html>

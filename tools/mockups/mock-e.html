@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>样张 E · 手绘档案</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { width: 1440px; height: 900px; margin: 0; overflow: hidden; }
+  body {
+    position: relative;
+    font-family: "KaiTi", "STKaiti", serif;
+    color: #2b2620;
+    background:
+      radial-gradient(85% 65% at 12% 0%, #f7f1e0 0%, rgba(247,241,224,0) 62%),
+      radial-gradient(110% 90% at 88% 108%, #d2c3a0 0%, rgba(210,195,160,0) 58%),
+      #e7dec7;
+  }
+  /* 纸纤维 */
+  body::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .55; mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='0.3'/%3E%3C/svg%3E");
+  }
+  .smudge {
+    position: absolute; pointer-events: none; border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(90,78,56,.5), rgba(90,78,56,0));
+    filter: blur(7px);
+  }
+
+  /* ── 抬头 ─────────────────────────────── */
+  .head { position: absolute; left: 44px; right: 44px; top: 30px; display: flex; justify-content: space-between; align-items: flex-end; z-index: 3; }
+  .kicker { margin: 0; font-family: "KaiTi", serif; font-size: 13px; letter-spacing: .34em; color: #6b6150; transform: rotate(-.3deg); }
+  h1 {
+    margin: 6px 0 0; font-family: "STXingkai", "KaiTi", serif; font-size: 42px; font-weight: 400;
+    letter-spacing: .06em; line-height: 1.1; color: #26221b; transform: rotate(-.5deg);
+  }
+  h1 small { font-family: "KaiTi", serif; font-size: 15px; letter-spacing: .1em; color: #6b6150; margin-left: 16px; }
+  .head .under { display: block; width: 470px; height: 14px; margin-top: -2px; }
+  .head-r { text-align: right; font-size: 14px; line-height: 1.9; color: #4b4234; transform: rotate(.4deg); }
+  .head-r b { font-family: "Ink Free", "KaiTi", serif; font-weight: 400; font-size: 16px; letter-spacing: .04em; color: #2b2620; }
+
+  /* ── 手写标题 ─────────────────────────── */
+  .sec { position: absolute; z-index: 2; }
+  .sec h2 {
+    margin: 0 0 2px; font-family: "STXingkai", "KaiTi", serif; font-size: 24px; font-weight: 400;
+    letter-spacing: .1em; color: #2b2620; display: inline-block; transform: rotate(-.6deg);
+  }
+  .sec .h-rule { display: block; width: 100%; height: 9px; margin-top: -4px; }
+
+  /* ── 左：部件清单 ─────────────────────── */
+  .list { left: 44px; top: 108px; width: 342px; }
+  .tbl { margin-top: 12px; font-size: 14px; }
+  .tbl .tr { display: grid; grid-template-columns: 26px 1fr 96px 62px 52px; align-items: baseline; padding: 7px 2px 8px; }
+  .tbl .th { font-family: "KaiTi", serif; font-size: 12px; letter-spacing: .16em; color: #6b6150; padding-bottom: 5px; }
+  .tbl .tr + .tr, .tbl .th { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='6'%3E%3Cpath d='M0,3.1C20,2.4 36,3.7 56,3S96,2.3 116,3.2S146,2.6 160,3' fill='none' stroke='%239c8d72' stroke-width='1'/%3E%3C/svg%3E"); background-repeat: repeat-x; background-position: left bottom; }
+  .tbl .idx { font-family: "Ink Free", "KaiTi", serif; font-size: 12px; color: #8a7c63; }
+  .tbl .nm { font-family: "KaiTi", serif; letter-spacing: .04em; }
+  .tbl .sp { font-family: "Ink Free", "KaiTi", serif; font-size: 13px; color: #4b4234; }
+  .tbl .wt { text-align: right; font-family: "Ink Free", "KaiTi", serif; font-size: 15px; }
+  .tbl .st { text-align: right; font-family: "KaiTi", serif; font-size: 12px; color: #4c5f3e; }
+  .tbl .st.wait { color: #a5332a; }
+  .tbl .tr:nth-child(even) .nm { transform: rotate(-.25deg); }
+  .tbl .tr:nth-child(odd) .nm { transform: rotate(.2deg); }
+  .total {
+    margin-top: 10px; display: flex; justify-content: space-between; align-items: baseline;
+    font-family: "KaiTi", serif; font-size: 15px; letter-spacing: .06em;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='7'%3E%3Cpath d='M0,2.2C22,1.4 40,3 60,2.2S100,1.6 120,2.6S148,2 160,2.4' fill='none' stroke='%237d6f57' stroke-width='1.1'/%3E%3Cpath d='M0,5.4C24,4.8 44,6 64,5.2S104,4.6 124,5.6S150,5 160,5.2' fill='none' stroke='%237d6f57' stroke-width='1'/%3E%3C/svg%3E");
+    background-repeat: repeat-x; background-position: left bottom; padding-bottom: 8px;
+  }
+  .total b { font-family: "Ink Free", "KaiTi", serif; font-weight: 400; font-size: 17px; }
+
+  .hand { font-family: "KaiTi", serif; font-size: 15px; line-height: 1.95; color: #3a3226; }
+  .hand u { text-decoration: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='4'%3E%3Cpath d='M0,2.2C14,1.6 26,2.8 40,2.1S54,1.8 60,2.3' fill='none' stroke='%23a5332a' stroke-width='1.2'/%3E%3C/svg%3E"); background-repeat: repeat-x; background-position: left bottom; padding-bottom: 2px; }
+  .memo { margin-top: 16px; transform: rotate(-.35deg); }
+  .memo p { margin: 0 0 4px; }
+  .sign-line { margin-top: 18px; font-size: 14px; color: #5b5142; }
+  .sign-line i { display: inline-block; width: 96px; border-bottom: 1px solid #8a7c63; height: 1px; margin: 0 6px 4px; transform: rotate(-.4deg); }
+
+  /* ── 中间照片 ─────────────────────────── */
+  .plate {
+    position: absolute; left: 410px; top: 100px; width: 598px; height: 474px; z-index: 2; margin: 0;
+    padding: 12px 12px 34px; background: #faf6ea; transform: rotate(-1.1deg);
+    box-shadow: 0 1px 0 #fff inset, 0 22px 42px rgba(52,40,20,.36), 0 4px 9px rgba(52,40,20,.18);
+  }
+  .plate .shot { position: absolute; inset: 12px 12px 34px; overflow: hidden; outline: 1px solid rgba(58,47,26,.35); }
+  .plate .shot img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+    transform: scale(1.3); transform-origin: 50% 54%;
+    filter: sepia(.18) saturate(.78) contrast(1.05) brightness(.99);
+  }
+  .plate .shot::after {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(120% 100% at 50% 42%, rgba(0,0,0,0) 46%, rgba(46,32,10,.4) 100%);
+    mix-blend-mode: multiply;
+  }
+  .plate .ink { position: absolute; inset: 12px 12px 34px; pointer-events: none; }
+  .plate figcaption {
+    position: absolute; left: 14px; right: 14px; bottom: 8px; display: flex; justify-content: space-between;
+    font-family: "KaiTi", serif; font-size: 14px; letter-spacing: .06em; color: #4b4234;
+  }
+  .plate figcaption span:last-child { font-family: "Ink Free", serif; font-size: 15px; }
+  .tape {
+    position: absolute; width: 96px; height: 25px; background: rgba(250,246,230,.66);
+    border-left: 1px solid rgba(255,255,255,.5); border-right: 1px solid rgba(255,255,255,.5);
+    box-shadow: 0 1px 3px rgba(52,40,20,.2);
+  }
+  .tape.t1 { left: -32px; top: -12px; transform: rotate(-31deg); }
+  .tape.t2 { right: -28px; bottom: -11px; transform: rotate(-24deg); }
+
+  /* ── 手绘三视图 ───────────────────────── */
+  .sketch { position: absolute; left: 410px; top: 594px; width: 598px; height: 234px; z-index: 2; }
+  .sketch svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+  /* ── 右：验收单 ───────────────────────── */
+  .verify { left: 1052px; top: 108px; width: 344px; }
+  .vrow { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 2px 8px; font-size: 14px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='6'%3E%3Cpath d='M0,3.1C20,2.4 36,3.7 56,3S96,2.3 116,3.2S146,2.6 160,3' fill='none' stroke='%239c8d72' stroke-width='1'/%3E%3C/svg%3E"); background-repeat: repeat-x; background-position: left bottom; }
+  .vrow span { color: #4b4234; letter-spacing: .04em; }
+  .vrow b { font-family: "Ink Free", "KaiTi", serif; font-weight: 400; font-size: 17px; }
+  .vrow b.ok { font-family: "KaiTi", serif; font-size: 14px; color: #3f5a35; letter-spacing: .1em; }
+  .vrow b.warn { position: relative; color: #a5332a; font-size: 18px; }
+  .vrow em { font-style: normal; font-family: "KaiTi", serif; font-size: 12px; color: #8a7c63; margin-left: 4px; }
+  .circled { position: relative; display: inline-block; }
+  .circled svg { position: absolute; left: -14px; top: -11px; width: 76px; height: 44px; overflow: visible; }
+
+  .review { margin-top: 12px; transform: rotate(.3deg); }
+  .seal {
+    position: absolute; right: 56px; top: 428px; padding: 10px 15px 7px;
+    border: 2.5px solid #a5332a; border-radius: 4px; color: #a5332a; opacity: .78;
+    font-family: "STXingkai", "KaiTi", serif; font-size: 30px; line-height: 1; letter-spacing: .1em;
+    transform: rotate(-13deg); box-shadow: 0 0 0 1px #a5332a inset; mix-blend-mode: multiply;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='76'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.46' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .58 .42'/%3E%3C/filter%3E%3Crect width='150' height='76' filter='url(%23m)'/%3E%3C/svg%3E");
+  }
+  .seal small { display: block; margin-top: 6px; font-family: "KaiTi", serif; font-size: 10px; letter-spacing: .34em; }
+
+  /* ── 便签 ─────────────────────────────── */
+  .sticky {
+    position: absolute; left: 24px; top: 600px; width: 214px; padding: 16px 15px 15px; z-index: 4;
+    background: #efe19a; transform: rotate(-3deg);
+    box-shadow: 0 12px 24px rgba(52,40,20,.34), 0 1px 0 #fff inset;
+    font-family: "KaiTi", serif; font-size: 15px; line-height: 1.75; color: #3a3226;
+  }
+  .sticky::before {
+    content: ""; position: absolute; left: 50%; top: -10px; width: 88px; height: 21px; margin-left: -44px;
+    background: rgba(255,255,255,.5); transform: rotate(1.8deg); box-shadow: 0 1px 2px rgba(52,40,20,.16);
+  }
+  .sticky b { font-weight: 400; color: #a5332a; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='4'%3E%3Cpath d='M0,2.2C14,1.6 26,2.8 40,2.1S54,1.8 60,2.3' fill='none' stroke='%23a5332a' stroke-width='1.2'/%3E%3C/svg%3E"); background-repeat: repeat-x; background-position: left bottom; padding-bottom: 2px; }
+
+  /* ── 铅笔 ─────────────────────────────── */
+  .pencil {
+    position: absolute; left: 46px; bottom: 56px; width: 190px; height: 11px; z-index: 4;
+    background: linear-gradient(180deg, #e3ba56, #c3922f); border-radius: 2px;
+    transform: rotate(-8deg); box-shadow: 0 5px 10px rgba(52,40,20,.4);
+  }
+  .pencil::before {
+    content: ""; position: absolute; right: -17px; top: 0; width: 17px; height: 11px;
+    background: linear-gradient(180deg, #ecdfc2, #cbb98f); clip-path: polygon(0 0, 100% 50%, 0 100%);
+  }
+  .pencil::after {
+    content: ""; position: absolute; left: -12px; top: 0; width: 12px; height: 11px;
+    background: #c96a6a; border-radius: 2px 0 0 2px;
+  }
+  .coffee {
+    position: absolute; left: 986px; top: 742px; width: 124px; height: 108px; z-index: 1;
+    border: 7px solid rgba(118,84,42,.13); border-radius: 50%;
+    transform: rotate(-14deg) scaleY(.86);
+    box-shadow: 0 0 0 2px rgba(118,84,42,.05) inset;
+  }
+
+  /* ── 页脚 ─────────────────────────────── */
+  .foot {
+    position: absolute; left: 44px; right: 44px; bottom: 22px; display: flex; justify-content: space-between;
+    font-family: "KaiTi", serif; font-size: 13px; letter-spacing: .08em; color: #6b6150;
+  }
+</style>
+</head>
+<body>
+  <div class="smudge" style="left:236px;top:410px;width:120px;height:34px;opacity:.13"></div>
+  <div class="smudge" style="left:1180px;top:470px;width:150px;height:40px;opacity:.1"></div>
+  <div class="coffee"></div>
+
+  <header class="head">
+    <div>
+      <p class="kicker">第 三 车 间 · 装 配 记 录</p>
+      <h1>步坦原型　改装方案<small>草案 · 第三稿</small></h1>
+      <svg class="under" viewBox="0 0 470 14" preserveAspectRatio="none">
+        <path d="M2 4.2 C 90 2.6, 210 5.4, 330 3.4 S 430 3, 468 4" fill="none" stroke="#7d6f57" stroke-width="1.4" stroke-linecap="round"/>
+        <path d="M4 10 C 96 8.6, 214 11, 336 9.2 S 432 8.8, 466 9.8" fill="none" stroke="#7d6f57" stroke-width="1" stroke-linecap="round" opacity=".7"/>
+      </svg>
+    </div>
+    <div class="head-r">
+      编号　<b>GT-03-0117</b><br>
+      日期　<b>2026.11.21</b>
+    </div>
+  </header>
+
+  <section class="sec list">
+    <h2>部件清单</h2>
+    <svg class="h-rule" viewBox="0 0 342 9" preserveAspectRatio="none">
+      <path d="M2 5 C 60 3.4, 130 6.2, 200 4.4 S 300 4, 340 5.2" fill="none" stroke="#7d6f57" stroke-width="1.3" stroke-linecap="round"/>
+    </svg>
+    <div class="tbl">
+      <div class="tr th"><span></span><span>名　称</span><span>规　格</span><span style="text-align:right">重量</span><span style="text-align:right">状态</span></div>
+      <div class="tr"><span class="idx">01</span><span class="nm">基础车体</span><span class="sp">3.9×2.9</span><span class="wt">10 t</span><span class="st">已装</span></div>
+      <div class="tr"><span class="idx">02</span><span class="nm">履带组</span><span class="sp">500 mm</span><span class="wt">5 t</span><span class="st">已装</span></div>
+      <div class="tr"><span class="idx">03</span><span class="nm">基础引擎</span><span class="sp">320 hp</span><span class="wt">3 t</span><span class="st">已装</span></div>
+      <div class="tr"><span class="idx">04</span><span class="nm">炮塔</span><span class="sp">环形座</span><span class="wt">6 t</span><span class="st">已装</span></div>
+      <div class="tr"><span class="idx">05</span><span class="nm">基础火炮</span><span class="sp">76 mm</span><span class="wt">4 t</span><span class="st">已装</span></div>
+      <div class="tr"><span class="idx">06</span><span class="nm">硬基装甲</span><span class="sp">附加</span><span class="wt">6 t</span><span class="st wait">待装</span></div>
+    </div>
+    <div class="total"><span>合计　六件</span><span><b>34 t</b></span></div>
+
+    <div class="memo hand">
+      <p>① 座圈沿用旧件，<u>转速偏高</u>，出厂前复校。</p>
+      <p>② 硬基装甲待装，重心后移约 0.12 m。</p>
+      <p>③ 履带张力按 500 mm 标准，勿再上调。</p>
+    </div>
+    <p class="sign-line">记录人<i></i>11.21</p>
+  </section>
+
+  <figure class="plate">
+    <span class="tape t1"></span><span class="tape t2"></span>
+    <div class="shot"><img src="scene-clean.png" alt="步坦原型侧前视"></div>
+    <svg class="ink" viewBox="0 0 574 428" preserveAspectRatio="none">
+      <g filter="url(#roughA)" fill="none" stroke="#a5332a" stroke-width="2.4" stroke-linecap="round" opacity=".9">
+        <path d="M258 198 C 254 158, 300 126, 348 126 C 398 126, 442 158, 442 198 C 442 238, 398 268, 348 268 C 300 268, 258 238, 258 198"/>
+        <path d="M266 186 C 272 152, 312 132, 356 134"/>
+      </g>
+      <path d="M348 270 L 348 306" stroke="#a5332a" stroke-width="1.4" stroke-dasharray="4 4" opacity=".8"/>
+      <text x="348" y="326" text-anchor="middle" fill="#f4edda" font-family="KaiTi, serif" font-size="15" letter-spacing="2">座圈换过</text>
+      <defs>
+        <filter id="roughA"><feTurbulence type="fractalNoise" baseFrequency="0.03" numOctaves="2" seed="9"/><feDisplacementMap in="SourceGraphic" scale="2.6"/></filter>
+      </defs>
+    </svg>
+    <figcaption><span>图 3-2　步坦原型 · 侧前视</span><span>1 : 24</span></figcaption>
+  </figure>
+
+  <div class="sketch">
+    <svg viewBox="0 0 598 234">
+      <defs>
+        <filter id="rough" x="-10%" y="-10%" width="120%" height="120%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="2" seed="4"/>
+          <feDisplacementMap in="SourceGraphic" scale="3.2"/>
+        </filter>
+      </defs>
+      <g filter="url(#rough)" fill="none" stroke="#3a3226" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <!-- 履带 -->
+        <path d="M104 62 C 200 60, 400 63, 486 61 C 490 74, 490 92, 486 104 C 400 106, 200 103, 104 105 C 100 92, 100 74, 104 62 Z"/>
+        <path d="M104 132 C 200 130, 400 133, 486 131 C 490 144, 490 162, 486 174 C 400 176, 200 173, 104 175 C 100 162, 100 144, 104 132 Z"/>
+        <!-- 车体 -->
+        <path d="M116 104 C 210 101, 380 105, 474 102 C 480 118, 480 140, 474 156 C 380 158, 210 155, 116 157 C 110 140, 110 118, 116 104 Z"/>
+        <!-- 炮塔 -->
+        <path d="M276 92 C 312 84, 360 86, 388 98 C 404 106, 404 132, 388 142 C 360 152, 312 154, 276 146 C 258 138, 258 100, 276 92 Z"/>
+        <!-- 炮管 -->
+        <path d="M388 112 C 440 110, 500 108, 556 106"/>
+        <path d="M388 126 C 440 124, 500 122, 556 120"/>
+        <path d="M556 106 C 562 110, 562 116, 556 120"/>
+        <!-- 舱盖 -->
+        <path d="M300 106 C 312 104, 322 108, 322 118 C 322 128, 310 132, 300 130 C 290 128, 288 114, 300 106 Z"/>
+        <path d="M348 104 C 358 102, 366 106, 366 116 C 366 126, 356 130, 348 128"/>
+        <!-- 履带齿 -->
+        <path d="M120 74 L 120 92 M 152 73 L 152 93 M 184 73 L 184 93 M 216 72 L 216 92 M 248 72 L 248 92 M 280 72 L 280 92 M 312 72 L 312 92 M 344 72 L 344 92 M 376 72 L 376 92 M 408 72 L 408 92 M 440 73 L 440 93 M 472 73 L 472 93"/>
+        <path d="M120 144 L 120 162 M 152 143 L 152 163 M 184 143 L 184 163 M 216 142 L 216 162 M 248 142 L 248 162 M 280 142 L 280 162 M 312 142 L 312 162 M 344 142 L 344 162 M 376 142 L 376 162 M 408 142 L 408 162 M 440 143 L 440 163 M 472 143 L 472 163"/>
+      </g>
+      <!-- 尺寸线 -->
+      <g fill="none" stroke="#2f4f7a" stroke-width="1.2" stroke-linecap="round" opacity=".9">
+        <path d="M104 202 L 486 200"/>
+        <path d="M104 196 L 104 208 M 486 194 L 486 206"/>
+        <path d="M108 202 L 116 198 M 108 202 L 116 206 M 482 200 L 474 196 M 482 200 L 474 204"/>
+        <path d="M74 62 L 74 175"/>
+        <path d="M68 62 L 80 62 M 68 175 L 80 175"/>
+      </g>
+      <g fill="#2f4f7a" font-family="KaiTi, serif" font-size="14" letter-spacing="1">
+        <text x="268" y="222">7.50 m</text>
+        <text x="18" y="126" transform="rotate(-90 30 126)">3.90 m</text>
+      </g>
+      <text x="100" y="26" fill="#8a7c63" font-family="KaiTi, serif" font-size="13" letter-spacing="1">图 3-3　平面布置</text>
+    </svg>
+  </div>
+
+  <section class="sec verify">
+    <h2>验收单</h2>
+    <svg class="h-rule" viewBox="0 0 344 9" preserveAspectRatio="none">
+      <path d="M2 5 C 60 3.4, 130 6.2, 200 4.4 S 300 4, 342 5.2" fill="none" stroke="#7d6f57" stroke-width="1.3" stroke-linecap="round"/>
+    </svg>
+
+    <div class="vrow"><span>结构校验</span><b class="ok">通过 ✓</b></div>
+    <div class="vrow"><span>连接完整性</span><b>6 / 6</b></div>
+    <div class="vrow"><span>整车质量</span><b>34.0<em>t</em></b></div>
+    <div class="vrow"><span>最大外形</span><b>7.50<em>m</em></b></div>
+    <div class="vrow"><span>武器挂载</span><b>1<em>/ 4</em></b></div>
+    <div class="vrow"><span>稳定性</span><span class="circled"><b class="warn">88<em>%</em></b>
+      <svg viewBox="0 0 76 44"><g fill="none" stroke="#a5332a" stroke-width="1.8" stroke-linecap="round" opacity=".85" filter="url(#roughB)">
+        <path d="M8 24 C 6 12, 26 5, 44 7 C 62 9, 72 18, 68 28 C 64 38, 40 41, 24 37 C 12 34, 9 30, 8 24"/>
+        <path d="M10 20 C 12 9, 30 6, 48 8"/>
+      </g><defs><filter id="roughB"><feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="2" seed="2"/><feDisplacementMap in="SourceGraphic" scale="2"/></filter></defs></svg>
+    </span></div>
+    <div class="vrow"><span>类型适配</span><b>73<em>%</em></b></div>
+    <div class="vrow"><span>生命 / 移速</span><b>175<em>· 30 km/h</em></b></div>
+
+    <div class="review hand">
+      <p>结构可交付。稳定性略低于新件标准，<br>随炮塔复校一并复核。</p>
+    </div>
+    <div class="seal">结构合格<small>三 车 间</small></div>
+    <p class="sign-line">复核<i></i>11.21</p>
+  </section>
+
+  <div class="sticky">炮塔转速 <b>133°/s</b><br>比旧图纸快了近两成，<br>后坐要重新算。</div>
+  <span class="pencil"></span>
+
+  <footer class="foot">
+    <span>零件余量 70 · 草稿已存 · 自动保存 00:09</span>
+    <span>— 12 —</span>
+  </footer>
+</body>
+</html>

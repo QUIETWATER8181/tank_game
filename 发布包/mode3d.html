@@ -3,15 +3,82 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="light">
   <title>钢铁征途 · 3D 车间</title>
-  <link rel="stylesheet" href="css/mode3d.css?v=5">
-  <script defer src="js/mode/core.bundle.js?v=4"></script>
-  <script defer src="js/three/scene.bundle.js?v=5"></script>
+  <link rel="stylesheet" href="css/mode3d.css?v=7">
+  <script defer src="js/mode/core.bundle.js?v=5"></script>
+  <script defer src="js/three/scene.bundle.js?v=7"></script>
 </head>
 <body>
-  <main id="viewport" aria-label="3D 场景"></main>
-  <div class="scene-hud" id="sceneHud"></div>
+  <div class="page">
+    <header class="head">
+      <div class="head-l">
+        <p class="kicker">第 三 车 间 · 装 配 记 录</p>
+        <h1><span id="docTitle">钢铁征途</span><small id="docSub">步坦原型 · 草稿</small></h1>
+        <nav class="mode-tabs" aria-label="工作区">
+          <button type="button" data-tab="workshop" aria-pressed="true">车间</button>
+          <button type="button" data-tab="garage" aria-pressed="false">坦克仓库</button>
+          <button type="button" data-tab="mission" aria-pressed="false">第一关</button>
+          <button type="button" data-tab="models" aria-pressed="false" hidden>模型仓库</button>
+        </nav>
+      </div>
+      <div class="head-r">
+        <p>编号　<b id="docNo">GT-03-0117</b></p>
+        <p>日期　<b id="docDate">—</b></p>
+        <p class="storage"><span id="storageStatus">正在打开本机仓库…</span></p>
+      </div>
+    </header>
+
+    <aside class="workbench" aria-label="装配单据">
+      <div class="notice" id="message" role="status">正在准备 3D 空间…</div>
+      <div id="workspace"><p class="subtle">正在加载工作区…</p></div>
+      <div class="ops" id="opsRow">
+        <p>操 作</p>
+        <div class="build-dock" id="buildDock" hidden>
+          <button type="button" data-action="undo" title="撤销 Ctrl+Z">撤销</button>
+          <button type="button" data-action="redo" title="重做 Ctrl+Y">重做</button>
+          <button type="button" data-action="rotateLeft" title="逆时针 15° Q">左转 15°</button>
+          <button type="button" data-action="rotateRight" title="顺时针 15° E">右转 15°</button>
+          <button type="button" data-action="raise" title="升高 0.1 m">升高</button>
+          <button type="button" data-action="lower" title="降低 0.1 m">降低</button>
+          <button type="button" data-action="snap" title="切换吸附网格" id="snapButton">吸附 0.1 m</button>
+          <button type="button" data-action="duplicate" title="复制 Ctrl+D">复制</button>
+          <button type="button" data-action="remove" title="删除 Delete">删除</button>
+        </div>
+      </div>
+      <div id="docFoot"></div>
+    </aside>
+
+    <main class="stage">
+      <figure class="plate">
+        <span class="tape t1"></span><span class="tape t2"></span>
+        <div class="shot">
+          <main id="viewport" aria-label="3D 场景"></main>
+        </div>
+        <figcaption>
+          <div class="cap-line"><span>图 3-2　<span id="sceneCaption">部件结构预览</span></span><span>1 : 24</span></div>
+          <div class="hud-line" id="sceneHud"></div>
+        </figcaption>
+      </figure>
+      <div class="sketch" id="sketch" aria-hidden="true"></div>
+    </main>
+
+    <aside class="report-panel" aria-label="验收单">
+      <div id="report"></div>
+    </aside>
+
+    <footer class="foot">
+      <span id="controlHint">拖动旋转 · 右键平移 · 滚轮缩放 · 拖动中滚轮旋转部件</span>
+      <div class="view-tools" aria-label="视角控制">
+        <button type="button" data-camera="orbit" aria-pressed="true">自由视角</button>
+        <button type="button" data-camera="auto" aria-pressed="false">自动环绕</button>
+        <button type="button" id="resetCamera">复位</button>
+        <label>画质<select id="quality"><option value="low">节能</option><option value="balanced" selected>均衡</option><option value="high">精细</option></select></label>
+      </div>
+      <span id="stats" aria-label="渲染统计"></span>
+    </footer>
+  </div>
+
   <div class="crosshair" id="crosshair" hidden aria-hidden="true"></div>
   <div class="camera-capsule" id="cameraCapsule" hidden>
     <button type="button" data-action="camPlayer">看玩家</button>
@@ -19,48 +86,11 @@
     <button type="button" data-action="camBase">基地</button>
     <button type="button" data-action="camEnemy">敌坦</button>
   </div>
-  <div class="scene-caption" id="sceneCaption">部件结构预览</div>
-  <header class="toolbar">
-    <a href="index.html">← 返回主页</a>
-    <div class="brand">钢铁征途 <span>3D 车间 · 第一关</span></div>
-    <div class="camera-tools" aria-label="视角控制">
-      <button type="button" data-camera="orbit" aria-pressed="true">自由视角</button>
-      <button type="button" data-camera="auto" aria-pressed="false">自动环绕</button>
-      <button type="button" id="resetCamera">复位</button>
-    </div>
-    <label>画质 <select id="quality"><option value="low">节能</option><option value="balanced" selected>均衡</option><option value="high">精细</option></select></label>
-  </header>
-  <nav class="mode-tabs" aria-label="工作区">
-    <button type="button" data-tab="workshop" aria-pressed="true">车间</button>
-    <button type="button" data-tab="garage" aria-pressed="false">坦克仓库</button>
-    <button type="button" data-tab="mission" aria-pressed="false">第一关</button>
-    <button type="button" data-tab="models" aria-pressed="false" hidden>模型仓库</button>
-    <span id="storageStatus">正在打开本机仓库…</span>
-  </nav>
-  <aside class="workbench">
-    <div class="notice" id="message" role="status">正在准备 3D 空间…</div>
-    <div id="workspace"><p>正在加载工作区…</p></div>
-  </aside>
-  <aside class="report-panel" aria-label="评估与检验结果"><div id="report"></div></aside>
-  <div class="build-dock" id="buildDock" hidden>
-    <button type="button" data-action="undo" title="撤销 Ctrl+Z">↶ 撤销</button>
-    <button type="button" data-action="redo" title="重做 Ctrl+Y">↷ 重做</button>
-    <span class="dock-sep"></span>
-    <button type="button" data-action="rotateLeft" title="逆时针 15° Q">⟲ 15°</button>
-    <button type="button" data-action="rotateRight" title="顺时针 15° E">⟳ 15°</button>
-    <button type="button" data-action="raise" title="升高 0.1 m">↑ 升高</button>
-    <button type="button" data-action="lower" title="降低 0.1 m">↓ 降低</button>
-    <span class="dock-sep"></span>
-    <button type="button" data-action="snap" title="切换吸附网格" id="snapButton">吸附 0.1 m</button>
-    <button type="button" data-action="duplicate" title="复制 Ctrl+D">复制</button>
-    <button type="button" data-action="remove" title="删除 Delete">删除</button>
-  </div>
   <div class="guide" id="guide" hidden>
     <p class="guide-step" id="guideStep">第 1 步 / 共 3 步</p>
     <p class="guide-text" id="guideText">点一下左侧的部件，它就会装到车上。</p>
     <div class="row"><button type="button" id="guideNext" class="primary">下一步</button><button type="button" id="guideSkip">跳过</button></div>
   </div>
-  <footer><span id="controlHint">拖动旋转 · 右键平移 · 滚轮缩放 · 拖动中滚轮旋转部件<br>触屏：单指旋转，双指缩放 / 平移</span><output id="stats" aria-label="渲染统计"></output></footer>
   <noscript>请启用 JavaScript 后使用 3D 空间。<a href="index.html">返回主页</a></noscript>
 </body>
 </html>

@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>样张 C · 夜班工位</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { width: 1440px; height: 900px; margin: 0; overflow: hidden; background: #0a0b0c; }
+  body { position: relative; font-family: "Deng", "Microsoft YaHei", sans-serif; color: #e6e0cf; }
+  .chalk { font-family: "KaiTi", "STKaiti", serif; }
+  .mono { font-family: "Cascadia Mono", "Consolas", monospace; font-variant-numeric: tabular-nums; }
+
+  /* ── 场景与光 ─────────────────────────── */
+  .scene { position: absolute; inset: 0; }
+  .scene img {
+    width: 100%; height: 100%; object-fit: cover;
+    transform: scale(1.04);
+    filter: sepia(.14) saturate(1.06) brightness(.88) contrast(1.05);
+  }
+  .lamps {
+    position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen;
+    background:
+      radial-gradient(19% 11% at 21% -5%, rgba(255,210,150,.30), rgba(255,210,150,0) 72%),
+      radial-gradient(13% 9% at 68% -6%, rgba(255,190,120,.20), rgba(255,190,120,0) 74%);
+  }
+  .vignette {
+    position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(130% 110% at 50% 46%, rgba(0,0,0,0) 42%, rgba(6,5,4,.78) 100%),
+      linear-gradient(90deg, rgba(6,6,7,.72) 0%, rgba(6,6,7,0) 26%, rgba(6,6,7,0) 74%, rgba(6,6,7,.78) 100%);
+  }
+  /* 地面暖反光 */
+  .floorglow {
+    position: absolute; left: 20%; right: 20%; bottom: 0; height: 46%; pointer-events: none;
+    background: radial-gradient(60% 90% at 50% 100%, rgba(255,168,88,.14), rgba(255,168,88,0) 70%);
+    mix-blend-mode: screen;
+  }
+
+  /* ── 工位铭牌 ─────────────────────────── */
+  .stencil {
+    position: absolute; left: 26px; top: 24px; display: flex; align-items: center; gap: 14px;
+    padding: 9px 16px 9px 13px;
+    background: linear-gradient(180deg, #40464a, #2b3033);
+    border: 1px solid #14171a; box-shadow: 0 1px 0 rgba(255,255,255,.12) inset, 0 6px 14px rgba(0,0,0,.45);
+    transform: rotate(-.35deg);
+  }
+  .stencil b {
+    font-family: "Bahnschrift", "Deng", sans-serif; font-stretch: 82%;
+    font-size: 19px; font-weight: 400; letter-spacing: .24em; color: rgba(232,226,210,.72);
+  }
+  .stencil span { font-size: 10px; letter-spacing: .3em; color: rgba(232,226,210,.42); }
+  .screw {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #6d7378, #23272a 70%);
+    box-shadow: 0 1px 1px rgba(0,0,0,.6), 0 0 0 1px rgba(0,0,0,.5);
+  }
+  .screw::after { content: ""; display: block; width: 5px; height: 1px; margin: 3px auto 0; background: rgba(0,0,0,.55); transform: rotate(24deg); }
+
+  /* ── 零件挂板 ─────────────────────────── */
+  .peg {
+    position: absolute; left: 22px; top: 104px; width: 236px; padding: 20px 20px 24px;
+    background-color: #262b2e;
+    background-image:
+      radial-gradient(circle, rgba(0,0,0,.6) 0 2px, rgba(255,255,255,.06) 2.3px 2.9px, rgba(0,0,0,0) 3.3px),
+      linear-gradient(180deg, rgba(255,255,255,.05), rgba(0,0,0,.25));
+    background-size: 22px 22px, 100% 100%;
+    border: 1px solid #14171a;
+    box-shadow: 0 1px 0 rgba(255,255,255,.1) inset, 0 18px 34px rgba(0,0,0,.55);
+  }
+  .peg .cap {
+    margin: 0 0 16px; font-size: 9.5px; letter-spacing: .3em; color: rgba(232,226,210,.4);
+    display: flex; justify-content: space-between;
+  }
+  .tag {
+    position: relative; margin: 0 0 13px 14px; padding: 9px 10px 8px 30px;
+    background: linear-gradient(180deg, #ece5d1, #ddd4bb);
+    color: #2a241b; box-shadow: 0 5px 10px rgba(0,0,0,.4), 0 1px 0 #fff inset;
+  }
+  .tag:nth-child(odd) { transform: rotate(-1.1deg); }
+  .tag:nth-child(even) { transform: rotate(.9deg); }
+  .tag::before {
+    content: ""; position: absolute; left: 9px; top: 12px; width: 9px; height: 9px; border-radius: 50%;
+    background: #1b1f21; box-shadow: 0 0 0 2px #8a9095, 0 0 0 3px rgba(0,0,0,.35);
+  }
+  .tag .n { display: block; font-size: 12.5px; letter-spacing: .06em; }
+  .tag .m { display: block; margin-top: 3px; font-family: "Cascadia Mono", monospace; font-size: 9.5px; color: #6d6552; letter-spacing: .02em; }
+  .tag .w { position: absolute; right: 9px; top: 9px; font-family: "Cascadia Mono", monospace; font-size: 10px; color: #6d6552; }
+  .tag.on {
+    background: linear-gradient(180deg, #fff9e8, #f2e8cd);
+    box-shadow: 0 8px 18px rgba(0,0,0,.5), 0 0 0 2px #f3b354, 0 0 22px rgba(243,179,84,.28);
+    transform: translateX(10px) rotate(-.6deg);
+    z-index: 2;
+  }
+  .tag.off { opacity: .58; }
+  .tag .mark { position: absolute; right: 8px; bottom: 6px; font-family: "KaiTi", serif; font-size: 13px; color: #b8442f; }
+  .peg .foot { margin: 14px 0 0; font-family: "KaiTi", serif; font-size: 12px; color: rgba(232,226,210,.4); }
+
+  /* ── 尺寸标注 ─────────────────────────── */
+  .dim { position: absolute; left: 452px; width: 500px; top: 702px; height: 26px; }
+  .dim .line { position: absolute; left: 0; right: 0; top: 12px; border-top: 1px dashed rgba(232,226,210,.5); }
+  .dim .tick { position: absolute; top: 4px; width: 1px; height: 17px; background: rgba(232,226,210,.5); }
+  .dim .tick.l { left: 0; } .dim .tick.r { right: 0; }
+  .dim .val {
+    position: absolute; left: 50%; top: -2px; transform: translateX(-50%);
+    padding: 2px 9px; background: rgba(14,15,16,.86); border: 1px solid rgba(232,226,210,.22);
+    font-family: "Cascadia Mono", monospace; font-size: 11px; letter-spacing: .1em; color: #f0e9d6;
+  }
+  .dim .note {
+    position: absolute; left: 1px; top: 25px; font-family: "KaiTi", serif; font-size: 11.5px;
+    letter-spacing: .08em; color: rgba(232,226,210,.38);
+  }
+
+  /* ── 选中标注（粉笔） ─────────────────── */
+  .mark {
+    position: absolute; left: 648px; top: 296px; padding-left: 13px;
+    border-left: 1px dashed rgba(232,226,210,.4);
+  }
+  .mark b {
+    display: block; font-family: "KaiTi", serif; font-size: 15px; font-weight: 400;
+    letter-spacing: .12em; color: rgba(244,238,222,.92); text-shadow: 0 1px 3px rgba(0,0,0,.6);
+  }
+  .mark span {
+    display: block; margin-top: 3px; font-size: 10.5px; letter-spacing: .14em;
+    color: rgba(232,226,210,.45);
+  }
+  .mark::after {
+    content: ""; position: absolute; left: -3px; bottom: -54px; width: 5px; height: 5px;
+    border-radius: 50%; background: rgba(244,238,222,.6); box-shadow: 0 0 9px rgba(244,238,222,.4);
+  }
+
+  /* ── 工具盘 ───────────────────────────── */
+  .tray {
+    position: absolute; left: 300px; bottom: 30px; display: flex; align-items: flex-end; gap: 10px;
+    padding: 14px 18px 11px;
+    background: linear-gradient(180deg, #33383b, #23272a);
+    border: 1px solid #101314;
+    box-shadow: 0 1px 0 rgba(255,255,255,.13) inset, 0 -1px 0 rgba(0,0,0,.6) inset, 0 16px 30px rgba(0,0,0,.55);
+  }
+  .tray::before {
+    content: ""; position: absolute; left: 0; right: 0; top: -7px; height: 6px;
+    background: repeating-linear-gradient(45deg, #e2b23c 0 9px, #17191b 9px 18px);
+    opacity: .82;
+  }
+  .tray .screw { position: absolute; }
+  .tray .screw.s1 { left: 5px; top: 5px; } .tray .screw.s2 { right: 5px; top: 5px; }
+  .tray .screw.s3 { left: 5px; bottom: 5px; } .tray .screw.s4 { right: 5px; bottom: 5px; }
+  .tool { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .key {
+    width: 46px; height: 40px; display: grid; place-items: center;
+    font-size: 15px; color: #d9d3c3;
+    background: linear-gradient(180deg, #4d5357, #34383b 62%, #2b2f32);
+    border: 1px solid #111416;
+    box-shadow: 0 1px 0 rgba(255,255,255,.18) inset, 0 -2px 0 rgba(0,0,0,.5) inset, 0 3px 0 #16191b, 0 5px 8px rgba(0,0,0,.45);
+  }
+  .key.on { background: linear-gradient(180deg, #6a5a34, #4a3f26); color: #f6d79a; border-color: #2a2314; }
+  .tool span { font-family: "KaiTi", serif; font-size: 11.5px; letter-spacing: .1em; color: rgba(232,226,210,.55); }
+
+  /* ── 夹板 ─────────────────────────────── */
+  .clip {
+    position: absolute; right: 26px; top: 100px; width: 258px; height: 356px;
+    background: #2b3033; border: 1px solid #101314;
+    box-shadow: 0 1px 0 rgba(255,255,255,.1) inset, 0 18px 34px rgba(0,0,0,.55);
+    transform: rotate(.5deg);
+  }
+  .clip .board {
+    position: absolute; left: 12px; right: 12px; top: 26px; bottom: 12px;
+    background: linear-gradient(180deg, #ddd4bd, #cfc4a8); color: #2a241b; padding: 18px 17px 12px;
+    box-shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 4px 10px rgba(0,0,0,.35);
+  }
+  .clip .bar {
+    position: absolute; left: 50%; top: 8px; width: 108px; height: 22px; margin-left: -54px;
+    background: linear-gradient(180deg, #6d7378, #3b4044); border: 1px solid #14171a;
+    box-shadow: 0 2px 4px rgba(0,0,0,.5), 0 1px 0 rgba(255,255,255,.2) inset;
+  }
+  .clip h3 { margin: 0 0 4px; font-size: 15px; font-weight: 400; letter-spacing: .16em; }
+  .clip .no { font-family: "Cascadia Mono", monospace; font-size: 9.5px; color: #6d6552; letter-spacing: .08em; }
+  .clip .rule { height: 1px; margin: 12px 0 10px; background: #b3a88c; }
+  .clip .r { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; border-bottom: 1px dotted #b3a88c; }
+  .clip .r span { font-size: 11.5px; letter-spacing: .06em; color: #4a4132; }
+  .clip .r b { font-family: "Bahnschrift", "Deng", sans-serif; font-stretch: 84%; font-size: 15px; font-weight: 400; }
+  .clip .r b.warn { color: #a5332a; }
+  .clip .ok { margin-top: 16px; font-family: "KaiTi", serif; font-size: 13px; color: #3f5a35; letter-spacing: .1em; }
+  .pencil {
+    position: absolute; right: 30px; bottom: 452px; width: 150px; height: 9px;
+    background: linear-gradient(180deg, #e0b44a, #c08e2c);
+    border-radius: 2px; transform: rotate(-24deg);
+    box-shadow: 0 4px 8px rgba(0,0,0,.5);
+    z-index: 6;
+  }
+  .pencil::before {
+    content: ""; position: absolute; right: -14px; top: 0; width: 14px; height: 9px;
+    background: linear-gradient(180deg, #e8dcc0, #c9b78f);
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+  }
+  .pencil::after {
+    content: ""; position: absolute; left: -10px; top: 0; width: 10px; height: 9px;
+    background: #c96a6a; border-radius: 2px 0 0 2px;
+  }
+</style>
+</head>
+<body>
+  <div class="scene"><img src="scene-clean.png" alt=""></div>
+  <div class="lamps"></div>
+  <div class="floorglow"></div>
+  <div class="vignette"></div>
+
+  <div class="stencil">
+    <span class="screw"></span>
+    <div><b>工位 03</b><br><span>夜 班 · 装 配</span></div>
+    <span class="screw"></span>
+  </div>
+
+  <aside class="peg">
+    <p class="cap"><span>零件挂板</span><span>06</span></p>
+    <div class="tag"><span class="w">10 t</span><span class="n">基础车体</span><span class="m">3.9 × 2.9 m</span></div>
+    <div class="tag"><span class="w">5 t</span><span class="n">履带组</span><span class="m">500 mm</span></div>
+    <div class="tag"><span class="w">3 t</span><span class="n">基础引擎</span><span class="m">320 hp</span></div>
+    <div class="tag on"><span class="w">6 t</span><span class="n">炮塔</span><span class="m">环形座</span><span class="mark">正在装</span></div>
+    <div class="tag"><span class="w">4 t</span><span class="n">基础火炮</span><span class="m">76 mm</span></div>
+    <div class="tag off"><span class="w">6 t</span><span class="n">硬基装甲</span><span class="m">附加</span></div>
+    <p class="foot">取件 6 / 余量 70</p>
+  </aside>
+
+  <div class="dim">
+    <span class="tick l"></span><span class="tick r"></span>
+    <span class="line"></span>
+    <span class="val">7.50 m</span>
+    <span class="note">车体全长 · 含炮口不计</span>
+  </div>
+
+  <div class="mark"><b>炮塔 6 t</b><span>正在装 · 已吸附 3 个挂点</span></div>
+
+  <div class="tray">
+    <span class="screw s1"></span><span class="screw s2"></span><span class="screw s3"></span><span class="screw s4"></span>
+    <div class="tool"><div class="key">↶</div><span>撤销</span></div>
+    <div class="tool"><div class="key">↷</div><span>重做</span></div>
+    <div class="tool"><div class="key on">⟲</div><span>旋转 15°</span></div>
+    <div class="tool"><div class="key">↑</div><span>升高</span></div>
+    <div class="tool"><div class="key">⧉</div><span>复制</span></div>
+    <div class="tool"><div class="key">⌫</div><span>删除</span></div>
+  </div>
+
+  <aside class="clip">
+    <span class="bar"></span>
+    <div class="board">
+      <h3>装配验收</h3>
+      <p class="no">GT-03-0117 / 步坦原型</p>
+      <div class="rule"></div>
+      <div class="r"><span>结构校验</span><b>通过</b></div>
+      <div class="r"><span>整车质量</span><b>34.0 t</b></div>
+      <div class="r"><span>最大外形</span><b>7.50 m</b></div>
+      <div class="r"><span>武器挂载</span><b>1 / 4</b></div>
+      <div class="r"><span>稳定性</span><b class="warn">88 %</b></div>
+      <div class="r"><span>生命 / 移速</span><b>175 · 30</b></div>
+      <p class="ok">炮塔转速偏快，出厂前再校一次。</p>
+    </div>
+  </aside>
+  <span class="pencil"></span>
+</body>
+</html>

@@ -36,6 +36,7 @@ export async function mountWorkbench(runtime) {
   let repo, app, profile, assets = [], tab = 'workshop', busy = false, disposed = false, generation = 0;
   let blueprint = createStarterBlueprint('infantry', uid('draft')), selected = 'weapon', dirty = true;
   let run = null, selectedTank = null, pendingFile = null, modelCategory = 'player-tank', modelFilter = '', boundModel = null;
+  let playerPose = null;
   let history = [], future = [], snap = BALANCE.snapGrid, interaction = null, levelScene = null, levelSystem = null;
   let combat = null, combatHud = null;
   let sceneKind = null, sceneKey = '', garageKey = '', saveTimer = 0, saving = false, saveQueued = false, dragSnapshot = false, focusEnemyCursor = -1;
@@ -61,14 +62,14 @@ export async function mountWorkbench(runtime) {
       interaction?.setSelected(selected);
       if (reset || changed) runtime.resetCamera();
     } else disposeObject(root);
-    caption.textContent = kind === 'garage' ? '成品坦克 · 写实代理模型 · 单位：米' : '部件代理预览 · 点击选中 · 拖动移动 · 拖动空白旋转视角';
+    caption.textContent = kind === 'garage' ? '成品坦克 · 写实代理模型 · 单位：米' : '部件结构预览';
     updateHud(hudValue);
   }
-  function showLevelScene({ reset = false, combatMode = false } = {}) {
+  function showLevelScene({ reset = false, combatMode = false, pose = playerPose } = {}) {
     if (!run) return null;
     sceneKind = 'level';
     clearLevelSystem();
-    const scene = missionScene(run, { combat: combatMode });
+    const scene = missionScene(run, { combat: combatMode, playerPose: combatMode ? null : pose });
     levelScene = scene;
     if (runtime && !runtime.disposed) {
       const changed = runtime.setEnvironment('level');
@@ -152,9 +153,17 @@ export async function mountWorkbench(runtime) {
     return true;
   }
   function endCombat() {
+    // Keep the tank where the battle ended before the live simulation is torn down, so
+    // the rebuilt static scene and the camera stay in the same place.
+    const player = combat?.state?.player;
+    const pose = player ? { x: player.position.x, z: player.position.z, yaw: player.yaw, turretYaw: player.turretYaw, pitch: player.pitch } : null;
     combat?.stop(); combat = null; combatHud = null;
     if (!run) return;
+    playerPose = pose;
     showLevelScene({ reset: false });
+    // Settle the free camera on the tank after the chase camera lets go, so orbiting
+    // afterwards pivots around something the player recognises.
+    focusCamera('player', { duration: .8 });
     render();
   }
   // Single entry point for every rule event, so manual dev buttons and the simulation
@@ -186,6 +195,7 @@ export async function mountWorkbench(runtime) {
         position: [Number(sim.player.position.x.toFixed(2)), Number(sim.player.position.z.toFixed(2))],
         yaw: Number(sim.player.yaw.toFixed(3)),
         turretYaw: Number(sim.player.turretYaw.toFixed(3)),
+        aim: [Number(sim.playerAim.x.toFixed(2)), Number(sim.playerAim.z.toFixed(2))],
         pitch: Number(sim.player.pitch.toFixed(3)),
         enemies: sim.aliveEnemies, total: sim.totalEnemies,
         enemyHealth: sim.enemies.map(enemy => Math.round(enemy.health)),
@@ -204,28 +214,102 @@ export async function mountWorkbench(runtime) {
     };
   }
 
-  // ---------------------------------------------------------------- report
-  function renderReport(value = assessment()) {
+  // ---------------------------------------------------------------- report（验收单）
+  function renderReport(value = assessment(), source = blueprint) {
     const manufacture = document.querySelector('[data-action="manufacture"]');
     if (manufacture) manufacture.disabled = !value.valid;
     if (!value.valid) {
-      report.innerHTML = `<p class="eyebrow">STRUCTURE CHECK</p><h2>需要调整</h2><p class="subtle">解决以下问题后才能制造；3D 中仍可点选和拖动。</p><ul class="issues">${value.errors.map(e => `<li>${escape(e)}</li>`).join('')}</ul>`;
+      report.innerHTML = `<h2>需要调整</h2><p class="subtle">解决以下问题后才能制造；3D 中仍可点选和拖动。</p><ul class="issues">${value.errors.map(e => `<li>${escape(e)}</li>`).join('')}</ul>`;
       return;
     }
-    const s = value.stats;
-    const metrics = [
-      ['生命值', s.maxHealth], ['移速', `${s.moveSpeed} m/s`], ['攻击力', s.attack], ['攻速', `${s.fireRate} 次/s`],
-      ['防御力', s.defense], ['车体转向', `${s.turnSpeed} rad/s`],
-      ...(s.turretSpeed ? [['炮塔转向', `${s.turretSpeed} rad/s`]] : []),
-      ['子弹初速', `${s.launchSpeed} m/s`], ['爆炸半径', `${s.blastRadius} m`],
-      ...(s.impactDelay ? [['命中延迟', `${s.impactDelay} s`]] : [])
+    const s = value.stats, m = value.metrics;
+    const size = m.size.map(v => v.toFixed(2));
+    const linked = source.parts.filter(p => p.parentId || PARTS[p.partId]?.role === 'hull').length;
+    const rows = [
+      ['结构校验', '<b class="ok">通过 ✓</b>'],
+      ['连接完整性', `<b>${linked} / ${source.parts.length}</b>`],
+      ['整车质量', `<b>${m.mass}<em>t</em></b>`],
+      ['最大外形', `<b>${size[2]}<em>m</em></b>`],
+      ['武器挂载', `<b>${value.weapons.length}<em>/ ${BALANCE.maxWeapons}</em></b>`],
+      ['稳定性', `<span class="circled"><b class="warn">${Math.round(m.stability * 100)}<em>%</em></b>
+        <svg viewBox="0 0 76 44"><g fill="none" stroke="#a5332a" stroke-width="1.8" stroke-linecap="round" opacity=".85" filter="url(#roughRing)">
+        <path d="M8 24 C 6 12, 26 5, 44 7 C 62 9, 72 18, 68 28 C 64 38, 40 41, 24 37 C 12 34, 9 30, 8 24"/>
+        <path d="M10 20 C 12 9, 30 6, 48 8"/></g></svg></span>`],
+      ['类型适配', `<b>${Math.round(m.typeFit * 100)}<em>%</em></b>`],
+      ['生命 / 移速', `<b>${s.maxHealth}<em>· ${Math.round(s.moveSpeed * 3.6)} km/h</em></b>`]
     ];
-    const size = value.metrics.size.map(v => v.toFixed(2)).join(' × ');
-    report.innerHTML = `<p class="eyebrow">TANK ASSESSMENT</p><h2>评估报告</h2><span class="pill">结构通过 · 原型数值</span>
-      <dl class="metrics">${metrics.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
-      <p class="subtle">质量 ${value.metrics.mass} t · 尺寸 ${size} m · 稳定性 ${Math.round(value.metrics.stability * 100)}% · 类型适配 ${Math.round(value.metrics.typeFit * 100)}%</p>
-      <p class="subtle">${value.metrics.hasTurret ? '炮塔独立瞄准' : '无炮塔 · 武器随车体'} · 武器 ${value.weapons.length} 件</p>
-      <details><summary>计算依据与限制</summary>${Object.values(value.explanation).map(v => `<p class="subtle">${escape(v)}</p>`).join('')}<p class="subtle">${escape(value.warnings.join(' '))}</p></details>`;
+    const detail = [
+      ['攻击力', s.attack], ['攻速', `${s.fireRate} <small>次/s</small>`], ['防御力', s.defense],
+      ['车体转向', `${s.turnSpeed} <small>${Math.round(s.turnSpeed * 180 / Math.PI)}°/s</small>`],
+      ...(s.turretSpeed ? [['炮塔转向', `${s.turretSpeed} <small>${Math.round(s.turretSpeed * 180 / Math.PI)}°/s</small>`]] : []),
+      ['子弹初速', `${s.launchSpeed} <small>m/s</small>`], ['爆炸半径', `${s.blastRadius} <small>m</small>`],
+      ...(s.impactDelay ? [['命中延迟', `${s.impactDelay} <small>s</small>`]] : [])
+    ];
+    report.innerHTML = `<h2>验收单 <em>GT-03-0117</em></h2>
+      <span class="pill">结构通过 · 原型数值</span>
+      ${rows.map(([k, v]) => `<div class="vrow"><span>${k}</span>${v}</div>`).join('')}
+      <p class="review">${m.hasTurret ? '炮塔独立瞄准' : '无炮塔 · 武器随车体'}，武器 ${value.weapons.length} 件。<br>结构可交付，稳定性与适配随下一次复校一并复核。</p>
+      <div class="seal-wrap"><div class="seal">结构合格<small>三 车 间</small></div></div>
+      <p class="doc-sign"><span>复核 <i></i></span><span>日期 ${new Date().getMonth() + 1}.${new Date().getDate()}</span></p>
+      <details class="dev-tools"><summary>全部数值与计算依据</summary>
+        <dl class="metrics">${detail.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>
+        <p class="subtle">尺寸 ${size.join(' × ')} m</p>
+        ${Object.values(value.explanation).map(v => `<p class="subtle">${escape(v)}</p>`).join('')}
+        <p class="subtle">${escape(value.warnings.join(' '))}</p>
+      </details>
+      <svg width="0" height="0" aria-hidden="true"><defs><filter id="roughRing"><feTurbulence type="fractalNoise" baseFrequency="0.06" numOctaves="2" seed="2"/><feDisplacementMap in="SourceGraphic" scale="2"/></filter></defs></svg>`;
+  }
+
+  // ---------------------------------------------------------------- 平面布置图（手绘）
+  function renderSketch(value = assessment()) {
+    const host = document.querySelector('#sketch');
+    if (!host) return;
+    if (!value.valid || tab !== 'workshop') { host.innerHTML = ''; return; }
+    const m = value.metrics;
+    const width = Math.max(.1, m.size[0]), length = Math.max(.1, m.size[2]);
+    const scale = Math.min(330 / length, 128 / width);
+    const cx = 300, cy = 74;
+    const L = length * scale, W = width * scale;
+    const halfL = L / 2, halfW = W / 2;
+    const trackW = Math.max(9, W * .2);
+    const hullW = Math.max(12, W - trackW * 2 - 7);
+    const turret = blueprint.parts.find(p => PARTS[p.partId]?.role === 'turret');
+    const weapon = blueprint.parts.find(p => p.id === blueprint.primaryWeaponId) || blueprint.parts.find(p => PARTS[p.partId]?.role === 'weapon');
+    const tSize = turret ? PARTS[turret.partId].size : null;
+    const tx = turret ? cx + (turret.position[2] || 0) * scale : cx;
+    const ty = turret ? cy + (turret.position[0] || 0) * scale : cy;
+    const trx = tSize ? tSize[2] * scale / 2 : 0;
+    const trY = tSize ? tSize[0] * scale / 2 : 0;
+    const barrel = weapon ? (PARTS[weapon.partId].size[2] || 2) * scale * 1.8 : 0;
+    const dimY = cy + halfW + 22, dimX = cx - halfL - 24;
+    let teeth = '';
+    for (let x = cx - halfL + 9; x < cx + halfL - 6; x += 19) {
+      teeth += `M${x.toFixed(1)} ${(cy - halfW + 3).toFixed(1)} L ${x.toFixed(1)} ${(cy - halfW + trackW - 3).toFixed(1)} `;
+      teeth += `M${x.toFixed(1)} ${(cy + halfW - trackW + 3).toFixed(1)} L ${x.toFixed(1)} ${(cy + halfW - 3).toFixed(1)} `;
+    }
+    host.innerHTML = `<svg viewBox="0 0 600 176">
+      <defs><filter id="roughPlan" x="-12%" y="-12%" width="124%" height="124%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="2" seed="4"/>
+        <feDisplacementMap in="SourceGraphic" scale="2.6"/>
+      </filter></defs>
+      <g filter="url(#roughPlan)" fill="none" stroke="#3a3226" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="${(cx - halfL).toFixed(1)}" y="${(cy - halfW).toFixed(1)}" width="${L.toFixed(1)}" height="${trackW.toFixed(1)}" rx="4"/>
+        <rect x="${(cx - halfL).toFixed(1)}" y="${(cy + halfW - trackW).toFixed(1)}" width="${L.toFixed(1)}" height="${trackW.toFixed(1)}" rx="4"/>
+        <rect x="${(cx - halfL * .94).toFixed(1)}" y="${(cy - hullW / 2).toFixed(1)}" width="${(L * .94).toFixed(1)}" height="${hullW.toFixed(1)}" rx="5"/>
+        ${turret ? `<ellipse cx="${tx.toFixed(1)}" cy="${ty.toFixed(1)}" rx="${trx.toFixed(1)}" ry="${trY.toFixed(1)}"/>` : ''}
+        ${barrel ? `<path d="M${(tx + trx * .4).toFixed(1)} ${(ty - 1.6).toFixed(1)} L ${(tx + trx * .4 + barrel).toFixed(1)} ${(ty - 1.6).toFixed(1)} M ${(tx + trx * .4).toFixed(1)} ${(ty + 1.6).toFixed(1)} L ${(tx + trx * .4 + barrel).toFixed(1)} ${(ty + 1.6).toFixed(1)}"/>` : ''}
+        <path d="${teeth}"/>
+      </g>
+      <g fill="none" stroke="#2f4f7a" stroke-width="1.1" stroke-linecap="round" opacity=".9">
+        <path d="M${(cx - halfL).toFixed(1)} ${dimY} L ${(cx + halfL).toFixed(1)} ${dimY}"/>
+        <path d="M${(cx - halfL).toFixed(1)} ${dimY - 5} L ${(cx - halfL).toFixed(1)} ${dimY + 5} M ${(cx + halfL).toFixed(1)} ${dimY - 5} L ${(cx + halfL).toFixed(1)} ${dimY + 5}"/>
+        <path d="M${dimX} ${(cy - halfW).toFixed(1)} L ${dimX} ${(cy + halfW).toFixed(1)}"/>
+        <path d="M${dimX - 5} ${(cy - halfW).toFixed(1)} L ${dimX + 5} ${(cy - halfW).toFixed(1)} M ${dimX - 5} ${(cy + halfW).toFixed(1)} L ${dimX + 5} ${(cy + halfW).toFixed(1)}"/>
+      </g>
+      <text x="${cx}" y="${dimY + 15}" text-anchor="middle" fill="#2f4f7a" font-family="KaiTi, serif" font-size="13">${length.toFixed(2)} m</text>
+      <text x="${dimX - 7}" y="${cy}" text-anchor="middle" fill="#2f4f7a" font-family="KaiTi, serif" font-size="13" transform="rotate(-90 ${dimX - 7} ${cy})">${width.toFixed(2)} m</text>
+      <text x="8" y="16" fill="#8a7c63" font-family="KaiTi, serif" font-size="12" letter-spacing="1">图 3-3　平面布置</text>
+    </svg>`;
   }
 
   // ---------------------------------------------------------------- workshop
@@ -236,27 +320,49 @@ export async function mountWorkbench(runtime) {
     const weaponCount = blueprint.parts.filter(item => PARTS[item.partId].role === 'weapon').length;
     const weaponsFull = part.role === 'weapon' && weaponCount >= BALANCE.maxWeapons;
     const disabled = (unique && installed) || weaponsFull;
-    const state = unique && installed ? ' · 已装' : weaponsFull ? ' · 武器已满' : '';
-    return `<button type="button" class="part-card ${installed ? 'installed' : ''}" data-action="addPart" data-part="${id}" ${disabled ? 'disabled' : ''} title="${escape(part.name)}：${roleLabels[part.role]}${locked ? ` · 解锁 ${part.cost} 零件` : ''}${state}">
+    const meta = `${roleLabels[part.role]} · ${part.mass} t${locked ? ` · 解锁 ${part.cost}` : ''}${weaponsFull ? ' · 武器已满' : ''}`;
+    return `<button type="button" class="part-card ${unique && installed ? 'installed' : ''}" data-action="addPart" data-part="${id}" ${disabled ? 'disabled' : ''} title="${escape(part.name)}：${roleLabels[part.role]}${locked ? ` · 解锁 ${part.cost} 零件` : ''}">
       <span class="part-icon">${partIcon(part.role)}</span>
       <span class="part-name">${escape(part.name)}</span>
-      <span class="part-meta">${roleLabels[part.role]} · ${part.mass} t${locked ? ` · 解锁 ${part.cost}` : ''}${state}</span>
+      <span class="part-meta">${meta}</span>
     </button>`;
   }
+
   function renderWorkshopPanel() {
     const item = blueprint.parts.find(p => p.id === selected);
-    const available = Object.entries(PARTS).filter(([, p]) => p.types.includes(blueprint.type));
+    const all = Object.entries(PARTS).filter(([, p]) => p.types.includes(blueprint.type));
+    // 已装的唯一部件不再列出；武器可多装，继续显示。
+    const available = all.filter(([id, p]) => !(uniqueRoles.has(p.role) && blueprint.parts.some(part => part.partId === id)));
     const status = dirty ? '有未保存修改' : '草稿已保存';
     const value = assessment();
-    workspace.innerHTML = `<p class="eyebrow">BUILD / DRAG / EVALUATE</p><h1>造一辆坦克</h1>
-      <p class="subtle">① 点目录装部件　② 在 3D 里拖动摆位　③ 数值合格后制造入库。</p>
-      <label class="field">蓝图名称<input id="blueprintName" maxlength="60" value="${escape(blueprint.name)}"></label>
-      <div class="row"><span class="pill">${TYPES[blueprint.type].name}</span><span class="subtle" id="draftState">${status} · ${blueprint.parts.length} 部件</span></div>
-      <div class="row">${button('save', '保存草稿')}${button('manufacture', '制造并入库', `class="primary" ${value.valid ? '' : 'disabled'}`)}</div>
-      <h3>① 部件目录 <span class="subtle">零件：${profile.currency.parts}</span></h3>
-      <div class="palette">${available.map(([id, p]) => partCard(id, p)).join('')}</div>
+    const totalMass = blueprint.parts.reduce((sum, p) => sum + (PARTS[p.partId]?.mass || 0), 0);
+    const title = document.querySelector('#docTitle');
+    if (title) title.textContent = `${blueprint.name}　改装方案`;
+    const sub = document.querySelector('#docSub');
+    if (sub) sub.textContent = `${TYPES[blueprint.type].name} · 第 ${blueprint.revision || 1} 稿`;
+
+    const rows = blueprint.parts.map((part, index) => {
+      const def = PARTS[part.partId];
+      const size = def.size.map(v => Number(v).toFixed(1)).join('×');
+      return `<tr><td class="idx">${String(index + 1).padStart(2, '0')}</td>
+        <td class="nm">${escape(def.name)}</td><td class="sp">${size}</td>
+        <td class="wt">${def.mass} t</td>
+        <td class="st${part.id === selected ? ' wait' : ''}">${part.id === selected ? '选中' : '已装'}</td></tr>`;
+    }).join('');
+
+    workspace.innerHTML = `<h2>部件清单 <em>${String(blueprint.parts.length).padStart(2, '0')} 件 / ${totalMass} t</em></h2>
+      <p class="subtle" id="draftState">${status} · ${blueprint.parts.length} 部件</p>
+      <table class="ledger">
+        <thead><tr><th class="idx"></th><th>名 称</th><th>规 格</th><th class="wt">重量</th><th class="st">状态</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="total"><span>合计　${blueprint.parts.length} 件</span><span><b>${totalMass} t</b></span></div>
+
+      <h3>可装部件 <span class="subtle" style="font-family:'Ink Free',serif">零件：${profile.currency.parts}</span></h3>
+      <div class="palette">${available.map(([id, p]) => partCard(id, p)).join('') || '<p class="subtle">该类型的部件都已装上。</p>'}</div>
       ${!profile.inspectionGrantClaimed ? `<div class="row">${button('grant', '领取 100 测试零件')}</div>` : '<p class="subtle">测试零件已领取 · 与旧模式钱包独立</p>'}
-      <h3>② 当前部件</h3>
+
+      <h3>当前部件</h3>
       <div class="selection-card">
         <div class="title"><strong>${item ? escape(PARTS[item.partId].name) : '未选中'}</strong><span class="pill">${item ? roleLabels[PARTS[item.partId].role] : '点击 3D 部件'}</span></div>
         ${item ? `
@@ -267,20 +373,37 @@ export async function mountWorkbench(runtime) {
             <div class="field"><span>朝向</span><div class="yaw-row"><input id="partYaw" type="range" min="-180" max="180" step="5" value="${Math.round(item.yaw * 180 / Math.PI)}"><output id="yawOutput">${Math.round(item.yaw * 180 / Math.PI)}°</output></div></div>
             <label class="field">连接到<select id="partParent">${option('', '无（车体根节点）', item.parentId || '')}${blueprint.parts.filter(p => p.id !== item.id).map(p => option(p.id, PARTS[p.partId].name + ' · ' + p.id.slice(0, 8), item.parentId)).join('')}</select></label>
           </details>
-        ` : '<p class="subtle">在左侧目录安装部件，或在 3D 中点击一个部件。</p>'}
+        ` : '<p class="subtle">在 3D 里点一个部件，或在上面目录里装一个。</p>'}
       </div>
-      <details class="dev-tools"><summary>高级：外观模型 / 草稿 / 模型仓库</summary>
+
+      <h3>备注</h3>
+      <div class="memo">
+        <p>① 座圈沿用旧件，转速偏高，出厂前复校。</p>
+        <p>② 硬基装甲待装，重心后移约 0.12 m。</p>
+        <p>③ 履带张力按 500 mm 标准，勿再上调。</p>
+      </div>
+
+      <details class="dev-tools"><summary>附页：蓝图 / 外观 / 草稿 / 模型仓库</summary>
+        <label class="field">蓝图名称<input id="blueprintName" maxlength="60" value="${escape(blueprint.name)}"></label>
         <div class="row"><select id="tankType" aria-label="新建坦克类型">${Object.entries(TYPES).map(([id, t]) => option(id, t.name, blueprint.type)).join('')}</select>${button('new', '新建蓝图')}</div>
         <label class="field">成品外观模型（可选）<select id="boundModel">${option('', '使用部件结构预览', boundModel || '')}${assets.filter(a => a.category === 'player-tank').map(a => option(a.id, a.name, boundModel)).join('')}</select></label>
         <h3>已保存草稿</h3>${profile.blueprints.length ? `<div class="row"><select id="savedDraft" aria-label="已保存草稿">${profile.blueprints.map(b => option(b.id, `${b.name} · ${b.parts.length} 部件`, blueprint.id)).join('')}</select>${button('load', '载入')}</div>` : '<p class="subtle">尚无草稿，点击“保存草稿”保留当前搭建。</p>'}
         <div class="row">${button('openModels', '打开模型仓库')}</div>
       </details>`;
+
+    const foot = document.querySelector('#docFoot');
+    if (foot) foot.innerHTML = `<div class="mint-row">${button('save', '保存草稿')}${button('manufacture', '制造并入库', `class="primary" ${value.valid ? '' : 'disabled'}`)}</div>
+      <div class="doc-sign"><span>记录人 <i></i></span><span>GT-03-0117 · 第 12 页</span></div>`;
+
     renderReport();
+    renderSketch(value);
     updateHud();
   }
   function updateDock() {
     if (!dock) return;
     dock.hidden = tab !== 'workshop';
+    const ops = dock.closest('.ops');
+    if (ops) ops.hidden = tab !== 'workshop';
     const undo = dock.querySelector('[data-action="undo"]'), redo = dock.querySelector('[data-action="redo"]');
     if (undo) undo.disabled = !history.length;
     if (redo) redo.disabled = !future.length;
@@ -335,7 +458,7 @@ export async function mountWorkbench(runtime) {
     workspace.innerHTML = `<p class="eyebrow">YOUR TANKS</p><h1>坦克仓库</h1><p class="subtle">成品保留制造时的蓝图；入场时重新评估。</p>${profile.tanks.map(t => `<article class="card ${t.id === selectedTank ? 'active' : ''}"><strong>${escape(t.blueprint.name)}</strong><small>${TYPES[t.blueprint.type].name} · ${t.blueprint.parts.length} 部件${t.modelId ? ' · 已绑定模型' : ''}</small><div class="row">${button('inspectTank', '检验', `data-id="${escape(t.id)}"`)}${button('prepare', '准备第一关', `class="primary" data-id="${escape(t.id)}"`)}</div></article>`).join('') || '<div class="card">还没有成品坦克。<p class="subtle">先在车间通过评估，再点击“制造并入库”。</p></div>'}`;
     const tank = profile.tanks.find(t => t.id === selectedTank);
     if (tank) {
-      renderReport(evaluateTank(tank.blueprint, profile.unlockedParts));
+      renderReport(evaluateTank(tank.blueprint, profile.unlockedParts), tank.blueprint);
       const key = `garage:${tank.id}:${tank.modelId || 'blueprint'}`;
       if (sceneKind !== 'garage' || garageKey !== key) {
         garageKey = key;
@@ -372,6 +495,11 @@ export async function mountWorkbench(runtime) {
   function render() {
     if (disposed) return;
     document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
+    if (tab !== 'workshop') {
+      const foot = document.querySelector('#docFoot'); if (foot) foot.innerHTML = '';
+      const plan = document.querySelector('#sketch'); if (plan) plan.innerHTML = '';
+      const guide = document.querySelector('#guide'); if (guide) guide.hidden = true;
+    }
     const capsule = document.querySelector('#cameraCapsule');
     if (capsule) capsule.hidden = !(tab === 'mission' && run && !combat?.state.active);
     const crosshair = document.querySelector('#crosshair');
@@ -609,16 +737,18 @@ export async function mountWorkbench(runtime) {
     async previewAsset(target) { await previewModelId(target.dataset.id); },
     inspectTank(target) { selectedTank = target.dataset.id; sceneKind = null; render(); },
     async prepare(target) {
+      playerPose = null;
       run = await app.prepareFirstLevel(target.dataset.id);
       tab = 'mission'; sceneKind = null; garageKey = ''; render();
       notify('第一关已准备。镜头可自由旋转，下方可对准目标。');
     },
-    startTest() { startCombat(); },
+    startTest() { playerPose = null; startCombat(); },
     destroyEnemy(target) { applyRunEvent({ type: 'enemy-destroyed', id: target.dataset.id }); },
     destroyBase() { applyRunEvent({ type: 'base-destroyed' }); },
     destroyPlayer() { applyRunEvent({ type: 'player-destroyed' }); },
     async resetTest() {
       combat?.stop(); combat = null; combatHud = null;
+      playerPose = null;
       run = await app.prepareFirstLevel(run.tank.id); render();
     },
     goGarage() { combat?.stop(); combat = null; combatHud = null; tab = 'garage'; sceneKind = null; garageKey = ''; render(); },
@@ -738,6 +868,8 @@ export async function mountWorkbench(runtime) {
   try {
     repo = await openRepository(); app = createApplication(repo); await refresh();
     document.querySelector('#storageStatus').textContent = '本机存档已连接';
+    const dateBox = document.querySelector('#docDate');
+    if (dateBox) { const now = new Date(); dateBox.textContent = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`; }
     if (runtime && !runtime.disposed) {
       interaction = createBuildInteraction({
         runtime,
