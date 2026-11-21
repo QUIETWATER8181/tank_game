@@ -2,6 +2,10 @@ import { PARTS, TYPES, PROJECTILES, BALANCE, RULES_VERSION, SCHEMA_VERSION } fro
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const round = value => Math.round(value * 1000) / 1000;
 const owns = (object, key) => typeof key === 'string' && Object.hasOwn(object, key);
+// Arcade multipliers. The assessment panel and the combat simulation read the same
+// `stats`, so a displayed 11 m/s really is what the tank reaches on the field. Change
+// these numbers (not combat.mjs) when the whole roster feels sluggish or twitchy.
+const ARCADE = Object.freeze({ speed: 2.8, turn: 4.2, turret: 1.5 });
 export function boundsOf(instance) {
   const size = PARTS[instance.partId].size;
   const c = Math.abs(Math.cos(instance.yaw)), s = Math.abs(Math.sin(instance.yaw));
@@ -80,10 +84,10 @@ export function evaluateTank(blueprint, unlocked) {
   const primary = weapons.find(weapon => weapon.instanceId === blueprint.primaryWeaponId);
   const stats = {
     maxHealth: round(total('health') * type.health),
-    moveSpeed: round(clamp(total('power') / mass * type.speed * stability * fitFactor, BALANCE.minSpeed, BALANCE.maxSpeed)),
-    turnSpeed: round(clamp(2 * type.turn * stability / (1 + mass * (size[0] ** 2 + size[2] ** 2) / 500), .1, 3)),
+    moveSpeed: round(clamp(total('power') / mass * type.speed * stability * fitFactor * ARCADE.speed, BALANCE.minSpeed, BALANCE.maxSpeed)),
+    turnSpeed: round(clamp(2 * type.turn * stability / (1 + mass * (size[0] ** 2 + size[2] ** 2) / 500) * ARCADE.turn, .1, 3)),
     defense: round(total('armor') * type.defense), attack: primary.attack, fireRate: primary.fireRate,
-    ...(turret ? { turretSpeed: round(clamp(3.2 * type.turn * stability / (1 + PARTS[turret.partId].mass * .08 + mass * .01), .15, 3)) } : {}),
+    ...(turret ? { turretSpeed: round(clamp(3.2 * type.turn * stability / (1 + PARTS[turret.partId].mass * .08 + mass * .01) * ARCADE.turret, .15, 3)) } : {}),
     ...primary.projectile
   };
   const warnings = ['原型评估：使用部件包围盒近似结构，尚未验证炮口遮挡、承重与真实碰撞。'];
@@ -91,6 +95,6 @@ export function evaluateTank(blueprint, unlocked) {
   return { valid: true, rulesVersion: RULES_VERSION, blueprintRevision: blueprint.revision, errors: [],
     warnings, stats, weapons,
     metrics: { mass, centerOfMass: center.map(round), size: size.map(round), stability: round(stability), typeFit: round(fit), hasTurret: Boolean(turret) },
-    explanation: { moveSpeed: '引擎功率 / 总质量 × 类型系数 × 稳定性 × 适配修正', turnSpeed: '受质量、水平尺寸和重心稳定性影响', defense: '车体与硬装甲评分之和 × 类型系数', attack: '主武器基础伤害 × 类型系数 × 适配修正', health: '车体与装甲生命之和 × 类型系数', turretSpeed: '炮塔质量与总质量越大，炮塔转动越慢；无炮塔时没有独立瞄准' }
+    explanation: { moveSpeed: '引擎功率 / 总质量 × 类型系数 × 稳定性 × 适配修正 × 街机系数（面板值与战场实际一致）', turnSpeed: '受质量、水平尺寸和重心稳定性影响，再乘街机系数', defense: '车体与硬装甲评分之和 × 类型系数', attack: '主武器基础伤害 × 类型系数 × 适配修正', health: '车体与装甲生命之和 × 类型系数', turretSpeed: '炮塔质量与总质量越大，炮塔转动越慢；再乘街机系数，无炮塔时没有独立瞄准' }
   };
 }

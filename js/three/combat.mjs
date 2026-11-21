@@ -15,10 +15,16 @@ export const COMBAT = Object.freeze({
   maxProjectiles: 48,
   tankHalf: [2, 1.3, 4.4],
   baseHalf: [17, 3, 11],
-  minPitch: -.06,
-  maxPitch: .32,
+  // Barrel elevation limits. The upper end has to clear a mortar's high arc; straight
+  // shots only use the small part of this range that points at the crosshair.
+  minPitch: -.2,
+  maxPitch: 1.15,
   arenaX: 17.4,
-  arenaZ: [-2, 178]
+  arenaZ: [-2, 178],
+  camera: Object.freeze({
+    distance: 13.2, height: 6.1, lookAhead: 14, lookHeight: 2,
+    yawLambda: 6.5, positionLambda: 10, targetLambda: 12, entryTime: .6
+  })
 });
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -33,6 +39,23 @@ export function solveLaunchPitch(distance, speed, gravity = 9.8, height = 0) {
   const discriminant = v2 * v2 - gravity * (gravity * d * d + 2 * height * v2);
   if (discriminant < 0) return Math.PI / 4; // out of range: best effort, caller clamps
   return Math.atan2(v2 - Math.sqrt(discriminant), gravity * d);
+}
+// Chase-camera heading: a damped follow, not a rigid lock. The camera trails the hull by a
+// few degrees while turning (which reads as weight) and re-centres as soon as the turn
+// stops. Keeping this pure makes the camera feel testable in Node.
+export function followYaw(current, target, dt, { lambda = COMBAT.camera.yawLambda } = {}) {
+  const error = wrap(target - current);
+  return wrap(current + error * (1 - Math.exp(-lambda * Math.max(0, dt))));
+}
+// Straight weapons point at the aim point; ballistic ones need the low-angle solution so
+// the shell still lands on the crosshair.
+function aimPitchFor(weapon, origin, point) {
+  const distance = Math.hypot(point.x - origin.x, point.z - origin.z);
+  const height = point.y - origin.y;
+  const pitch = weapon.straight
+    ? Math.atan2(height, Math.max(distance, .001))
+    : solveLaunchPitch(distance, weapon.launchSpeed, weapon.gravity, height);
+  return clamp(pitch, COMBAT.minPitch, COMBAT.maxPitch);
 }
 // Distance from a point to an axis-aligned footprint in the XZ plane.
 function footprintDistance(x, z, box) {
@@ -58,7 +81,7 @@ function muzzleOf(unit) {
   return { x: unit.position.x + Math.sin(angle) * 3.5, y: 2.35, z: unit.position.z + Math.cos(angle) * 3.5 };
 }
 function weaponFrom(stats) {
-  return { kind: stats.kind, launchSpeed: stats.launchSpeed, gravity: stats.gravity, blastRadius: stats.blastRadius, lifetime: stats.lifetime };
+  return { kind: stats.kind, launchSpeed: stats.launchSpeed, gravity: stats.gravity, blastRadius: stats.blastRadius, lifetime: stats.lifetime, straight: Boolean(stats.straight) };
 }
 
 export class CombatSim {
@@ -153,14 +176,17 @@ export class CombatSim {
     const throttle = clamp(input.throttle || 0, -1, 1);
     const steer = clamp(input.steer || 0, -1, 1);
     const factor = this.zoneFactorAt(player.position.x, player.position.z);
-    player.speed = damp(player.speed, throttle * player.moveSpeed * factor, throttle ? 2.6 : 3.4, dt);
+    // Arcade driving: reach top speed quickly, stop quickly, and keep most of the turn
+    // rate at a standstill so the hull does not feel like a barge.
+    player.speed = damp(player.speed, throttle * player.moveSpeed * factor, throttle ? 4.4 : 5.2, dt);
     if (Math.abs(player.speed) < .01) player.speed = 0;
     const grip = clamp(Math.abs(player.speed) / (player.moveSpeed * .4), 0, 1);
-    player.yaw = wrap(player.yaw + steer * player.turnSpeed * factor * (Math.sign(player.speed) || 1) * (.45 + .55 * grip) * dt);
+    player.yaw = wrap(player.yaw + steer * player.turnSpeed * factor * (Math.sign(player.speed) || 1) * (.62 + .38 * grip) * dt);
     this.moveUnit(player, Math.sin(player.yaw) * player.speed * dt, Math.cos(player.yaw) * player.speed * dt);
-    if (input.aim) this.playerAim = { x: input.aim.x, z: input.aim.z };
+    if (input.aim) this.playerAim = { x: input.aim.x, y: input.aim.y, z: input.aim.z, kind: input.aim.kind };
     const aim = this.playerAim;
-    const desired = Math.atan2(aim.x - player.position.x, aim.z - player.position.z);
+    const aimPoint = { x: aim.x, y: Number.isFinite(aim.y) ? aim.y : COMBAT.aimPlaneY, z: aim.z };
+    const desired = Math.atan2(aimPoint.x - player.position.x, aimPoint.z - player.position.z);
     if (player.turretSpeed) {
       const delta = wrap(desired - player.yaw - player.turretYaw);
       const limit = player.turretSpeed * dt;
@@ -170,13 +196,14 @@ export class CombatSim {
       player.yaw = wrap(player.yaw + clamp(delta, -player.turnSpeed * dt, player.turnSpeed * dt));
     }
     const muzzle = muzzleOf(player);
-    const distance = Math.hypot(aim.x - muzzle.x, aim.z - muzzle.z);
-    // A crosshair on the ground means "a tank is standing here", so solve for hull height.
-    const aimY = aim.kind === 'unit' ? aim.y : (Number.isFinite(aim.y) ? aim.y + 1.2 : 1.3);
-    player.pitchTarget = clamp(solveLaunchPitch(distance, player.weapon.launchSpeed, player.weapon.gravity, aimY - muzzle.y), COMBAT.minPitch, COMBAT.maxPitch);
-    player.pitch = damp(player.pitch, player.pitchTarget, 8, dt);
+    // Aim exactly where the crosshair is. A straight shell then flies down that line;
+    // an explosive one is solved so its arc still lands on the same point.
+    player.pitchTarget = aimPitchFor(player.weapon, muzzle, aimPoint);
+    player.pitch = damp(player.pitch, player.pitchTarget, 14, dt);
     player.reload = Math.max(0, player.reload - dt);
     if (input.fire && player.reload <= 0) {
+      // Snap the barrel to the aim so the tracer leaves along the visible gun line.
+      player.pitch = player.pitchTarget;
       this.spawnProjectile(player, muzzle, player.yaw + player.turretYaw, player.pitchTarget);
       player.reload = 1 / Math.max(player.fireRate, .2);
       this.shots++;
@@ -202,24 +229,31 @@ export class CombatSim {
       enemy.reload = Math.max(0, enemy.reload - dt);
       if (Math.abs(delta) < .16 && distance < 62 && enemy.reload <= 0 && this.player.alive) {
         const muzzle = muzzleOf(enemy);
-        const pitch = clamp(solveLaunchPitch(Math.hypot(this.player.position.x - muzzle.x, this.player.position.z - muzzle.z), enemy.weapon.launchSpeed, enemy.weapon.gravity, COMBAT.aimPlaneY - muzzle.y), COMBAT.minPitch, COMBAT.maxPitch);
+        const targetPoint = { x: this.player.position.x, y: COMBAT.aimPlaneY, z: this.player.position.z };
+        const pitch = aimPitchFor(enemy.weapon, muzzle, targetPoint);
         // Enemies aim at the hull centre with a little human error; without it a stationary
-        // player is hit by every single shell and the four-enemy level is unwinnable.
+        // player is hit by every single shell and the four-enemy level is unwinnable. A
+        // straight shot needs a wider lateral spread than the old lobbed shell did, or it
+        // would hit every time at close range.
         const jitter = () => this.random() - .5;
-        this.spawnProjectile(enemy, muzzle, enemy.yaw + jitter() * .14, clamp(pitch + jitter() * .05, COMBAT.minPitch, COMBAT.maxPitch));
+        const spread = enemy.weapon.straight ? .42 : .14;
+        this.spawnProjectile(enemy, muzzle, enemy.yaw + jitter() * spread, clamp(pitch + jitter() * (enemy.weapon.straight ? .02 : .05), COMBAT.minPitch, COMBAT.maxPitch));
         enemy.reload = 1 / Math.max(enemy.fireRate, .2) + .35 + this.random() * .5;
       }
     }
   }
   spawnProjectile(owner, origin, angle, pitch) {
-    const speed = owner.weapon.launchSpeed;
+    const weapon = owner.weapon;
+    const speed = weapon.launchSpeed;
     const horizontal = Math.cos(pitch) * speed;
+    const straight = Boolean(weapon.straight);
     this.projectiles.push({
       owner: owner.id, team: owner.team,
       position: { x: origin.x, y: origin.y, z: origin.z },
       velocity: { x: Math.sin(angle) * horizontal, y: Math.sin(pitch) * speed, z: Math.cos(angle) * horizontal },
-      gravity: owner.weapon.gravity, life: owner.weapon.lifetime,
-      damage: owner.attack, blastRadius: owner.weapon.blastRadius, kind: owner.weapon.kind
+      gravity: straight ? 0 : weapon.gravity, straight, speed,
+      life: weapon.lifetime,
+      damage: owner.attack, blastRadius: weapon.blastRadius, kind: weapon.kind
     });
     if (this.projectiles.length > COMBAT.maxProjectiles) this.projectiles.shift();
     this.events.push({ type: 'fired', owner: owner.id, position: { ...origin }, angle, pitch });
@@ -249,7 +283,7 @@ export class CombatSim {
     const alive = [];
     for (const shot of this.projectiles) {
       shot.life -= dt;
-      shot.velocity.y -= shot.gravity * dt;
+      if (!shot.straight) shot.velocity.y -= shot.gravity * dt;
       const speed = Math.hypot(shot.velocity.x, shot.velocity.y, shot.velocity.z);
       const steps = Math.max(1, Math.min(10, Math.ceil((speed * dt) / .4)));
       const step = dt / steps;
@@ -373,12 +407,18 @@ export function createCombat({ runtime, run, scene, onEvent, onHud }) {
     bursts.push({ mesh, life: 0, duration: .45, radius: 2 });
   }
   const keys = new Set();
-  let fireHeld = false, disposed = false, firstFrame = true, hudTimer = 0;
+  let fireHeld = false, disposed = false, hudTimer = 0;
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
   const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   const hitPoint = new THREE.Vector3();
   const cameraTarget = new THREE.Vector3(sim.player.position.x, 1.8, sim.player.position.z);
+  const shotDirection = new THREE.Vector3();
+  const FORWARD = new THREE.Vector3(0, 0, 1);
+  const crosshair = document.querySelector('#crosshair');
+  // Chase camera state. `cameraYaw` is its own damped heading so a hull turn does not
+  // whip the whole view around, and `cameraEntry` eases the jump from the workbench view.
+  let cameraYaw = sim.player.yaw, cameraEntry = 0, cameraReady = false;
   let pointerAim = null;
 
   // Aim at whatever the pointer is actually over: an enemy hull first, then the ground.
@@ -400,9 +440,17 @@ export function createCombat({ runtime, run, scene, onEvent, onHud }) {
     const length = Math.hypot(direction.x, direction.z) || 1;
     return { x: sim.player.position.x + (direction.x / length) * 120, y: 1.2, z: sim.player.position.z + (direction.z / length) * 120, kind: 'sky' };
   }
-  const onPointerMove = event => { pointerAim = aimFromPointer(event.clientX, event.clientY) || pointerAim; };
+  // The reticle follows the pointer instead of sitting at the screen centre: the shell is
+  // aimed at the pointer, so a fixed centre reticle would lie about where it goes.
+  function placeCrosshair(clientX, clientY) {
+    if (!crosshair) return;
+    crosshair.style.left = `${clientX}px`;
+    crosshair.style.top = `${clientY}px`;
+  }
+  const onPointerMove = event => { placeCrosshair(event.clientX, event.clientY); pointerAim = aimFromPointer(event.clientX, event.clientY) || pointerAim; };
   const onPointerDown = event => {
     if (event.button !== 0) return;
+    placeCrosshair(event.clientX, event.clientY);
     pointerAim = aimFromPointer(event.clientX, event.clientY) || pointerAim;
     fireHeld = true;
   };
@@ -423,6 +471,16 @@ export function createCombat({ runtime, run, scene, onEvent, onHud }) {
   window.addEventListener('blur', onBlur);
   runtime.controls.enabled = false;
   runtime.setKeyboardPan(false);
+  // A preset tween or "复位" during the battle would fight the chase camera every frame.
+  runtime.setAutoRotate(false);
+  runtime.lockCamera(true);
+  // Start with the reticle on the viewport centre and the gun already aimed there; the
+  // system cursor is hidden over the battlefield so the reticle is the only pointer.
+  const startRect = host.getBoundingClientRect();
+  const startX = startRect.left + startRect.width / 2, startY = startRect.top + startRect.height / 2;
+  placeCrosshair(startX, startY);
+  pointerAim = aimFromPointer(startX, startY) || pointerAim;
+  host.style.cursor = 'none';
 
   function spawnBurst(position, radius, color) {
     const burst = bursts.find(entry => entry.life <= 0) || bursts[0];
@@ -475,6 +533,15 @@ export function createCombat({ runtime, run, scene, onEvent, onHud }) {
       if (!shot) { mesh.visible = false; continue; }
       mesh.visible = true;
       mesh.position.set(shot.position.x, shot.position.y, shot.position.z);
+      // Stretch the sphere along its velocity so a fast straight shot reads as a tracer
+      // instead of a dot that teleports between frames.
+      shotDirection.set(shot.velocity.x, shot.velocity.y, shot.velocity.z);
+      const length = shotDirection.length();
+      if (length > 1e-4) {
+        shotDirection.multiplyScalar(1 / length);
+        mesh.quaternion.setFromUnitVectors(FORWARD, shotDirection);
+        mesh.scale.set(1, 1, shot.straight ? 4.2 : 2.2);
+      }
     }
     for (const burst of bursts) {
       if (burst.life <= 0) { burst.mesh.visible = false; continue; }
@@ -488,24 +555,36 @@ export function createCombat({ runtime, run, scene, onEvent, onHud }) {
   }
   function updateCamera(delta) {
     const player = sim.player;
+    const cam = COMBAT.camera;
+    if (!cameraReady) {
+      // Start from wherever the player left the free camera, so entering the battle eases
+      // in instead of snapping to a new angle. If that view is already roughly behind the
+      // hull, take the hull heading: it avoids a pointless 180-degree swing on entry.
+      const dx = runtime.camera.position.x - player.position.x;
+      const dz = runtime.camera.position.z - player.position.z;
+      const offsetYaw = Math.hypot(dx, dz) > 2 ? wrap(Math.atan2(-dx, -dz)) : player.yaw;
+      cameraYaw = Math.abs(wrap(player.yaw - offsetYaw)) < Math.PI * .5 ? player.yaw : offsetYaw;
+      cameraReady = true;
+    }
+    cameraEntry = Math.min(1, cameraEntry + delta / cam.entryTime);
+    const ease = cameraEntry * cameraEntry * (3 - 2 * cameraEntry);
+    cameraYaw = followYaw(cameraYaw, player.yaw, delta, { lambda: cam.yawLambda * (.7 + .3 * ease) });
     const desired = new THREE.Vector3(
-      player.position.x - Math.sin(player.yaw) * 12.5,
-      player.position.y + 6.2,
-      player.position.z - Math.cos(player.yaw) * 12.5
+      player.position.x - Math.sin(cameraYaw) * cam.distance,
+      player.position.y + cam.height,
+      player.position.z - Math.cos(cameraYaw) * cam.distance
     );
-    // Look ahead of the hull, not at it: a target on the tank puts the screen centre on
-    // the ground two metres in front, which makes every shot fall short.
+    runtime.camera.position.lerp(desired, 1 - Math.exp(-cam.positionLambda * (.12 + .88 * ease) * delta));
+    // Look ahead along the camera's own heading: the tank then stays near the screen
+    // centre even while the chase heading trails the hull through a turn.
     const target = new THREE.Vector3(
-      player.position.x + Math.sin(player.yaw) * 16,
-      player.position.y + 2.2,
-      player.position.z + Math.cos(player.yaw) * 16
+      player.position.x + Math.sin(cameraYaw) * cam.lookAhead,
+      player.position.y + cam.lookHeight,
+      player.position.z + Math.cos(cameraYaw) * cam.lookAhead
     );
-    const rate = firstFrame ? 1 : 1 - Math.exp(-4.5 * delta);
-    runtime.camera.position.lerp(desired, rate);
-    cameraTarget.lerp(target, firstFrame ? 1 : 1 - Math.exp(-6 * delta));
+    cameraTarget.lerp(target, 1 - Math.exp(-cam.targetLambda * delta));
     runtime.controls.target.copy(cameraTarget);
     runtime.camera.lookAt(cameraTarget);
-    firstFrame = false;
   }
   function hudSnapshot() {
     return {
@@ -551,8 +630,15 @@ export function createCombat({ runtime, run, scene, onEvent, onHud }) {
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('keyup', onKeyUp);
     window.removeEventListener('blur', onBlur);
+    host.style.cursor = '';
+    if (crosshair) { crosshair.style.left = ''; crosshair.style.top = ''; }
     effects.removeFromParent();
+    // Hand the free camera back with the orbit pivot on the hull, not on the point the
+    // chase camera was looking at 14 m ahead.
+    runtime.lockCamera(false);
     runtime.controls.enabled = true;
+    runtime.controls.target.set(sim.player.position.x, 1.6, sim.player.position.z);
+    runtime.controls.update();
     runtime.invalidate();
   }
   return { sim, stop, state: sim, hud: hudSnapshot };

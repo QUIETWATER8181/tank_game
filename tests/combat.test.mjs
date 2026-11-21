@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createApplication, MemoryRepository, createStarterBlueprint, generateLevel } from '../js/mode/index.mjs';
-import { CombatSim, COMBAT, solveLaunchPitch } from '../js/three/combat.mjs';
+import { createApplication, MemoryRepository, createStarterBlueprint, evaluateTank, generateLevel } from '../js/mode/index.mjs';
+import { CombatSim, COMBAT, solveLaunchPitch, followYaw } from '../js/three/combat.mjs';
 
 // A flat, cover-free slice of level 01 so ballistics can be asserted without scenery.
 async function bareRun({ enemies, spawn = [0, 0, 0], cover = [], zones = [] } = {}) {
@@ -24,6 +24,41 @@ test('launch pitch matches the documented low-angle solution', () => {
   assert.ok(Math.abs(angle - 0.2499) < 0.01, `60 m pitch ${angle}`);
   assert.equal(solveLaunchPitch(0, 35, 9.8, 0), 0);
   assert.ok(solveLaunchPitch(400, 35, 9.8, 0) > 0, 'out-of-range shots still return an angle');
+});
+
+test('cannon shells are straight, fast shots that land on the crosshair', async () => {
+  const run = await bareRun({ enemies: [enemyAt('far', [0, 0, 100], { triggerZ: 999 })] });
+  const sim = new CombatSim({ run, random: () => 0.5 });
+  const aim = { x: 0, z: 100 };
+  sim.fixedUpdate(1 / 60, { aim, fire: true });
+  const shot = sim.projectiles.find(projectile => projectile.team === 'player');
+  assert.ok(shot, 'no shell was spawned');
+  assert.equal(shot.gravity, 0, 'straight shell still has gravity');
+  assert.equal(shot.straight, true);
+  assert.ok(shot.speed >= 100, `shell is too slow (${shot.speed} m/s)`);
+  const startZ = shot.position.z;
+  for (let index = 0; index < 60 && sim.projectiles.includes(shot); index++) sim.fixedUpdate(1 / 60, { aim });
+  assert.ok(sim.hits >= 1, 'straight shell missed a stationary target 100 m away');
+  assert.ok(shot.position.z > startZ + 80, `shell only travelled ${(shot.position.z - startZ).toFixed(1)} m`);
+});
+
+test('arcade tuning gives the starter tank game speeds', () => {
+  const stats = evaluateTank(createStarterBlueprint('infantry')).stats;
+  assert.ok(stats.moveSpeed >= 9 && stats.moveSpeed <= 13, `moveSpeed ${stats.moveSpeed} m/s`);
+  assert.ok(stats.turnSpeed >= 1.3 && stats.turnSpeed <= 2, `turnSpeed ${stats.turnSpeed} rad/s`);
+  assert.ok(stats.turretSpeed >= 2.2 && stats.turretSpeed <= 3, `turretSpeed ${stats.turretSpeed} rad/s`);
+  const heavy = evaluateTank(createStarterBlueprint('heavy')).stats;
+  assert.ok(heavy.turnSpeed < stats.turnSpeed, 'heavy tank should still turn slower');
+  assert.ok(heavy.moveSpeed < stats.moveSpeed, 'heavy tank should still move slower');
+});
+
+test('the chase camera eases after the hull instead of snapping to it', () => {
+  const eased = followYaw(0, 1.2, .2);
+  assert.ok(eased > 0 && eased < 1.2, `camera did not ease (${eased})`);
+  let yaw = 0;
+  for (let index = 0; index < 120; index++) yaw = followYaw(yaw, 1.2, 1 / 60);
+  assert.ok(Math.abs(1.2 - yaw) < .01, `camera did not settle behind the hull (${yaw})`);
+  assert.ok(followYaw(0, .1, 1 / 60) > 0, 'camera ignored a small hull turn');
 });
 
 test('a shell fired at a 60 m target lands on it', async () => {

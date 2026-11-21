@@ -36,6 +36,7 @@ export class SceneRuntime {
     this.environment = null;
     this.focusPoint = null;
     this.tween = null;
+    this.cameraLocked = false;
     this.keys = new Set();
     this.keyboardPan = false;
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -142,7 +143,7 @@ export class SceneRuntime {
   }
   // Explicit camera target for a level point: position + radius from level-scene focus data.
   focusOn(point, { distance, height, duration = 0.65, azimuth } = {}) {
-    if (!point) return;
+    if (!point || this.cameraLocked) return false;
     const target = point.position.clone ? point.position.clone() : new THREE.Vector3(...point.position);
     const radius = point.radius || 4;
     const view = point.view || {};
@@ -158,13 +159,14 @@ export class SceneRuntime {
       elapsed: 0, duration
     };
     this.invalidate();
+    return true;
   }
   focusPointById(focus, id, options) {
     if (!focus || !focus.has(id)) return false;
-    this.focusOn(focus.get(id), options);
-    return true;
+    return this.focusOn(focus.get(id), options);
   }
   setAutoRotate(enabled) {
+    if (this.cameraLocked) return;
     this.controls.autoRotate = Boolean(enabled);
     this.controls.autoRotateSpeed = 0.7;
     this.invalidate();
@@ -174,14 +176,24 @@ export class SceneRuntime {
     this.tween = null;
     this.invalidate();
   }
+  // While a gameplay system owns the camera, preset tweens and "复位" must be inert.
+  lockCamera(locked) {
+    this.cameraLocked = Boolean(locked);
+    if (this.cameraLocked) {
+      this.tween = null;
+      this.controls.autoRotate = false;
+    }
+    this.invalidate();
+  }
   setKeyboardPan(enabled) {
     this.keyboardPan = Boolean(enabled);
     if (!enabled) this.keys.clear();
   }
   resetCamera() {
+    if (this.cameraLocked) return;
     if (this.environment === 'level' && this.focusPoint) { this.focusOn(this.focusPoint, { duration: 0.001 }); return; }
     if (this.environment === 'level') { this.camera.position.set(16, 13, -16); this.controls.target.set(0, 2, 20); }
-    else { this.camera.position.set(10.5, 8.4, 13.2); this.controls.target.set(0, 1.9, 0); }
+    else { this.camera.position.set(7.6, 6.2, 9.6); this.controls.target.set(0, 1.7, 0); }
     this.controls.update();
     this.invalidate();
   }
@@ -244,9 +256,12 @@ export class SceneRuntime {
   updateCameraTween(delta) {
     const tween = this.tween;
     if (!tween) return false;
+    if (this.cameraLocked) { this.tween = null; return false; }
     tween.elapsed += delta;
     const t = tween.duration <= 0 ? 1 : Math.min(1, tween.elapsed / tween.duration);
-    const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    // Smootherstep: zero velocity at both ends, so preset switches do not lurch into
+    // motion or stop with a visible snap.
+    const eased = t * t * t * (t * (t * 6 - 15) + 10);
     this.camera.position.lerpVectors(tween.fromPos, tween.toPos, eased);
     this.controls.target.lerpVectors(tween.fromTarget, tween.toTarget, eased);
     this.camera.lookAt(this.controls.target);

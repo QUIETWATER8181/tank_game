@@ -26,7 +26,12 @@
     assert((await app.models.get('model')).blob.size === bytes.byteLength, 'GLB did not persist');
     assert(!('blob' in (await app.models.list())[0]), 'list exposes large blobs');
     assert((await app.prepareFirstLevel('browser-tank')).level.enemies.length === 4, 'level flow failed');
-    return { passed: true, checks: ['IndexedDB reopen', 'Blob persistence', 'concurrent unlock', 'transaction rollback', 'manufacture and prepare'] };
+    // 老存档（建库时目录里还没有炮塔）读出来要自动补回免费部件，付费部件不能顺带解锁。
+    await repo.updateProfile(p => { p.unlockedParts = p.unlockedParts.filter(id => id !== 'turret'); });
+    const healed = await app.profile();
+    assert(healed.unlockedParts.includes('turret'), 'legacy profile did not regain free turret');
+    assert(!healed.unlockedParts.includes('rapid'), 'paid part was unlocked for free');
+    return { passed: true, checks: ['IndexedDB reopen', 'Blob persistence', 'concurrent unlock', 'transaction rollback', 'manufacture and prepare', 'legacy unlock migration'] };
   } finally {
     repo?.close();
     await new Promise((resolve, reject) => { const request = indexedDB.deleteDatabase(name); request.onsuccess = resolve; request.onerror = () => reject(request.error); });

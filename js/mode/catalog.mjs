@@ -1,6 +1,6 @@
 // All gameplay values here are provisional game-design units, not real ballistics.
 // Sizes follow roughly real proportions (1 unit = 1 metre) so the 3D proxy reads as a tank.
-export const RULES_VERSION = 'prototype-2';
+export const RULES_VERSION = 'prototype-3';
 export const SCHEMA_VERSION = 1;
 export const TYPES = Object.freeze({
   infantry: { name: '步坦', speed: 1, attack: 1, rate: 1, health: 1, defense: 1, turn: 1, preferredMass: 22 },
@@ -21,10 +21,13 @@ export const PARTS = Object.freeze({
   rapid: { name: '速射炮', role: 'weapon', size: [.8, .8, 2], mass: 3, damage: 15, rate: 2, projectile: 'shell', cost: 40, types: ['assassin', 'exotic'] },
   bomb: { name: '爆破发射器', role: 'weapon', size: [1.2, .8, 2], mass: 5, damage: 32, rate: .8, projectile: 'bomb', cost: 40, types: ['exotic'] }
 });
+// `straight: true` is an arcade shot: it follows the aim line with no drop, so the shell
+// lands exactly on the crosshair. Explosive launchers keep a low-angle arc (and their
+// gravity) so a bomb/mortar still reads as a lobbed shot.
 export const PROJECTILES = Object.freeze({
-  shell: { launchSpeed: 35, gravity: 9.8, blastRadius: .15, lifetime: 4, impactDelay: null },
-  bomb: { launchSpeed: 22, gravity: 12, blastRadius: 3, lifetime: 4, impactDelay: null },
-  mortar: { launchSpeed: 28, gravity: 9.8, blastRadius: 5, lifetime: 8, impactDelay: 2.5 }
+  shell: { launchSpeed: 110, gravity: 0, blastRadius: .15, lifetime: 2, impactDelay: null, straight: true },
+  bomb: { launchSpeed: 42, gravity: 11, blastRadius: 3, lifetime: 3, impactDelay: null },
+  mortar: { launchSpeed: 32, gravity: 9.8, blastRadius: 5, lifetime: 6, impactDelay: 2.5 }
 });
 export const STAT_DEFINITIONS = Object.freeze({
   maxHealth: '生命值', moveSpeed: '米/秒', fireRate: '次/秒', attack: '伤害/发',

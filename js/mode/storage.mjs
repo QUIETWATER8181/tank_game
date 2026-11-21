@@ -7,9 +7,20 @@ function validateProfile(profile) {
   if (profile.schemaVersion !== SCHEMA_VERSION) throw new Error('存档版本不支持；保留原数据，等待迁移');
   if (!Number.isSafeInteger(profile.currency?.parts) || profile.currency.parts < 0 || !Array.isArray(profile.unlockedParts) || !Array.isArray(profile.blueprints) || !Array.isArray(profile.tanks)) throw new Error('存档结构损坏');
 }
+// 免费部件永远是开放的（`newProfile` 就是这么建的），但老存档不会自己长出新目录项：
+// prototype-1 时代还没有炮塔，那份存档的 unlockedParts 里就永远没有 turret，而每个
+// 新蓝图（`createStarterBlueprint`）都带炮塔，于是验收单每次都报「turret：部件未解锁」，
+// 制造按钮也跟着禁用；炮塔又已经装在车上，「可装部件」按设计不列已装的唯一部件，
+// 界面上连解锁入口都没有。这里在读/写存档时把缺的免费部件补回去，付费部件不受影响。
+export function migrateProfile(profile) {
+  const free = Object.keys(PARTS).filter(id => PARTS[id].cost === 0);
+  profile.unlockedParts = [...new Set([...profile.unlockedParts, ...free])];
+  return profile;
+}
 // Reducers are synchronous and run inside one transaction. Never await in a reducer.
 function reduceProfile(profile, reducer) {
   validateProfile(profile);
+  migrateProfile(profile);
   const result = reducer(profile);
   if (result?.then) throw new Error('存档更新函数必须同步');
   validateProfile(profile);
@@ -17,7 +28,7 @@ function reduceProfile(profile, reducer) {
 }
 export class MemoryRepository {
   constructor(profile = newProfile()) { this.profile = structuredClone(profile); this.assets = new Map(); }
-  async readProfile() { validateProfile(this.profile); return structuredClone(this.profile); }
+  async readProfile() { validateProfile(this.profile); return structuredClone(migrateProfile(this.profile)); }
   async updateProfile(reducer) {
     const { profile, result } = reduceProfile(structuredClone(this.profile), reducer);
     this.profile = profile; return structuredClone(result);
@@ -57,7 +68,7 @@ export async function openRepository(indexedDB = globalThis.indexedDB, name = 's
   }
   return {
     readProfile: () => transaction('profiles', 'readonly', (store, done, fail) => {
-      store.get('local').onsuccess = event => { try { const profile = event.target.result || newProfile(); validateProfile(profile); done(profile); } catch (error) { fail(error); } };
+      store.get('local').onsuccess = event => { try { const profile = migrateProfile(event.target.result || newProfile()); validateProfile(profile); done(profile); } catch (error) { fail(error); } };
     }),
     updateProfile: reducer => transaction('profiles', 'readwrite', (store, done, fail) => {
       store.get('local').onsuccess = event => {

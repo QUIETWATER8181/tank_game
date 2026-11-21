@@ -145,6 +145,21 @@ test('repository rollback and unknown versions preserve the original profile', a
   const future = newProfile(); future.schemaVersion = 99;
   await assert.rejects(new MemoryRepository(future).readProfile(), /版本/);
 });
+test('老存档缺免费部件时自动补回，付费部件仍需解锁', async () => {
+  // prototype-1 时代还没有炮塔，那份存档的 unlockedParts 里也没有它；炮塔现在免费，
+  // 必须补回，否则每个带炮塔的新蓝图都会报「turret：部件未解锁」并且无法制造。
+  const legacy = newProfile();
+  legacy.unlockedParts = legacy.unlockedParts.filter(id => id !== 'turret');
+  const repo = new MemoryRepository(legacy), app = createApplication(repo);
+  const profile = await app.profile();
+  assert.ok(profile.unlockedParts.includes('turret'), '免费炮塔没有补回');
+  assert.equal(profile.unlockedParts.includes('armor'), false, '付费部件被误开放');
+  const assessment = await app.evaluate(createStarterBlueprint());
+  assert.equal(assessment.valid, true, JSON.stringify(assessment.errors));
+  // 补回的结果要跟着下一次写入落盘，而不是只在内存里修一次。
+  await repo.updateProfile(p => { p.currency.parts += 1; });
+  assert.ok((await repo.readProfile()).unlockedParts.includes('turret'));
+});
 test('model categories, GLB structure and immutable model IDs', async () => {
   const models = new ModelLibrary(new MemoryRepository());
   const text = JSON.stringify({ asset: { version: '2.0' }, scenes: [{}] });

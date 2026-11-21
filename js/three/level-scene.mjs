@@ -471,17 +471,22 @@ function rigPlayerTank(player) {
   return { turret, weapon, pivot, hasTurret: Boolean(turret) };
 }
 
-function addTanks(group, run, focus, updates, smokeMap, { combat = false } = {}) {
+function addTanks(group, run, focus, updates, smokeMap, { combat = false, playerPose = null } = {}) {
   const level = run.level;
   const templates = level.enemyTemplates || {};
   const units = { player: null, enemies: new Map() };
+  // After a battle the static scene keeps the tank where it stopped, so the camera does
+  // not fly back to the spawn when the result screen rebuilds the level.
+  const spawn = playerPose ? { x: playerPose.x, z: playerPose.z } : { x: level.playerSpawn[0], z: level.playerSpawn[2] };
+  const spawnYaw = playerPose?.yaw || 0;
   const player = buildTankModel(run.tank.blueprint, { faction: 'player', merged: true, whole: !combat });
-  player.position.set(level.playerSpawn[0], 0, level.playerSpawn[2]);
+  player.position.set(spawn.x, 0, spawn.z);
+  player.rotation.y = spawnYaw;
   player.name = 'player-tank';
   group.add(player);
   if (combat) units.player = { object: player, ...rigPlayerTank(player) };
-  ring(group, level.playerSpawn, 2.4, '#b9d38f', .5);
-  focus.set('player', { position: new THREE.Vector3(level.playerSpawn[0], 1.6, level.playerSpawn[2]), radius: 4.2, label: '玩家坦克', view: { distance: 13.5, height: 3.4 } });
+  ring(group, [spawn.x, 0, spawn.z], 2.4, '#b9d38f', .5);
+  focus.set('player', { position: new THREE.Vector3(spawn.x, 1.6, spawn.z), radius: 4.2, label: '玩家坦克', view: { distance: 13.5, height: 3.4 } });
 
   level.enemies.forEach((enemy, index) => {
     const defeated = run.defeatedEnemies.includes(enemy.id);
@@ -540,7 +545,7 @@ function addTriggers(group, level) {
   }
 }
 
-export function buildLevelScene(run, { showLabels = true, combat = false } = {}) {
+export function buildLevelScene(run, { showLabels = true, combat = false, playerPose = null } = {}) {
   const group = new THREE.Group();
   group.name = 'level-01';
   const updates = [];
@@ -570,7 +575,7 @@ export function buildLevelScene(run, { showLabels = true, combat = false } = {})
   } else {
     updates.push(smokeColumn(group, [0, 2, 174], { color: '#6b625a', count: 40, size: 5, speed: 2.2, map: smokeMap }));
   }
-  const units = addTanks(group, run, focus, updates, smokeMap, { combat });
+  const units = addTanks(group, run, focus, updates, smokeMap, { combat, playerPose });
   units.base = base.compound;
   addTriggers(group, run.level);
   updates.push(dustMotes(group));
